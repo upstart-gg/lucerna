@@ -1,0 +1,12 @@
+node_modules/
+dist/
+bin/
+.lucerna/
+.bench-index/
+*.local
+.env
+benchmark-results.jsonl
+.bench-index-jina
+.bench-index
+.bench-index-bge
+.bench-index-coderank

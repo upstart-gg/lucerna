@@ -1,0 +1,58 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig.json"
+      - "biome.json"
+      - "tsdown.config.ts"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig.json"
+      - "biome.json"
+      - "tsdown.config.ts"
+      - ".github/workflows/**"
+
+permissions: read-all
+
+jobs:
+  test:
+    name: Build, Lint, Typecheck & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: pnpm/action-setup@v6.0.0
+      - uses: oven-sh/setup-bun@v2.2.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm ci:lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:dist
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    # Secrets are only available on push to main, not on fork PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: pnpm/action-setup@v6.0.0
+      - uses: oven-sh/setup-bun@v2.2.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:integration
+        env:
+          INTEGRATION_TESTS: "1"
+          # Add secret-backed env vars here, e.g.:
+          # CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

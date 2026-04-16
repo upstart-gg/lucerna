@@ -63,8 +63,5 @@
     "tree-sitter",
     "lancedb"
   ],
-  "license": "MIT",
-  "pnpm": {
-    "onlyBuiltDependencies": ["onnxruntime-node", "protobufjs", "sharp"]
-  }
+  "license": "MIT"
 }

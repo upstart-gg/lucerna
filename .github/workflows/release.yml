@@ -13,7 +13,7 @@ jobs:
     environment: npm-publish
     permissions:
       contents: read
-      id-token: write       # npm SLSA provenance
+      id-token: write # npm SLSA provenance
     steps:
       - uses: actions/checkout@v6.0.2
 
@@ -30,7 +30,7 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
 
       - run: pnpm build
 

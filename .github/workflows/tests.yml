@@ -35,7 +35,7 @@ jobs:
           version: "10"
           cache: true
       - uses: oven-sh/setup-bun@v2.2.0
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
       - run: pnpm build
       - run: pnpm ci:lint
       - run: pnpm typecheck

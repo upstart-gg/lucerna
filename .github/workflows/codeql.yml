@@ -33,7 +33,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2.2.0
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
 
       - uses: github/codeql-action/init@5c8a8a642e79153f5d047b10ec1cba1d1cc65699 # v3.35.1
         with:

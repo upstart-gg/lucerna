@@ -20,6 +20,7 @@
   "scripts": {
     "build": "tsdown",
     "test": "bun test",
+    "ci:test": "bun test --coverage --coverage-reporter=lcov",
     "test:dist": "bun test src/tests/cli.dist.test.ts",
     "test:integration": "INTEGRATION_TESTS=1 bun test",
     "typecheck": "tsgo --noEmit",

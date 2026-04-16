@@ -26,7 +26,6 @@
     "lint": "biome check --write",
     "ci:lint": "biome ci .",
     "dev": "bun run src/cli/index.ts",
-    "prepare": "pnpm build",
     "build:binary": "bun scripts/build-binary.ts",
     "test:binary": "bun test src/tests/binary.smoke.test.ts",
     "bench": "bun scripts/benchmark.ts",

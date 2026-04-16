@@ -280,17 +280,12 @@ JSON/pretty-json format returns `{ total, recallAtK, details }` where `details` 
 
 ### Usage patterns
 
+
+```bash
 #### Quick recall check with hybrid search
-```bash
 lucerna eval . queries.jsonl --k 1,5,10
-```
-
 #### Lexical-only baseline
-```bash
 lucerna eval . queries.jsonl --k 1,5,10 --no-semantic
-```
-
 #### Capture results for CI
-```bash
 lucerna eval . queries.jsonl --format json > eval-results.json
 ```

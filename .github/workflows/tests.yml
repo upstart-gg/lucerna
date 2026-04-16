@@ -22,7 +22,9 @@ on:
       - "tsdown.config.ts"
       - ".github/workflows/**"
 
-permissions: read-all
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   test:
@@ -40,10 +42,12 @@ jobs:
       - run: pnpm ci:lint
       - run: pnpm typecheck
       - run: pnpm ci:test
-      - uses: actions/upload-artifact@v4
+      - uses: zgosalvez/github-actions-report-lcov@v4
         with:
-          name: coverage
-          path: coverage/lcov.info
+          coverage-files: coverage/lcov.info
+          update-comment: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm test:integration
       - run: pnpm test:dist
 

@@ -134,7 +134,8 @@ describe("JinaReranker — unit", () => {
   });
 });
 
-const SKIP_INTEGRATION = process.env.INTEGRATION_TESTS !== "1";
+const SKIP_INTEGRATION =
+  process.env.INTEGRATION_TESTS !== "1" || !process.env.JINA_API_KEY;
 
 describe.skipIf(SKIP_INTEGRATION)("JinaReranker — integration", () => {
   test("returns one score per input text", async () => {

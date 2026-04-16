@@ -104,7 +104,7 @@ program
   .option("--storage-dir <dir>", "Override storage directory")
   .option("--no-semantic", "Disable semantic/vector search")
   .option("--limit <n>", "Max results", "10")
-  .option("--format <fmt>", "Output format: table or json", "table")
+  .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
   .option(
     "--language <lang>",
     "Filter by language (typescript, javascript, json, markdown)",
@@ -133,18 +133,20 @@ program
           return;
         }
 
+        const slim = results.map((r) => {
+          const hasContext = Object.keys(r.chunk.metadata).length > 0;
+          return {
+            id: r.chunk.id,
+            file: `${r.chunk.filePath}:${r.chunk.startLine}-${r.chunk.endLine}`,
+            type: r.chunk.type,
+            ...(r.chunk.name ? { name: r.chunk.name } : {}),
+            ...(hasContext ? { context: r.chunk.metadata } : {}),
+            content: r.chunk.content,
+          };
+        });
         if (opts.format === "json") {
-          const slim = results.map((r) => {
-            const hasContext = Object.keys(r.chunk.metadata).length > 0;
-            return {
-              id: r.chunk.id,
-              file: `${r.chunk.filePath}:${r.chunk.startLine}-${r.chunk.endLine}`,
-              type: r.chunk.type,
-              ...(r.chunk.name ? { name: r.chunk.name } : {}),
-              ...(hasContext ? { context: r.chunk.metadata } : {}),
-              content: r.chunk.content,
-            };
-          });
+          console.log(JSON.stringify(slim));
+        } else if (opts.format === "pretty-json") {
           console.log(JSON.stringify(slim, null, 2));
         } else {
           printList(results);
@@ -169,7 +171,7 @@ program
     "neighborhood",
   )
   .option("--depth <n>", "BFS depth for neighborhood", "1")
-  .option("--format <fmt>", "Output format: table or json", "table")
+  .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
   .action(
     async (
       projectRoot: string,
@@ -184,21 +186,18 @@ program
         if (relation === "neighborhood") {
           const depth = parseInt(String(opts.depth ?? "1"), 10);
           const hood = await indexer.getNeighborhood(chunkId, { depth });
+          const hoodJson = {
+            center: chunkToJson(hood.center),
+            related: hood.edges.map((e) => ({
+              ...chunkToJson(e.chunk),
+              relation: e.edge.type,
+              direction: e.direction,
+            })),
+          };
           if (opts.format === "json") {
-            console.log(
-              JSON.stringify(
-                {
-                  center: chunkToJson(hood.center),
-                  related: hood.edges.map((e) => ({
-                    ...chunkToJson(e.chunk),
-                    relation: e.edge.type,
-                    direction: e.direction,
-                  })),
-                },
-                null,
-                2,
-              ),
-            );
+            console.log(JSON.stringify(hoodJson));
+          } else if (opts.format === "pretty-json") {
+            console.log(JSON.stringify(hoodJson, null, 2));
           } else {
             console.log(
               `Center: ${hood.center.filePath}:${hood.center.startLine}  [${hood.center.type}]${hood.center.name ? ` ${hood.center.name}` : ""}`,
@@ -234,6 +233,8 @@ program
           return;
         }
         if (opts.format === "json") {
+          console.log(JSON.stringify(chunks.map(chunkToJson)));
+        } else if (opts.format === "pretty-json") {
           console.log(JSON.stringify(chunks.map(chunkToJson), null, 2));
         } else {
           printChunks(chunks);
@@ -252,13 +253,15 @@ program
   .command("stats <project-root>")
   .description("Show index statistics for a project")
   .option("--storage-dir <dir>", "Override storage directory")
-  .option("--format <fmt>", "Output format: table or json", "table")
+  .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
     const indexer = buildIndexer(projectRoot, { ...opts, semantic: false });
     try {
       await indexer.initialize();
       const stats = await indexer.getStats();
       if (opts.format === "json") {
+        console.log(JSON.stringify(stats));
+      } else if (opts.format === "pretty-json") {
         console.log(JSON.stringify(stats, null, 2));
       } else {
         console.log(`Project:        ${stats.projectRoot}`);
@@ -313,7 +316,7 @@ program
     "Comma-separated k values to evaluate (e.g. 1,5,10)",
     "1,5,10",
   )
-  .option("--format <fmt>", "Output format: table or json", "table")
+  .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
   .option("--no-semantic", "Disable semantic (vector) search — lexical only")
   .action(
     async (
@@ -406,6 +409,8 @@ program
         );
 
         if (opts.format === "json") {
+          console.log(JSON.stringify({ total, recallAtK, details }));
+        } else if (opts.format === "pretty-json") {
           console.log(JSON.stringify({ total, recallAtK, details }, null, 2));
         } else {
           console.log(`\nEvaluation results — ${total} queries\n`);

@@ -134,7 +134,8 @@ describe("VoyageReranker — unit", () => {
   });
 });
 
-const SKIP_INTEGRATION = process.env.INTEGRATION_TESTS !== "1";
+const SKIP_INTEGRATION =
+  process.env.INTEGRATION_TESTS !== "1" || !process.env.VOYAGE_API_KEY;
 
 describe.skipIf(SKIP_INTEGRATION)("VoyageReranker — integration", () => {
   test("returns one score per input text", async () => {

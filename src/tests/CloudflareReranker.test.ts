@@ -263,7 +263,10 @@ describe("CloudflareReranker — unit", () => {
 // Integration tests — real Cloudflare calls, only when INTEGRATION_TESTS=1
 // ---------------------------------------------------------------------------
 
-const SKIP_INTEGRATION = process.env.INTEGRATION_TESTS !== "1";
+const SKIP_INTEGRATION =
+  process.env.INTEGRATION_TESTS !== "1" ||
+  !process.env.CLOUDFLARE_ACCOUNT_ID ||
+  !process.env.CLOUDFLARE_API_TOKEN;
 
 describe.skipIf(SKIP_INTEGRATION)("CloudflareReranker — integration", () => {
   test("returns one score per input text", async () => {

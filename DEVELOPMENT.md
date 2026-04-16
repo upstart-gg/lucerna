@@ -83,9 +83,19 @@ This project uses [Changesets](https://github.com/changesets/changesets) for ver
 ### What happens automatically
 
 - **On PR open/update** — CI runs: build, lint, typecheck, and unit tests.
-- **On PR merge to `main`** — if a changeset file is present, a canary snapshot is published to npm under the `canary` tag and a comment is posted on the PR with the install command.
-- **Version PR** — the release workflow automatically opens (or updates) a PR titled "chore: version packages" that aggregates all pending changesets into a version bump and updated CHANGELOG.
-- **On version PR merge** — the release workflow publishes the new version to npm with SLSA provenance (requires approval from the `npm-publish` environment).
+- **On PR merge to `main`** — if a changeset file is present, a canary snapshot is published to npm under the `canary` tag and a comment is posted on the PR with the install command. The version workflow also opens (or updates) a PR titled "chore: version packages" that aggregates all pending changesets into a version bump and updated CHANGELOG.
+- **On version PR merge** — `package.json` version and CHANGELOG are updated on `main`. No automatic npm publish at this stage.
+- **On GitHub release publish** — the release workflow publishes the new version to npm with SLSA provenance (requires approval from the `npm-publish` environment). Binary artifacts are also built and uploaded to the release.
+
+### Creating a release
+
+After the version PR is merged:
+
+1. Go to **GitHub → Releases → Draft a new release**.
+2. Create a tag matching the version in `package.json` (e.g. `v0.2.0`).
+3. Publish the release — this triggers the release workflow, which publishes to npm and builds the platform binaries.
+
+Both full releases and pre-releases trigger the workflow.
 
 ### Publishing manually
 
@@ -94,7 +104,7 @@ This project uses [Changesets](https://github.com/changesets/changesets) for ver
 pnpm changeset:version
 
 # Publish to npm
-pnpm changeset:publish
+pnpm changeset publish --no-git-tag
 ```
 
 > Make sure you are authenticated with npm (`npm login`) and have publish access to the `@upstart.gg/lucerna` package.

@@ -1,26 +1,25 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
 
 permissions: read-all
 
 jobs:
   release:
-    name: Release
+    name: Publish to npm
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
-      contents: write       # push version commit to main
-      pull-requests: write  # open / update the version PR
+      contents: read
       id-token: write       # npm SLSA provenance
     steps:
       - uses: actions/checkout@v6.0.2
-        with:
-          fetch-depth: 0    # full history needed for changeset detection
 
       - uses: pnpm/action-setup@v6.0.0
+        with:
+          version: "10"
 
       - uses: oven-sh/setup-bun@v2.2.0
 
@@ -34,13 +33,7 @@ jobs:
 
       - run: pnpm build
 
-      - uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
-        with:
-          publish: pnpm changeset:publish
-          version: pnpm changeset:version
-          title: "chore: version packages"
-          commit: "chore: version packages"
+      - run: pnpm changeset publish --no-git-tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"

@@ -1,4 +1,4 @@
-# @upstart.gg/lucerna
+# Lucerna
 
 AST-aware code indexer, search engine, and knowledge graph for AI agents.
 

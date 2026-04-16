@@ -23,7 +23,7 @@ Searches a pre-built index. The project must already be indexed (`lucerna index 
 | Flag | Default | Description |
 |---|---|---|
 | `--limit <n>` | `10` | Maximum number of results to return |
-| `--format json\|table` | `table` | Output format |
+| `--format raw\|json\|pretty-json` | `raw` | Output format |
 | `--language <lang>` | *(all)* | Filter by language: any indexed language, e.g. `typescript`, `python`, `rust`, `go`, `java` |
 | `--type <type>` | *(all)* | Filter by chunk type (see below) |
 | `--no-semantic` | *(hybrid)* | Disable vector search — run BM25 lexical only |
@@ -64,7 +64,15 @@ src/auth/AuthMiddleware.ts:20-35  [method] run  className=AuthMiddleware
 
 ### JSON (`--format json`)
 
-Returns a compact array — useful for piping into other tools or agentic processing. Fields: `id` (chunk ID, usable with `lucerna graph`), `file` (`{path}:{start}-{end}`), `type`, `name` (if applicable), `context` (if non-empty), `content`.
+Returns a compact single-line JSON array — ideal for piping into `jq` or other tools. Fields: `id` (chunk ID, usable with `lucerna graph`), `file` (`{path}:{start}-{end}`), `type`, `name` (if applicable), `context` (if non-empty), `content`.
+
+```
+[{"id":"a3f9b2c1d4e5f6a7","file":"src/auth/middleware.ts:12-45","type":"function","name":"verifyToken","content":"..."},...]
+```
+
+### Pretty JSON (`--format pretty-json`)
+
+Same content as `--format json` but indented for human inspection:
 
 ```json
 [
@@ -123,7 +131,7 @@ lucerna search /repos/my-app "cache invalidation" --storage-dir /var/indexes/my-
 - **Query with intent, not just keywords.** "function that retries HTTP requests with exponential backoff" retrieves better than "retry".
 - **Use `--no-semantic` for identifiers.** Exact names like `UserRepository` or `ERR_CONN_RESET` match better with BM25.
 - **Narrow with `--type` before raising `--limit`.** Filtering to `method` or `function` reduces noise more reliably than increasing result count.
-- **Use `--format json` in scripts.** The table format truncates content; JSON gives you full chunk text, line ranges, and scores.
+- **Use `--format json` in scripts.** The raw format truncates content; `--format json` gives compact single-line JSON ideal for piping, and `--format pretty-json` gives the same data indented for human inspection.
 - **Score is relative, not absolute.** A score of `0.03` can be top-ranked; compare results within a query, not across queries.
 - **The index must be current.** If files have changed since the last `index` or `watch` run, results may be stale. Re-run `lucerna index <project-root>` to refresh.
 
@@ -145,7 +153,7 @@ Traverses the knowledge graph for a chunk. Requires a chunk ID, which is availab
 |---|---|---|
 | `--relation <type>` | `neighborhood` | Which relationship to traverse (see below) |
 | `--depth <n>` | `1` | BFS depth for `neighborhood` traversal |
-| `--format json\|table` | `table` | Output format |
+| `--format raw\|json\|pretty-json` | `raw` | Output format |
 | `--storage-dir <dir>` | `<project-root>/.lucerna` | Override index location |
 
 ### Relation types
@@ -161,7 +169,7 @@ Traverses the knowledge graph for a chunk. Requires a chunk ID, which is availab
 
 ### Output
 
-Table format shows one entry per related chunk with file location, type, name, and a 200-char content snippet. JSON format returns an array with `id`, `file`, `type`, `name`, `content` fields — or for `neighborhood`, an object with `center` and `related` (each related entry also includes `relation` and `direction`).
+Raw format shows one entry per related chunk with file location, type, name, and a 200-char content snippet. JSON/pretty-json format returns an array with `id`, `file`, `type`, `name`, `content` fields — or for `neighborhood`, an object with `center` and `related` (each related entry also includes `relation` and `direction`).
 
 ### Usage patterns
 
@@ -211,10 +219,10 @@ Shows index statistics: total files, total chunks, last indexed time, and breakd
 
 | Flag | Default | Description |
 |---|---|---|
-| `--format json\|table` | `table` | Output format |
+| `--format raw\|json\|pretty-json` | `raw` | Output format |
 | `--storage-dir <dir>` | `<project-root>/.lucerna` | Override index location |
 
-### Output (table)
+### Output (raw)
 
 ```
 Project:        /repos/my-app
@@ -224,7 +232,7 @@ Total chunks:   3817
 Last indexed:   2025-04-15T10:00:00.000Z
 ```
 
-JSON format returns the full `IndexStats` object, including `byLanguage` and `byType` maps with chunk counts per language and chunk type.
+JSON/pretty-json format returns the full `IndexStats` object, including `byLanguage` and `byType` maps with chunk counts per language and chunk type.
 
 ---
 
@@ -243,7 +251,7 @@ Measures search recall against a JSONL file of labeled queries. Each line must b
 | Flag | Default | Description |
 |---|---|---|
 | `--k <numbers>` | `1,5,10` | Comma-separated k values to evaluate |
-| `--format json\|table` | `table` | Output format |
+| `--format raw\|json\|pretty-json` | `raw` | Output format |
 | `--no-semantic` | *(hybrid)* | Disable vector search — run BM25 only |
 | `--storage-dir <dir>` | `<project-root>/.lucerna` | Override index location |
 
@@ -254,7 +262,7 @@ Measures search recall against a JSONL file of labeled queries. Each line must b
 {"query": "database connection pool", "expectedFile": "src/db/pool.ts"}
 ```
 
-### Output (table)
+### Output (raw)
 
 ```
 Evaluation results — 2 queries
@@ -268,7 +276,7 @@ Per-query breakdown:
   [@1:✗  @5:✓  @10:✓]  "database connection pool"  →  src/db/pool.ts
 ```
 
-JSON format returns `{ total, recallAtK, details }` where `details` is one object per query with `query`, `expectedFile`, optional `expectedSymbol`, and `hitsAtK` (map of k → boolean).
+JSON/pretty-json format returns `{ total, recallAtK, details }` where `details` is one object per query with `query`, `expectedFile`, optional `expectedSymbol`, and `hitsAtK` (map of k → boolean).
 
 ### Usage patterns
 

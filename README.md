@@ -110,12 +110,12 @@ lucerna search /path/to/project "authentication middleware"
 # Options:
 #   --no-semantic              Disable semantic search
 #   --limit <n>                Max results (default: 10)
-#   --format json|table        Output format (default: table)
-#   --language <lang>          Filter by language: typescript | javascript | json | markdown
-#   --type <type>              Filter by chunk type: function | class | method | interface | …
+#   --format raw|json|pretty-json  Output format (default: raw)
+#   --language <lang>              Filter by language: typescript | javascript | json | markdown
+#   --type <type>                  Filter by chunk type: function | class | method | interface | …
 ```
 
-**Table output (default):**
+**Raw output (default):**
 
 ```
 src/auth/middleware.ts:12-45  [function] verifyToken
@@ -132,10 +132,20 @@ src/auth/guards.ts:8-22  [function] requireAuth
 3 result(s)
 ```
 
-**JSON output (`--format json`):**
+**Compact JSON output (`--format json`)** — single line, ideal for piping:
 
 ```bash
-lucerna search /path/to/project "verifyToken" --format json
+lucerna search /path/to/project "verifyToken" --format json | jq '.[0].id'
+```
+
+```
+[{"id":"a3f9b2c1d4e5f6a7","file":"src/auth/middleware.ts:12-45","type":"function","name":"verifyToken","content":"export function verifyToken..."},...]
+```
+
+**Pretty JSON output (`--format pretty-json`)** — indented, for human inspection:
+
+```bash
+lucerna search /path/to/project "verifyToken" --format pretty-json
 ```
 
 ```json
@@ -171,10 +181,10 @@ lucerna graph /path/to/project <chunk-id> --relation neighborhood --depth 2
 # Options:
 #   --relation <type>   callers | callees | implementors | super-types | usages | neighborhood (default)
 #   --depth <n>         BFS depth for neighborhood (default: 1)
-#   --format json|table Output format (default: table)
+#   --format raw|json|pretty-json  Output format (default: raw)
 ```
 
-**Callers (table):**
+**Callers (raw):**
 
 ```
 lucerna graph /path/to/project a3f9b2c1d4e5f6a7 --relation callers
@@ -191,7 +201,7 @@ src/auth/guards.ts:8-22  [function] requireAuth  (CALLS (incoming))
 2 result(s)
 ```
 
-**Neighborhood (table):**
+**Neighborhood (raw):**
 
 ```
 lucerna graph /path/to/project a3f9b2c1d4e5f6a7 --relation neighborhood --depth 2
@@ -213,7 +223,7 @@ src/auth/types.ts:1-8  [interface] JWTPayload  (USES (outgoing))
 
 ```bash
 lucerna stats /path/to/project
-# --format json|table
+# --format raw|json|pretty-json
 ```
 
 ```
@@ -224,7 +234,7 @@ Total chunks:   3817
 Last indexed:   2025-04-15T10:00:00.000Z
 ```
 
-**JSON output (`--format json`)** includes full breakdowns:
+**Pretty JSON output (`--format pretty-json`)** includes full breakdowns:
 
 ```json
 {
@@ -283,8 +293,8 @@ lucerna eval /path/to/project queries.jsonl --k 1,5,10
 
 # Options:
 #   --k <numbers>       Comma-separated k values to evaluate (default: 1,5,10)
-#   --format json|table Output format (default: table)
-#   --no-semantic       Lexical search only
+#   --format raw|json|pretty-json  Output format (default: raw)
+#   --no-semantic                  Lexical search only
 ```
 
 ```

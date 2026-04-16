@@ -42,6 +42,8 @@ jobs:
       - run: pnpm ci:lint
       - run: pnpm typecheck
       - run: pnpm ci:test
+      - name: Setup LCOV
+        uses: hrishikesh-kadam/setup-lcov@v1
       - uses: zgosalvez/github-actions-report-lcov@v4
         with:
           coverage-files: coverage/lcov.info

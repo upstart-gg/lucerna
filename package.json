@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsdown",
     "test": "bun test",
-    "test:dist": "pnpm build && bun test src/tests/cli.dist.test.ts",
+    "test:dist": "bun test src/tests/cli.dist.test.ts",
     "test:integration": "INTEGRATION_TESTS=1 bun test",
     "typecheck": "tsgo --noEmit",
     "lint": "biome check --write",

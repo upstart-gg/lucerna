@@ -55,6 +55,9 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["onnxruntime-node", "protobufjs", "sharp"]
+  },
   "keywords": [
     "lucerna",
     "semantic-search",

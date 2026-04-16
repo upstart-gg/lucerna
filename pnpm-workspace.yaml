@@ -3,3 +3,4 @@ onlyBuiltDependencies:
 - protobufjs
 ignoredBuiltDependencies:
   - sharp
+strictDepBuilds: false

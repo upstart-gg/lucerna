@@ -26,13 +26,35 @@ Parses your codebase with [tree-sitter](https://tree-sitter.github.io/tree-sitte
 
 ## Installation
 
+### Binary (no runtime required)
+
+**macOS / Linux**
+
 ```bash
-pnpm add @upstart.gg/lucerna
-# or
-npm install @upstart.gg/lucerna
+curl -fsSL https://raw.githubusercontent.com/upstart-gg/lucerna/main/install/install.sh | bash
 ```
 
-> **Runtime requirement:** Node.js ≥ 20.
+**Windows (PowerShell)**
+
+```powershell
+irm https://raw.githubusercontent.com/upstart-gg/lucerna/main/install/install.ps1 | iex
+```
+
+Or download a prebuilt binary directly from [GitHub Releases](https://github.com/upstart-gg/lucerna/releases).
+
+### npx / pnpx / bunx (no install needed)
+
+Run the CLI directly without a global install:
+
+```bash
+npx @upstart.gg/lucerna index /path/to/project
+# or
+pnpx @upstart.gg/lucerna search /path/to/project "my query"
+# or
+bunx @upstart.gg/lucerna index /path/to/project
+```
+
+> **Runtime requirement:** Node.js ≥ 20 or Bun ≥ 1.0.
 
 ---
 
@@ -282,6 +304,16 @@ Per-query breakdown:
 ---
 
 ## Programmatic usage
+
+Install as a library dependency:
+
+```bash
+pnpm add @upstart.gg/lucerna
+# or
+npm install @upstart.gg/lucerna
+# or
+bun add @upstart.gg/lucerna
+```
 
 ### Quick start
 

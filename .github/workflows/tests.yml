@@ -31,12 +31,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: pnpm/action-setup@v6.0.0
+        with:
+          version: "10"
+          cache: true
       - uses: oven-sh/setup-bun@v2.2.0
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
       - run: pnpm build
       - run: pnpm ci:lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test:integration
       - run: pnpm test:dist
 
   integration-test:
@@ -47,6 +51,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: pnpm/action-setup@v6.0.0
+        with:
+          version: "10"
+          cache: true
       - uses: oven-sh/setup-bun@v2.2.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm build

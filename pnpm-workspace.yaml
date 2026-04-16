@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+- onnxruntime-node
+- protobufjs
+ignoredBuiltDependencies:
+  - sharp
+strictDepBuilds: false

@@ -98,7 +98,7 @@ class UserService:
     );
     const cls = chunksByType(chunks, "class");
     expect(cls.length).toBeGreaterThan(0);
-    expect(cls[0]!.name).toBe("UserService");
+    expect(cls[0]?.name).toBe("UserService");
   });
 
   test("extracts methods as children of class", async () => {
@@ -123,7 +123,7 @@ class UserService:
     );
     const findUser = chunkByName(chunks, "find_user");
     expect(findUser).toBeDefined();
-    expect(findUser!.contextContent).toContain("// Class: UserService");
+    expect(findUser?.contextContent).toContain("// Class: UserService");
   });
 
   test("all chunks have language: python", async () => {
@@ -249,7 +249,7 @@ pub enum Status {
     );
     const ifaces = chunksByType(chunks, "interface");
     expect(ifaces.length).toBeGreaterThan(0);
-    expect(ifaces[0]!.name).toBe("Greeter");
+    expect(ifaces[0]?.name).toBe("Greeter");
   });
 
   test("enum maps to type", async () => {
@@ -261,7 +261,7 @@ pub enum Status {
     );
     const types = chunksByType(chunks, "type");
     expect(types.length).toBeGreaterThan(0);
-    expect(types[0]!.name).toBe("Status");
+    expect(types[0]?.name).toBe("Status");
   });
 
   test("all chunks have language: rust", async () => {
@@ -399,7 +399,7 @@ public class UserService implements Greeter {
     );
     const ifaces = chunksByType(chunks, "interface");
     expect(ifaces.length).toBeGreaterThan(0);
-    expect(ifaces[0]!.name).toBe("Greeter");
+    expect(ifaces[0]?.name).toBe("Greeter");
   });
 
   test("extracts class", async () => {
@@ -411,7 +411,7 @@ public class UserService implements Greeter {
     );
     const cls = chunksByType(chunks, "class");
     expect(cls.length).toBeGreaterThan(0);
-    expect(cls[0]!.name).toBe("UserService");
+    expect(cls[0]?.name).toBe("UserService");
   });
 
   test("extracts methods as children", async () => {
@@ -708,7 +708,7 @@ class UserService {
     );
     const cls = chunksByType(chunks, "class");
     expect(cls.length).toBeGreaterThan(0);
-    expect(cls[0]!.name).toBe("UserService");
+    expect(cls[0]?.name).toBe("UserService");
   });
 
   test("extracts class methods", async () => {
@@ -910,7 +910,7 @@ public class UserService : IGreeter {
     );
     const ifaces = chunksByType(chunks, "interface");
     expect(ifaces.length).toBeGreaterThan(0);
-    expect(ifaces[0]!.name).toBe("IGreeter");
+    expect(ifaces[0]?.name).toBe("IGreeter");
   });
 
   test("extracts class", async () => {
@@ -922,7 +922,7 @@ public class UserService : IGreeter {
     );
     const cls = chunksByType(chunks, "class");
     expect(cls.length).toBeGreaterThan(0);
-    expect(cls[0]!.name).toBe("UserService");
+    expect(cls[0]?.name).toBe("UserService");
   });
 
   test("extracts methods", async () => {

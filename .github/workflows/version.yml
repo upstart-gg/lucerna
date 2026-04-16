@@ -1,0 +1,37 @@
+name: Version Packages
+
+on:
+  push:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  version:
+    name: Open / Update Version PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # push version commit to main
+      pull-requests: write  # open / update the version PR
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0    # full history needed for changeset detection
+
+      - uses: pnpm/action-setup@v6.0.0
+        with:
+          version: "10"
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2.2.0
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
+        with:
+          version: pnpm changeset:version
+          title: "chore: version packages"
+          commit: "chore: version packages"
+          # No `publish` input — only creates/updates the version PR, never publishes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

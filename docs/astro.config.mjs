@@ -15,6 +15,7 @@ export default defineConfig({
           href: "https://github.com/upstart-gg/lucerna",
         },
       ],
+      favicon: "/favicon.svg",
       customCss: ["./src/styles/custom.css"],
       sidebar: [
         {

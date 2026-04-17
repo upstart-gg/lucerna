@@ -5,7 +5,7 @@ on:
     types: [published]
 
 permissions:
-  contents: write   # upload release assets
+  contents: write # upload release assets
 
 jobs:
   build:
@@ -66,7 +66,7 @@ jobs:
       # ── Toolchain setup (skip for musl containers — bun is pre-installed) ──
       - name: Set up pnpm (non-musl)
         if: ${{ !matrix.container }}
-        uses: pnpm/action-setup@v6.0.0
+        uses: pnpm/action-setup@v5.0.0
         with:
           version: "10"
           cache: true
@@ -77,7 +77,7 @@ jobs:
 
       - name: Set up pnpm in musl container
         if: ${{ matrix.container }}
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.29.2
 
       - name: Install gh CLI in musl container
         if: ${{ matrix.container }}

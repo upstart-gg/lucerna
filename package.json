@@ -12,7 +12,8 @@
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "bin": {
-    "lucerna": "./dist/cli.mjs"
+    "lucerna": "./dist/cli.mjs",
+    "lucerna-mcp": "./dist/mcp.mjs"
   },
   "files": [
     "dist"
@@ -27,9 +28,7 @@
     "lint": "biome check --write",
     "ci:lint": "biome ci .",
     "dev": "bun run src/cli/index.ts",
-    "build:binary": "bun scripts/build-binary.ts",
-    "test:binary": "bun test src/tests/binary.smoke.test.ts",
-    "bench": "bun scripts/benchmark.ts",
+"bench": "bun scripts/benchmark.ts",
     "bench:no-semantic": "BENCH_SEMANTIC=0 bun scripts/benchmark.ts",
     "changeset": "changeset",
     "changeset:version": "changeset version",
@@ -39,9 +38,11 @@
     "@huggingface/transformers": "latest",
     "@kreuzberg/tree-sitter-language-pack": "latest",
     "@lancedb/lancedb": "latest",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "latest",
     "commander": "latest",
-    "fast-glob": "latest"
+    "fast-glob": "latest",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
@@ -54,6 +55,10 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/upstart-gg/lucerna"
   },
   "keywords": [
     "lucerna",

@@ -24,37 +24,54 @@ Parses your codebase with [tree-sitter](https://tree-sitter.github.io/tree-sitte
 
 ---
 
-## Installation
+## MCP server Installation
 
-### Binary (no runtime required)
+lucerna ships a built-in [Model Context Protocol](https://modelcontextprotocol.io/) server so AI coding assistants (Claude Code, Cursor, Windsurf, Zed, VS Code, and more) can search your codebase directly.
 
-**macOS / Linux**
+When the MCP server starts it **indexes the project and begins watching for file changes automatically** — no separate `lucerna watch` process needed.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/upstart-gg/lucerna/main/install/install.sh | bash
-```
+### Setup
 
-**Windows (PowerShell)**
-
-```powershell
-irm https://raw.githubusercontent.com/upstart-gg/lucerna/main/install/install.ps1 | iex
-```
-
-Or download a prebuilt binary directly from [GitHub Releases](https://github.com/upstart-gg/lucerna/releases).
-
-### npx / pnpx / bunx (no install needed)
-
-Run the CLI directly without a global install:
+**1. Install lucerna globally**
 
 ```bash
-npx @upstart.gg/lucerna index /path/to/project
+npm install -g @upstart.gg/lucerna
 # or
-pnpx @upstart.gg/lucerna search /path/to/project "my query"
+pnpm add -g @upstart.gg/lucerna
 # or
-bunx @upstart.gg/lucerna index /path/to/project
+bun add -g @upstart.gg/lucerna
 ```
 
-> **Runtime requirement:** Node.js ≥ 20 or Bun ≥ 1.0.
+**2. Register the MCP server with your AI client(s)**
+
+Use [`add-mcp`](https://github.com/neondatabase/add-mcp), which supports 14 clients and writes the correct config file automatically:
+
+```bash
+npx add-mcp "@upstart.gg/lucerna mcp-server" --name lucerna
+```
+
+`add-mcp` will prompt you to choose which clients to configure (Claude Code, Claude Desktop, Cursor, VS Code, Zed, etc.). The MCP server will use **the working directory of the client** as the project root — no hardcoded paths needed.
+
+### MCP tools
+
+| Tool | Description |
+|------|-------------|
+| `search_codebase` | Hybrid semantic + BM25 search with optional graph context expansion. Returns `{ results, warning? }`. |
+| `get_neighbors` | Get the knowledge-graph neighborhood for a chunk ID from search results. |
+
+**`search_codebase` parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | — | Search query |
+| `includeGraphContext` | boolean | `true` | Expand results with related symbols from the knowledge graph |
+| `graphDepth` | number | `1` | Hops to follow when expanding graph context (0–3) |
+| `limit` | number | `10` | Maximum results to return |
+| `language` | string | — | Restrict to a language (e.g. `"typescript"`) |
+| `type` | string | — | Restrict to a chunk type (`"function"`, `"class"`, etc.) |
+| `filePath` | string | — | Filter by file path (supports glob patterns) |
+
+> **First-time indexing:** If the project has never been indexed, `search_codebase` returns `{ results: [], warning: "Lucerna is still indexing…" }`. Results become available once the initial index completes (typically a few seconds for small projects).
 
 ---
 

@@ -1,291 +1,60 @@
 ---
 name: "lucerna"
-description: "Guide to using the `lucerna search`, `lucerna graph`, `lucerna stats`, and `lucerna eval` CLI commands for querying, navigating, and evaluating your codebase index."
+description: "Guide to using the `lucerna search` and `lucerna graph` CLI commands for querying and navigating a codebase index."
 ---
 # Lucerna — CLI skill guide
 
 ## lucerna search
 
-### Synopsis
-
 ```
 lucerna search <project-root> <query> [options]
 ```
 
-Searches a pre-built index. The project must already be indexed (`lucerna index <project-root>`) before running search.
-
-`lucerna index` supports popular languages with custom AST-aware chunkers — Python, Rust, Go, Java, TypeScript/JavaScript, C/C++, C#, Swift, Kotlin, Ruby, PHP, and more. Files in other languages are not indexed. `.gitignore` files at any depth are always respected.
-
----
-
-## Options
-
 | Flag | Default | Description |
 |---|---|---|
 | `--limit <n>` | `10` | Maximum number of results to return |
-| `--format raw\|json\|pretty-json` | `raw` | Output format |
-| `--language <lang>` | *(all)* | Filter by language: any indexed language, e.g. `typescript`, `python`, `rust`, `go`, `java` |
-| `--type <type>` | *(all)* | Filter by chunk type (see below) |
+| `--language <lang>` | *(all)* | Filter by language: `typescript`, `python`, `rust`, `go`, `java`, etc. |
+| `--type <type>` | *(all)* | Filter by chunk type: `function` · `class` · `method` · `interface` · `type` · `variable` · `import` · `section` · `file` |
 | `--no-semantic` | *(hybrid)* | Disable vector search — run BM25 lexical only |
-| `--storage-dir <dir>` | `<project-root>/.lucerna` | Override index location |
+| `--format raw\|json\|pretty-json` | `raw` | Output format — use `json` when piping results |
 
-### Chunk types for `--type`
+### Query guidance
 
-`function` · `class` · `method` · `interface` · `type` · `variable` · `import` · `section` · `file`
-
----
-
-## Search modes
-
-| Mode | When active | Best for |
-|---|---|---|
-| **Hybrid** (default) | Embeddings available | General queries — semantic intent + keyword match |
-| **Lexical only** | `--no-semantic` | Exact symbol names, identifiers, error messages |
-
-Hybrid mode fuses vector and BM25 rankings via Reciprocal Rank Fusion. Both modes share the same `--limit`, `--language`, and `--type` filters.
-
----
-
-## Output
-
-### Default output
-
-One entry per result: a header line with file, line range, chunk type, name, and any context (e.g. class name or markdown breadcrumb), followed by an indented content snippet (200 chars).
-
-```
-src/auth/middleware.ts:12-45  [function] verifyToken
-  export function verifyToken(token: string): JWTPayload {
-
-src/auth/AuthMiddleware.ts:20-35  [method] run  className=AuthMiddleware
-  run(req: Request, res: Response, next: NextFunction) {
-
-2 result(s)
-```
-
-### JSON (`--format json`)
-
-Returns a compact single-line JSON array — ideal for piping into `jq` or other tools. Fields: `id` (chunk ID, usable with `lucerna graph`), `file` (`{path}:{start}-{end}`), `type`, `name` (if applicable), `context` (if non-empty), `content`.
-
-```
-[{"id":"a3f9b2c1d4e5f6a7","file":"src/auth/middleware.ts:12-45","type":"function","name":"verifyToken","content":"..."},...]
-```
-
-### Pretty JSON (`--format pretty-json`)
-
-Same content as `--format json` but indented for human inspection:
-
-```json
-[
-  {
-    "id": "a3f9b2c1d4e5f6a7",
-    "file": "src/auth/middleware.ts:12-45",
-    "type": "function",
-    "name": "verifyToken",
-    "content": "export function verifyToken(token: string): JWTPayload { ... }"
-  },
-  {
-    "id": "b7c4d8e2f1a9b3c5",
-    "file": "src/auth/AuthMiddleware.ts:20-35",
-    "type": "method",
-    "name": "run",
-    "context": { "className": "AuthMiddleware" },
-    "content": "run(req, res, next) { ... }"
-  }
-]
-```
-
----
-
-## Usage patterns
-
-### Natural language query
-```bash
-lucerna search . "authentication middleware that validates JWT tokens"
-```
-
-### Exact symbol lookup
-```bash
-lucerna search . "verifyToken" --no-semantic --type function
-```
-
-### Find all methods in a specific language, return more results
-```bash
-lucerna search . "database connection" --language typescript --type method --limit 20
-lucerna search . "database connection" --language python --type function --limit 20
-```
-
-### Pipe JSON results to jq
-```bash
-lucerna search . "error handling" --format json | jq '.[].chunk.filePath' | sort -u
-```
-
-### Search a non-default index location
-```bash
-lucerna search /repos/my-app "cache invalidation" --storage-dir /var/indexes/my-app
-```
-
----
-
-## Best practices
-
-- **Combine intent with technical terms.** Before searching, mentally rewrite the query to include both the goal and relevant identifiers or keywords. "JWT token verify session middleware auth" retrieves better than "where is authentication implemented". Mix natural language with concrete terms — semantic search handles intent, BM25 handles exact identifiers.
-- **Use `--no-semantic` for identifiers.** Exact names like `UserRepository` or `ERR_CONN_RESET` match better with BM25.
-- **Narrow with `--type` before raising `--limit`.** Filtering to `method` or `function` reduces noise more reliably than increasing result count.
-- **Use `--format json` in scripts.** The raw format truncates content; `--format json` gives compact single-line JSON ideal for piping, and `--format pretty-json` gives the same data indented for human inspection.
-- **Score is relative, not absolute.** A score of `0.03` can be top-ranked; compare results within a query, not across queries.
-- **The index must be current.** If files have changed since the last `index` or `watch` run, results may be stale. Re-run `lucerna index <project-root>` to refresh.
+- **Combine intent with technical terms.** "JWT token verify session middleware auth" retrieves better than "where is authentication implemented". Semantic search handles intent; BM25 handles exact identifiers.
+- **Use `--no-semantic` for exact symbol names.** Identifiers like `UserRepository` or `ERR_CONN_RESET` match better with BM25 alone.
+- **Narrow with `--type` before raising `--limit`.** Filtering to `function` or `method` reduces noise more reliably than increasing result count.
 
 ---
 
 ## lucerna graph
 
-### Synopsis
-
 ```
 lucerna graph <project-root> <chunk-id> [options]
 ```
 
-Traverses the knowledge graph for a chunk. Requires a chunk ID, which is available in `lucerna search --format json` output as the `id` field.
-
-### Options
+Traverses the knowledge graph for a chunk. The `<chunk-id>` comes from the `id` field in `lucerna search --format json` output.
 
 | Flag | Default | Description |
 |---|---|---|
 | `--relation <type>` | `neighborhood` | Which relationship to traverse (see below) |
 | `--depth <n>` | `1` | BFS depth for `neighborhood` traversal |
 | `--format raw\|json\|pretty-json` | `raw` | Output format |
-| `--storage-dir <dir>` | `<project-root>/.lucerna` | Override index location |
 
 ### Relation types
 
 | Relation | Description |
 |---|---|
 | `neighborhood` | BFS traversal of all edges up to `--depth` hops (default) |
-| `callers` | Chunks that call this function/method (reverse CALLS edges) |
-| `callees` | Chunks that this function/method calls (outgoing CALLS edges) |
-| `implementors` | Classes that implement or extend this interface/class (reverse IMPLEMENTS/EXTENDS) |
-| `super-types` | Interfaces/classes that this chunk extends or implements (outgoing EXTENDS/IMPLEMENTS) |
-| `usages` | Chunks that reference this symbol (reverse USES edges) |
+| `callers` | Chunks that call this function/method |
+| `callees` | Chunks that this function/method calls |
+| `implementors` | Classes that implement or extend this interface/class |
+| `super-types` | Interfaces/classes that this chunk extends or implements |
+| `usages` | Chunks that reference this symbol |
 
-### Output
-
-Raw format shows one entry per related chunk with file location, type, name, and a 200-char content snippet. JSON/pretty-json format returns an array with `id`, `file`, `type`, `name`, `content` fields — or for `neighborhood`, an object with `center` and `related` (each related entry also includes `relation` and `direction`).
-
-### Usage patterns
-
-#### Find everything that calls a function
+### Search → graph pipeline
 
 ```bash
-# Step 1: get the chunk ID
-ID=$(lucerna search . "verifyToken" --format json | jq -r '.[0].id')
-
-# Step 2: find all callers
-lucerna graph . "$ID" --relation callers
-```
-
-#### Find all classes implementing an interface
-
-```bash
-lucerna graph . "$INTERFACE_CHUNK_ID" --relation implementors
-```
-
-#### Explore the neighborhood of a chunk (2 hops)
-
-```bash
-lucerna graph . "$CHUNK_ID" --relation neighborhood --depth 2 --format json
-```
-
-#### Full search → graph pipeline in JSON
-
-```bash
-lucerna search . "authentication" --format json \
-  | jq -r '.[0].id' \
-  | xargs -I{} lucerna graph . {} --relation callers --format json
-```
-
----
-
-## lucerna stats
-
-### Synopsis
-
-```
-lucerna stats <project-root> [options]
-```
-
-Shows index statistics: total files, total chunks, last indexed time, and breakdown by language and chunk type.
-
-### Options
-
-| Flag | Default | Description |
-|---|---|---|
-| `--format raw\|json\|pretty-json` | `raw` | Output format |
-| `--storage-dir <dir>` | `<project-root>/.lucerna` | Override index location |
-
-### Output (raw)
-
-```
-Project:        /repos/my-app
-Project ID:     a1b2c3d4
-Total files:    142
-Total chunks:   3817
-Last indexed:   2025-04-15T10:00:00.000Z
-```
-
-JSON/pretty-json format returns the full `IndexStats` object, including `byLanguage` and `byType` maps with chunk counts per language and chunk type.
-
----
-
-## lucerna eval
-
-### Synopsis
-
-```
-lucerna eval <project-root> <queries-file> [options]
-```
-
-Measures search recall against a JSONL file of labeled queries. Each line must be a JSON object with a `query` string and an `expectedFile` path (relative to project root). An optional `expectedSymbol` string further narrows the match to a specific named chunk.
-
-### Options
-
-| Flag | Default | Description |
-|---|---|---|
-| `--k <numbers>` | `1,5,10` | Comma-separated k values to evaluate |
-| `--format raw\|json\|pretty-json` | `raw` | Output format |
-| `--no-semantic` | *(hybrid)* | Disable vector search — run BM25 only |
-| `--storage-dir <dir>` | `<project-root>/.lucerna` | Override index location |
-
-### Queries file format (JSONL)
-
-```jsonl
-{"query": "function that verifies JWT tokens", "expectedFile": "src/auth/middleware.ts", "expectedSymbol": "verifyToken"}
-{"query": "database connection pool", "expectedFile": "src/db/pool.ts"}
-```
-
-### Output (raw)
-
-```
-Evaluation results — 2 queries
-
-  Recall@1  : 50.0%  (1/2)
-  Recall@5  : 100.0%  (2/2)
-  Recall@10 : 100.0%  (2/2)
-
-Per-query breakdown:
-  [@1:✓  @5:✓  @10:✓]  "function that verifies JWT tokens"  →  src/auth/middleware.ts::verifyToken
-  [@1:✗  @5:✓  @10:✓]  "database connection pool"  →  src/db/pool.ts
-```
-
-JSON/pretty-json format returns `{ total, recallAtK, details }` where `details` is one object per query with `query`, `expectedFile`, optional `expectedSymbol`, and `hitsAtK` (map of k → boolean).
-
-### Usage patterns
-
-
-```bash
-#### Quick recall check with hybrid search
-lucerna eval . queries.jsonl --k 1,5,10
-#### Lexical-only baseline
-lucerna eval . queries.jsonl --k 1,5,10 --no-semantic
-#### Capture results for CI
-lucerna eval . queries.jsonl --format json > eval-results.json
+# Find callers of a function
+ID=$(lucerna search . "verifyToken" --no-semantic --type function --format json | jq -r '.[0].id')
+lucerna graph . "$ID" --relation callers --format json
 ```

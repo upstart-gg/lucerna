@@ -1,0 +1,40 @@
+---
+title: Reranking
+description: Second-stage cross-encoder reranking to improve search precision.
+---
+
+After RRF fusion, a cross-encoder reranker scores each candidate against the query and re-sorts results by relevance. This improves precision at the cost of an additional inference pass.
+
+Reranking is applied automatically in `search()` and `searchWithContext()` when a `rerankingFunction` is configured. Opt out per-query with `{ rerank: false }`.
+
+## CloudflareReranker
+
+Uses Cloudflare Workers AI (`@cf/baai/bge-reranker-base`, 512-token cross-encoder):
+
+```ts
+import { CodeIndexer, CloudflareEmbeddings, CloudflareReranker } from '@upstart.gg/lucerna';
+
+const indexer = new CodeIndexer({
+  projectRoot: '.',
+  embeddingFunction: new CloudflareEmbeddings(),
+  rerankingFunction: new CloudflareReranker(),
+});
+```
+
+## Other rerankers
+
+`JinaReranker` and `VoyageReranker` are also provided and follow the same interface.
+
+## Custom reranker
+
+Implement `RerankingFunction` to use any provider:
+
+```ts
+import type { RerankingFunction } from '@upstart.gg/lucerna';
+
+class MyReranker implements RerankingFunction {
+  async rerank(query: string, texts: string[]): Promise<number[]> {
+    // return a relevance score (0–1) for each text in the same order
+  }
+}
+```

@@ -1,0 +1,36 @@
+---
+title: Indexing
+description: Index projects and individual files with the programmatic API.
+---
+
+## Lifecycle
+
+```ts
+await indexer.initialize();  // required before any other method; idempotent
+await indexer.close();       // flushes pending writes, closes DB, stops watcher
+```
+
+## Index a project
+
+```ts
+const stats: IndexStats = await indexer.indexProject();
+// {
+//   projectId, projectRoot,
+//   totalFiles, totalChunks, totalEdges,
+//   byLanguage,  // e.g. { typescript: 120, markdown: 12 }
+//   byType,      // e.g. { function: 80, class: 15, method: 90, … }
+//   byEdgeType,  // e.g. { CALLS: 200, IMPORTS: 150, … }
+//   lastIndexed,
+// }
+```
+
+:::caution
+`indexProject()` throws if called while a previous call is still in progress.
+:::
+
+## Index or remove a single file
+
+```ts
+await indexer.indexFile('src/utils.ts');  // (re-)index a single file
+await indexer.removeFile('src/utils.ts'); // remove a file's chunks and edges
+```

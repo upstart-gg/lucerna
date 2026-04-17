@@ -1,0 +1,51 @@
+---
+title: lucerna graph
+description: Explore knowledge graph relationships for a chunk.
+---
+
+Traverse the knowledge graph starting from a chunk ID. Get the chunk ID from `search` output first.
+
+```bash
+# Get a chunk ID
+lucerna search /path/to/project "verifyToken" --format json | jq '.[0].id'
+
+# Then traverse the graph
+lucerna graph /path/to/project <chunk-id> --relation callers
+lucerna graph /path/to/project <chunk-id> --relation implementors
+lucerna graph /path/to/project <chunk-id> --relation neighborhood --depth 2
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--relation <type>` | `callers`, `callees`, `implementors`, `super-types`, `usages`, `neighborhood` (default) |
+| `--depth <n>` | BFS depth for neighborhood (default: `1`) |
+| `--format raw\|json\|pretty-json` | Output format (default: `raw`) |
+
+## Example: callers
+
+```
+src/auth/AuthMiddleware.ts:20-35  [method] run  (CALLS (incoming))
+  run(req: Request, res: Response, next: NextFunction) {
+    const payload = verifyToken(token);
+
+src/auth/guards.ts:8-22  [function] requireAuth  (CALLS (incoming))
+  export function requireAuth(roles: Role[] = []): RequestHandler {
+
+2 result(s)
+```
+
+## Example: neighborhood
+
+```
+Center: src/auth/middleware.ts:12  [function] verifyToken
+
+src/auth/AuthMiddleware.ts:20-35  [method] run  (CALLS (incoming))
+  run(req: Request, res: Response, next: NextFunction) {
+
+src/auth/types.ts:1-8  [interface] JWTPayload  (USES (outgoing))
+  export interface JWTPayload { userId: string; roles: Role[]; iat: number; }
+
+2 result(s)
+```

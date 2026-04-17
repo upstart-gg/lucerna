@@ -1,0 +1,63 @@
+---
+title: lucerna stats
+description: Show index statistics for a project.
+---
+
+Display statistics about an indexed project.
+
+```bash
+lucerna stats /path/to/project
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--format raw\|json\|pretty-json` | Output format (default: `raw`) |
+
+## Raw output
+
+```
+Project:        /path/to/project
+Project ID:     a1b2c3d4e5f6
+Total files:    142
+Total chunks:   3817
+Last indexed:   2025-04-15T10:00:00.000Z
+```
+
+## Pretty JSON output
+
+```json
+{
+  "projectId": "a1b2c3d4e5f6",
+  "projectRoot": "/path/to/project",
+  "totalFiles": 142,
+  "totalChunks": 3817,
+  "totalEdges": 1204,
+  "byLanguage": {
+    "typescript": 3201,
+    "javascript": 412,
+    "markdown": 156,
+    "json": 48
+  },
+  "byType": {
+    "function": 980,
+    "method": 1102,
+    "class": 87,
+    "interface": 243,
+    "type": 318,
+    "import": 142,
+    "section": 156,
+    "file": 789
+  },
+  "byEdgeType": {
+    "CALLS": 641,
+    "IMPORTS": 312,
+    "DEFINES": 142,
+    "EXTENDS": 54,
+    "IMPLEMENTS": 28,
+    "USES": 27
+  },
+  "lastIndexed": "2025-04-15T10:00:00.000Z"
+}
+```

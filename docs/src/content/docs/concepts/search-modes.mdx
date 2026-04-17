@@ -1,0 +1,29 @@
+---
+title: Search Modes
+description: Hybrid, semantic, lexical, and graph-context search modes.
+---
+
+| Mode | When used |
+|---|---|
+| **Hybrid** (default) | Embedding function available — runs vector search and BM25, fuses via Reciprocal Rank Fusion |
+| **Semantic only** | `searchSemantic()` |
+| **Lexical only** | `searchLexical()` or `embeddingFunction: false` |
+| **Graph-context** | `searchWithContext()` — hybrid search + BFS graph expansion |
+
+## Hybrid search
+
+Both vector search (top-K by cosine similarity) and BM25 (top-K by text relevance) run in parallel. Results are merged with [Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf):
+
+```
+score = Σ 1 / (k + rank)
+```
+
+Default `k=45`, tuned for code retrieval. Results can then be optionally re-ranked by a cross-encoder.
+
+## Code-aware BM25
+
+Identifiers are expanded before indexing — `getUserById` becomes `getUserById get user by id`, `parse_json` becomes `parse_json parse json` — so BM25 matches sub-word tokens without sacrificing exact-identifier recall.
+
+## Graph-context expansion
+
+`searchWithContext()` runs hybrid search and then expands the result set by following knowledge graph edges (BFS up to `graphDepth` hops). Neighbour chunks are included with a discounted score (`contextScoreDiscount`, default `0.7`).

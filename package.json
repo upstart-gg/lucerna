@@ -35,27 +35,28 @@
     "changeset:publish": "changeset publish"
   },
   "dependencies": {
-    "@huggingface/transformers": "latest",
-    "@kreuzberg/tree-sitter-language-pack": "latest",
-    "@lancedb/lancedb": "latest",
+    "@huggingface/transformers": "^4.1.0",
+    "@kreuzberg/tree-sitter-language-pack": "^1.6.1",
+    "@lancedb/lancedb": "^0.27.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "chokidar": "latest",
-    "commander": "latest",
-    "fast-glob": "latest",
+    "chokidar": "^5.0.0",
+    "commander": "^14.0.3",
+    "fast-glob": "^3.3.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
-    "@changesets/changelog-github": "latest",
-    "@changesets/cli": "latest",
+    "@changesets/changelog-github": "^0.6.0 ",
+    "@changesets/cli": "^2.30.0",
     "@types/bun": "^1.3.12",
-    "@typescript/native-preview": "7.0.0-dev.20260412.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260412.1",
     "cross-env": "^10.1.0",
-    "tsdown": "latest",
-    "typescript": "latest"
+    "tsdown": "^0.21.9",
+    "typescript": "^5.0.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0",
+    "bun": ">=1.0.0"
   },
   "repository": {
     "type": "git",

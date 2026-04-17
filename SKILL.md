@@ -2,7 +2,7 @@
 name: "lucerna"
 description: "Guide to using the `lucerna search`, `lucerna graph`, `lucerna stats`, and `lucerna eval` CLI commands for querying, navigating, and evaluating your codebase index."
 ---
-# lucerna — CLI skill guide
+# Lucerna — CLI skill guide
 
 ## lucerna search
 
@@ -14,7 +14,7 @@ lucerna search <project-root> <query> [options]
 
 Searches a pre-built index. The project must already be indexed (`lucerna index <project-root>`) before running search.
 
-`lucerna index` picks up all 305 languages automatically — Python, Rust, Go, Java, C/C++, and more are indexed out of the box. `.gitignore` files at any depth are always respected.
+`lucerna index` supports popular languages with custom AST-aware chunkers — Python, Rust, Go, Java, TypeScript/JavaScript, C/C++, C#, Swift, Kotlin, Ruby, PHP, and more. Files in other languages are not indexed. `.gitignore` files at any depth are always respected.
 
 ---
 

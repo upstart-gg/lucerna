@@ -1,0 +1,19 @@
+---
+title: lucerna clear
+description: Delete the index for a project.
+---
+
+Remove the index directory for a project. This deletes all stored chunks, embeddings, and graph edges.
+
+```bash
+lucerna clear /path/to/project
+# Removes <project-root>/.lucerna (or --storage-dir)
+```
+
+## Output
+
+```
+Cleared index at /path/to/project/.lucerna
+```
+
+Run `lucerna index` again to rebuild from scratch.

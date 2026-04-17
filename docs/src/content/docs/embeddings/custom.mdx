@@ -1,0 +1,38 @@
+---
+title: Custom Embeddings
+description: Implement EmbeddingFunction to use any embedding provider.
+---
+
+Implement the `EmbeddingFunction` interface to plug in any provider:
+
+```ts
+import type { EmbeddingFunction } from '@upstart.gg/lucerna';
+
+class OpenAIEmbeddings implements EmbeddingFunction {
+  readonly dimensions = 1536;
+  readonly modelId = 'text-embedding-3-small';
+
+  async generate(texts: string[]): Promise<number[][]> {
+    const response = await openai.embeddings.create({
+      model: this.modelId,
+      input: texts,
+    });
+    return response.data.map(d => d.embedding);
+  }
+}
+
+const indexer = new CodeIndexer({
+  projectRoot: '.',
+  embeddingFunction: new OpenAIEmbeddings(),
+});
+```
+
+## Interface
+
+```ts
+interface EmbeddingFunction {
+  readonly dimensions: number;
+  readonly modelId: string;
+  generate(texts: string[]): Promise<number[][]>;
+}
+```

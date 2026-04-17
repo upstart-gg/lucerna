@@ -1,0 +1,41 @@
+---
+title: Quickstart
+description: Install and configure the Lucerna MCP server for AI coding assistants.
+---
+
+Lucerna ships a built-in [Model Context Protocol](https://modelcontextprotocol.io/) server so AI coding assistants (Claude Code, Cursor, Windsurf, Zed, VS Code, and more) can search your codebase directly.
+
+When the MCP server starts it **indexes the project and begins watching for file changes automatically** — no separate `lucerna watch` process needed.
+
+## Setup
+
+Use [`add-mcp`](https://github.com/neondatabase/add-mcp), which supports 14 clients and writes the correct config file automatically:
+
+```bash
+npx add-mcp "@upstart.gg/lucerna mcp-server" --name lucerna
+```
+
+`add-mcp` will prompt you to choose which clients to configure (Claude Code, Claude Desktop, Cursor, VS Code, Zed, etc.). The MCP server will use **the working directory of the client** as the project root — no hardcoded paths needed.
+
+## MCP tools
+
+| Tool | Description |
+|------|-------------|
+| `search_codebase` | Hybrid semantic + BM25 search with optional graph context expansion. Returns `{ results, warning? }`. |
+| `get_neighbors` | Get the knowledge-graph neighborhood for a chunk ID from search results. |
+
+## `search_codebase` parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | — | Search query |
+| `includeGraphContext` | boolean | `true` | Expand results with related symbols from the knowledge graph |
+| `graphDepth` | number | `1` | Hops to follow when expanding graph context (0–3) |
+| `limit` | number | `10` | Maximum results to return |
+| `language` | string | — | Restrict to a language (e.g. `"typescript"`) |
+| `type` | string | — | Restrict to a chunk type (`"function"`, `"class"`, etc.) |
+| `filePath` | string | — | Filter by file path (supports glob patterns) |
+
+:::note
+**First-time indexing:** If the project has never been indexed, `search_codebase` returns `{ results: [], warning: "Lucerna is still indexing…" }`. Results become available once the initial index completes (typically a few seconds for small projects).
+:::

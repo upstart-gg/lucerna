@@ -1,0 +1,28 @@
+---
+title: Multiple Projects
+description: Run multiple CodeIndexer instances in the same process.
+---
+
+Each `CodeIndexer` instance is fully isolated — separate database, separate watcher. Run as many as you need in the same process:
+
+```ts
+const [frontend, backend] = await Promise.all([
+  (async () => {
+    const idx = new CodeIndexer({ projectRoot: '/repos/frontend' });
+    await idx.initialize();
+    await idx.indexProject();
+    return idx;
+  })(),
+  (async () => {
+    const idx = new CodeIndexer({ projectRoot: '/repos/backend' });
+    await idx.initialize();
+    await idx.indexProject();
+    return idx;
+  })(),
+]);
+
+const frontendResults = await frontend.search('React component');
+const backendResults  = await backend.search('authentication handler');
+```
+
+Each instance stores its index at `<projectRoot>/.lucerna` by default. Use `storageDir` to override if needed.

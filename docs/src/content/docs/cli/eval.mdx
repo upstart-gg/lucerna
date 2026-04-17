@@ -1,0 +1,49 @@
+---
+title: lucerna eval
+description: Measure recall@k against a JSONL query set.
+---
+
+Evaluate search quality against a set of labelled queries. Useful for tuning embedding models and search parameters.
+
+```bash
+lucerna eval /path/to/project queries.jsonl --k 1,5,10
+```
+
+## Query file format
+
+One JSON object per line:
+
+```jsonl
+{ "query": "function that verifies JWT tokens", "expectedFile": "src/auth.ts", "expectedSymbol": "verifyToken" }
+{ "query": "database connection pool", "expectedFile": "src/db/pool.ts" }
+{ "query": "retry logic with exponential backoff", "expectedFile": "src/utils/retry.ts", "expectedSymbol": "withRetry" }
+```
+
+`expectedSymbol` is optional — omit it to match on file only.
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--k <numbers>` | Comma-separated k values to evaluate (default: `1,5,10`) |
+| `--format raw\|json\|pretty-json` | Output format (default: `raw`) |
+| `--no-semantic` | Lexical search only |
+| `--embedder <name>` | Built-in embedder: `cloudflare`, `local`, `bge-small`, `nomic` |
+| `--reranker <name>` | Built-in reranker: `cloudflare`, `jina`, `voyage` |
+| `--config <path>` | Path to `lucerna.config.ts` / `lucerna.config.js` |
+
+## Example output
+
+```
+Evaluation results — 24 queries
+
+  Recall@1  : 54.2%  (13/24)
+  Recall@5  : 87.5%  (21/24)
+  Recall@10 : 95.8%  (23/24)
+
+Per-query breakdown:
+  [@1:✓  @5:✓  @10:✓]  "function that verifies JWT tokens"  →  src/auth/middleware.ts::verifyToken
+  [@1:✗  @5:✓  @10:✓]  "database connection pool"  →  src/db/pool.ts
+  [@1:✗  @5:✗  @10:✓]  "retry logic with exponential backoff"  →  src/utils/retry.ts::withRetry
+  [@1:✓  @5:✓  @10:✓]  "user repository find by email"  →  src/db/UserRepository.ts::findByEmail
+```

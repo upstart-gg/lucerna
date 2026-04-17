@@ -34,7 +34,7 @@ import { Watcher } from "./watcher/Watcher.js";
 // ---------------------------------------------------------------------------
 
 // Match all files — language detection filters files with no detectable language.
-// This allows lucerna to index any of the 305 languages supported by the tree-sitter pack.
+// Files whose language has no custom chunker produce no chunks and are skipped.
 const DEFAULT_INCLUDE = ["**/*"];
 
 const DEFAULT_EXCLUDE = [

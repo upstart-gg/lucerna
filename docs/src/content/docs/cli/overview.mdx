@@ -1,0 +1,48 @@
+---
+title: CLI Overview
+description: How to install and run the Lucerna CLI.
+---
+
+The `lucerna` CLI lets you index, search, and inspect codebases directly from the terminal — no code required.
+
+## Running without installing
+
+Use a package manager's runner to execute Lucerna as a one-off command:
+
+```bash
+npx @upstart.gg/lucerna <command>
+# or
+pnpm dlx @upstart.gg/lucerna <command>
+# or
+bunx @upstart.gg/lucerna <command>
+```
+
+## Installing globally
+
+For repeated use, install Lucerna globally so the `lucerna` binary is always available:
+
+```bash
+npm install -g @upstart.gg/lucerna
+# or
+pnpm add -g @upstart.gg/lucerna
+# or
+bun add -g @upstart.gg/lucerna
+```
+
+Then use it directly:
+
+```bash
+lucerna <command>
+```
+
+## Available commands
+
+| Command | Description |
+|---------|-------------|
+| [`index`](/cli/index) | One-shot indexing of a project |
+| [`watch`](/cli/watch) | Index and re-index on file changes |
+| [`search`](/cli/search) | Search an existing index |
+| [`graph`](/cli/graph) | Explore knowledge graph relationships |
+| [`stats`](/cli/stats) | Show index statistics |
+| [`clear`](/cli/clear) | Delete the index |
+| [`eval`](/cli/eval) | Measure recall@k against a query set |

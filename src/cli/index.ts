@@ -2,12 +2,19 @@
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { CodeIndexer } from "../CodeIndexer.js";
+import {
+  loadConfig,
+  resolveBuiltinEmbedder,
+  resolveBuiltinReranker,
+} from "../config.js";
 import pkg from "../../package.json";
 import type {
   CodeChunk,
   ChunkType,
+  EmbeddingFunction,
   EvalQuery,
   IndexEvent,
+  RerankingFunction,
   SearchResult,
 } from "../types.js";
 
@@ -29,8 +36,14 @@ program
   .option("--include <globs>", "Comma-separated include glob patterns")
   .option("--exclude <globs>", "Comma-separated exclude glob patterns")
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
+  .option(
+    "--embedder <name>",
+    "Built-in embedder: cloudflare, local, bge-small, nomic",
+  )
+  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
-    const indexer = buildIndexer(projectRoot, opts);
+    const indexer = await buildIndexer(projectRoot, opts);
     try {
       await indexer.initialize();
       console.log(`Indexing ${resolve(projectRoot)}...`);
@@ -54,9 +67,15 @@ program
   .option("--include <globs>", "Comma-separated include glob patterns")
   .option("--exclude <globs>", "Comma-separated exclude glob patterns")
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
+  .option(
+    "--embedder <name>",
+    "Built-in embedder: cloudflare, local, bge-small, nomic",
+  )
+  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--debounce <ms>", "Debounce delay in milliseconds", "500")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
-    const indexer = buildIndexer(projectRoot, {
+    const indexer = await buildIndexer(projectRoot, {
       ...opts,
       watch: false, // we start watching manually below so we can log first
       watchDebounce: parseInt(String(opts.debounce ?? "500"), 10),
@@ -103,6 +122,12 @@ program
   .description("Search the index for a project")
   .option("--storage-dir <dir>", "Override storage directory")
   .option("--no-semantic", "Disable semantic/vector search")
+  .option(
+    "--embedder <name>",
+    "Built-in embedder: cloudflare, local, bge-small, nomic",
+  )
+  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--limit <n>", "Max results", "10")
   .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
   .option(
@@ -119,7 +144,7 @@ program
       query: string,
       opts: Record<string, unknown>,
     ) => {
-      const indexer = buildIndexer(projectRoot, opts);
+      const indexer = await buildIndexer(projectRoot, opts);
       try {
         await indexer.initialize();
         const results = await indexer.search(query, {
@@ -178,7 +203,10 @@ program
       chunkId: string,
       opts: Record<string, unknown>,
     ) => {
-      const indexer = buildIndexer(projectRoot, { ...opts, semantic: false });
+      const indexer = await buildIndexer(projectRoot, {
+        ...opts,
+        semantic: false,
+      });
       try {
         await indexer.initialize();
         const relation = String(opts.relation ?? "neighborhood");
@@ -255,7 +283,10 @@ program
   .option("--storage-dir <dir>", "Override storage directory")
   .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
-    const indexer = buildIndexer(projectRoot, { ...opts, semantic: false });
+    const indexer = await buildIndexer(projectRoot, {
+      ...opts,
+      semantic: false,
+    });
     try {
       await indexer.initialize();
       const stats = await indexer.getStats();
@@ -318,6 +349,12 @@ program
   )
   .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
   .option("--no-semantic", "Disable semantic (vector) search — lexical only")
+  .option(
+    "--embedder <name>",
+    "Built-in embedder: cloudflare, local, bge-small, nomic",
+  )
+  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(
     async (
       projectRoot: string,
@@ -360,7 +397,7 @@ program
         process.exit(1);
       }
 
-      const indexer = buildIndexer(projectRoot, {
+      const indexer = await buildIndexer(projectRoot, {
         ...opts,
         semantic: opts.semantic !== false ? undefined : false,
       });
@@ -441,12 +478,33 @@ program
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildIndexer(
+async function buildIndexer(
   projectRoot: string,
   opts: Record<string, unknown>,
-): CodeIndexer {
+): Promise<CodeIndexer> {
+  const resolvedRoot = resolve(projectRoot);
+
+  // Load config file (lucerna.config.ts / .js) — may be overridden by flags below.
+  const cfg = await loadConfig(resolvedRoot, opts.config as string | undefined);
+
+  // Resolve embedding function. Priority: --no-semantic > --embedder flag > config file.
+  let embeddingFunction: EmbeddingFunction | false | undefined =
+    cfg.embeddingFunction;
+  if (opts.semantic === false) {
+    embeddingFunction = false;
+  } else if (opts.embedder) {
+    embeddingFunction = await resolveBuiltinEmbedder(String(opts.embedder));
+  }
+
+  // Resolve reranking function. Priority: --reranker flag > config file.
+  let rerankingFunction: RerankingFunction | false | undefined =
+    cfg.rerankingFunction;
+  if (opts.reranker) {
+    rerankingFunction = await resolveBuiltinReranker(String(opts.reranker));
+  }
+
   return new CodeIndexer({
-    projectRoot: resolve(projectRoot),
+    projectRoot: resolvedRoot,
     ...(opts.storageDir
       ? { storageDir: resolve(String(opts.storageDir)) }
       : {}),
@@ -464,7 +522,8 @@ function buildIndexer(
             .map((s) => s.trim()),
         }
       : {}),
-    ...(opts.semantic === false ? { embeddingFunction: false as const } : {}),
+    ...(embeddingFunction !== undefined ? { embeddingFunction } : {}),
+    ...(rerankingFunction !== undefined ? { rerankingFunction } : {}),
     ...(opts.watchDebounce !== undefined
       ? { watchDebounce: opts.watchDebounce as number }
       : {}),
@@ -528,6 +587,12 @@ program
   )
   .option("--storage-dir <dir>", "Override storage directory")
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
+  .option(
+    "--embedder <name>",
+    "Built-in embedder: cloudflare, local, bge-small, nomic",
+  )
+  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot = ".", opts: Record<string, unknown>) => {
     const { startMcpServer } = await import("../mcp/server.js");
     await startMcpServer(resolve(projectRoot), {
@@ -535,6 +600,9 @@ program
         ? { storageDir: resolve(String(opts.storageDir)) }
         : {}),
       ...(opts.semantic === false ? { semantic: false } : {}),
+      ...(opts.embedder ? { embedder: String(opts.embedder) } : {}),
+      ...(opts.reranker ? { reranker: String(opts.reranker) } : {}),
+      ...(opts.config ? { config: String(opts.config) } : {}),
     });
   });
 

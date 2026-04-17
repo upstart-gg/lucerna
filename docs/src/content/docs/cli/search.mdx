@@ -1,0 +1,68 @@
+---
+title: lucerna search
+description: Search an existing index using hybrid semantic + BM25 search.
+---
+
+Search an indexed project with natural language or symbol names.
+
+```bash
+lucerna search /path/to/project "authentication middleware"
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--no-semantic` | Disable semantic search (BM25 only) |
+| `--embedder <name>` | Built-in embedder: `cloudflare`, `local`, `bge-small`, `nomic` |
+| `--reranker <name>` | Built-in reranker: `cloudflare`, `jina`, `voyage` |
+| `--config <path>` | Path to `lucerna.config.ts` / `lucerna.config.js` |
+| `--limit <n>` | Max results (default: `10`) |
+| `--format raw\|json\|pretty-json` | Output format (default: `raw`) |
+| `--language <lang>` | Filter by language: `typescript`, `javascript`, `json`, `markdown` |
+| `--type <type>` | Filter by chunk type: `function`, `class`, `method`, `interface`, … |
+
+## Output formats
+
+### Raw (default)
+
+```
+src/auth/middleware.ts:12-45  [function] verifyToken
+  export function verifyToken(token: string): JWTPayload {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+
+src/auth/AuthMiddleware.ts:20-35  [method] run  className=AuthMiddleware
+  run(req: Request, res: Response, next: NextFunction) {
+    const token = req.headers.authorization?.split(' ')[1];
+
+src/auth/guards.ts:8-22  [function] requireAuth
+  export function requireAuth(roles: Role[] = []): RequestHandler {
+
+3 result(s)
+```
+
+### Compact JSON (`--format json`)
+
+Ideal for piping:
+
+```bash
+lucerna search /path/to/project "verifyToken" --format json | jq '.[0].id'
+```
+
+```json
+[{"id":"a3f9b2c1d4e5f6a7","file":"src/auth/middleware.ts:12-45","type":"function","name":"verifyToken","content":"export function verifyToken..."}]
+```
+
+### Pretty JSON (`--format pretty-json`)
+
+```json
+[
+  {
+    "id": "a3f9b2c1d4e5f6a7",
+    "file": "src/auth/middleware.ts:12-45",
+    "type": "function",
+    "name": "verifyToken",
+    "content": "export function verifyToken(token: string): JWTPayload {\n  ..."
+  }
+]
+```

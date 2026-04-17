@@ -1,0 +1,61 @@
+---
+title: Language Support
+description: Popular languages with custom chunkers; all others are not indexed.
+---
+
+Lucerna ships custom AST-aware chunkers for popular languages. Files in any other language are not indexed.
+
+**`.gitignore` is always respected.** Lucerna discovers all `.gitignore` files in the project tree (root and subdirectories) and applies their patterns to both indexing and file watching.
+
+## Chunking quality per language
+
+| Language | Extensions | Chunks | Graph edges |
+|---|---|---|---|
+| TypeScript / JavaScript | `.ts`, `.tsx`, `.js`, `.jsx` | Imports, functions, generators, arrow functions, classes, methods, interfaces, type aliases | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| Python | `.py`, `.pyw` | Imports, classes, functions (including class methods with `className`) | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| Java | `.java` | Imports, classes, interfaces, enums (`type`), methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `IMPLEMENTS`, `CALLS` |
+| Go | `.go` | Imports, functions, receiver methods (`method`), structs (`class`), interfaces, type declarations | `IMPORTS`, `DEFINES`, `CALLS` |
+| Rust | `.rs` | Imports (`use`), structs (`class`), enums (`type`), traits (`interface`), impl blocks (`class`), functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| C# | `.cs` | Imports (`using`), classes, records (`class`), structs (`class`), interfaces, enums (`type`), methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| Swift | `.swift` | Imports, classes + structs (`class`), protocols (`interface`), enums (`type`), functions/methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| Kotlin | `.kt`, `.kts` | Imports, classes + interfaces (`class`), functions/methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `IMPLEMENTS`, `CALLS` |
+| Ruby | `.rb` | Imports (`require`/`require_relative`), classes, modules (`class`), methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| PHP | `.php` | Imports (`use`), functions, classes, interfaces, traits (`interface`), methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `IMPLEMENTS`, `CALLS` |
+| C | `.c`, `.h` | Includes (`#include`), functions, structs (`class`) | `IMPORTS`, `DEFINES`, `CALLS` |
+| C++ | `.cpp`, `.cc`, `.cxx`, `.hpp` | Includes (`#include`), classes, functions/methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| Bash / Shell | `.sh`, `.bash` | Source imports (`source`/`.`), functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| Scala | `.scala` | Imports, classes, objects (`class`), traits (`interface`), methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| Lua | `.lua` | Requires (`require()`), functions, local functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| R | `.r`, `.R` | Library imports (`library()`/`require()`), functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| Dart | `.dart` | Imports, classes, functions/methods | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| Haskell | `.hs` | Imports, functions, data types (`type`), type classes (`class`) | `IMPORTS`, `DEFINES`, `CALLS` |
+| Elixir | `.ex`, `.exs` | Aliases/imports, modules (`class`), def/defp functions/methods | `IMPORTS`, `DEFINES`, `CALLS` |
+| Clojure | `.clj`, `.cljs`, `.cljc` | `ns` form (import chunk), defn/defn-/defmacro functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| Groovy | `.groovy`, `.gradle` | Imports, classes, methods | `IMPORTS`, `DEFINES`, `CALLS` |
+| Perl | `.pl`, `.pm` | `use` imports, subroutines | `IMPORTS`, `DEFINES`, `CALLS` |
+| PowerShell | `.ps1`, `.psm1` | `using` imports, functions, classes/methods | `IMPORTS`, `DEFINES`, `CALLS` |
+| MATLAB | `.m` | Functions, classdefs and methods | `DEFINES`, `CALLS` |
+| Zig | `.zig` | `@import` declarations, functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| Solidity | `.sol` | Imports, contracts (`class`), interfaces, functions/methods, events/modifiers (`type`) | `IMPORTS`, `DEFINES`, `EXTENDS`, `CALLS` |
+| SQL | `.sql` | Statement-level chunks: `CREATE TABLE`, `CREATE VIEW`, `SELECT`, `INSERT`, `UPDATE`, `DELETE` | — |
+| JSON | `.json` | Top-level key splitting for large files; single chunk for small files | — |
+| Markdown | `.md`, `.mdx` | Heading-based sections (H1–H3) with full breadcrumbs | — |
+| XML | `.xml`, `.xsd`, `.xsl` | Top-level element splitting for large files; single chunk for small files | — |
+| TOML | `.toml` | Table splitting by `[section]` / `[[array]]` headers | — |
+| YAML | `.yaml`, `.yml` | Top-level key splitting | — |
+| HTML | `.html`, `.htm` | Top-level element splitting (like XML) | — |
+| CSS | `.css` | Rule-set splitting by selector | — |
+| SCSS | `.scss` | Rule-set splitting; named `@mixin` and `@function` definitions | — |
+| Vue | `.vue` | One chunk per top-level block: `<script>`, `<template>`, `<style>` | — |
+| Svelte | `.svelte` | One chunk per block: `<script>`, `<style>`, remaining markup as `template` | — |
+| Julia | `.jl` | Imports, functions, structs (`class`), modules (`class`) | `IMPORTS`, `DEFINES`, `CALLS` |
+| OCaml | `.ml`, `.mli` | Imports (`open`), let bindings, type definitions, modules | `IMPORTS`, `DEFINES` |
+| Erlang | `.erl` | Module/export attributes (import), functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| Objective-C | `.m`, `.mm` | Imports (`#import`), interfaces, implementations, methods | `IMPORTS`, `DEFINES`, `CALLS` |
+| All other languages | — | Not indexed | — |
+
+`DEFINES` edges link the import chunk to every named symbol in the same file. `EXTENDS`/`IMPLEMENTS` edges are emitted when inheritance syntax is present and the grammar supports it.
+
+## Lazy grammar loading
+
+Grammar modules are loaded on first encounter — no configuration needed. Lucerna automatically initializes any language the first time it sees a file of that type.

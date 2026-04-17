@@ -1,0 +1,133 @@
+---
+title: Custom Providers
+description: Implement your own embedding or reranking provider and use it in the MCP server and CLI.
+---
+
+You can plug any embedding or reranking provider into Lucerna by implementing a small interface and referencing it in `lucerna.config.ts`. No changes to Lucerna itself are required.
+
+## Custom embedding provider
+
+Implement `EmbeddingFunction`:
+
+```ts
+import type { EmbeddingFunction } from '@upstart.gg/lucerna';
+
+export class OpenAIEmbeddings implements EmbeddingFunction {
+  readonly dimensions = 1536;
+  readonly modelId = 'text-embedding-3-small';
+
+  async generate(texts: string[]): Promise<number[][]> {
+    const response = await openai.embeddings.create({
+      model: this.modelId,
+      input: texts,
+    });
+    return response.data.map((d) => d.embedding);
+  }
+}
+```
+
+The `modelId` field is optional but recommended — Lucerna uses it to detect if you change models between runs and warns you to clear the index (changing models corrupts the vector space).
+
+## Custom reranking provider
+
+Implement `RerankingFunction`:
+
+```ts
+import type { RerankingFunction } from '@upstart.gg/lucerna';
+
+export class MyReranker implements RerankingFunction {
+  async rerank(query: string, texts: string[]): Promise<number[]> {
+    // Return one relevance score (0–1) per text, in the same order.
+    // Higher score = more relevant.
+  }
+}
+```
+
+## Using a local file
+
+The simplest approach: put your provider in any `.ts` or `.js` file and import it directly from `lucerna.config.ts`. No build step or publishing required — Lucerna's config loader handles TypeScript transpilation automatically.
+
+```
+your-project/
+├── lucerna.config.ts        ← config file
+├── lucerna-providers/
+│   ├── my-embeddings.ts     ← your EmbeddingFunction
+│   └── my-reranker.ts       ← your RerankingFunction
+└── src/
+    └── ...
+```
+
+```ts
+// lucerna.config.ts
+import { MyEmbeddings } from './lucerna-providers/my-embeddings.ts';
+import { MyReranker } from './lucerna-providers/my-reranker.ts';
+
+export default {
+  embeddingFunction: new MyEmbeddings({ apiKey: process.env.MY_API_KEY }),
+  rerankingFunction: new MyReranker(),
+};
+```
+
+Then run as usual — no flags needed:
+
+```bash
+lucerna mcp-server /path/to/project
+lucerna index /path/to/project
+```
+
+## Publishing as an npm package
+
+If you want to share a provider across projects or with others, package it as a normal npm package that exports the class:
+
+```ts
+// my-lucerna-embeddings/index.ts (or index.js)
+import type { EmbeddingFunction } from '@upstart.gg/lucerna';
+
+export class MyEmbeddings implements EmbeddingFunction {
+  // ...
+}
+```
+
+Install it in the project you want to index:
+
+```bash
+npm install my-lucerna-embeddings
+# or: pnpm add my-lucerna-embeddings
+```
+
+Then use it in `lucerna.config.ts`:
+
+```ts
+import { MyEmbeddings } from 'my-lucerna-embeddings';
+
+export default {
+  embeddingFunction: new MyEmbeddings(),
+};
+```
+
+## Interface reference
+
+```ts
+interface EmbeddingFunction {
+  /** Dimensionality of output vectors */
+  readonly dimensions: number;
+  /**
+   * Stable model identifier (e.g. "text-embedding-3-small").
+   * Used to detect model changes between runs and warn about vector-space corruption.
+   */
+  readonly modelId?: string;
+  /** Produce one embedding vector per input text */
+  generate(texts: string[]): Promise<number[][]>;
+  /** Optional: pre-load the model before the first generate() call */
+  warmup?(): Promise<void>;
+}
+
+interface RerankingFunction {
+  /**
+   * Score each text against the query.
+   * Returns one relevance score per text, in the same order.
+   * Scores should be in the 0–1 range.
+   */
+  rerank(query: string, texts: string[]): Promise<number[]>;
+}
+```

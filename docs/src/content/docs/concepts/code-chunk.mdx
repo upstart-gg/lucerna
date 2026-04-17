@@ -1,0 +1,35 @@
+---
+title: CodeChunk
+description: The atomic unit of the Lucerna index.
+---
+
+A `CodeChunk` is the atomic unit of the index. Every chunk represents a single logical unit of code or documentation extracted from a source file.
+
+## Fields
+
+| Field | Description |
+|---|---|
+| `id` | Stable 16-char hex hash of `projectId + filePath + startLine` |
+| `projectId` | Isolates chunks belonging to this project |
+| `filePath` | Path relative to `projectRoot` |
+| `language` | Any language supported by `@kreuzberg/tree-sitter-language-pack` (e.g. `typescript`, `python`, `rust`, `go`, …) |
+| `type` | See **Chunk types** below |
+| `name` | Symbol name (function/class/method/heading), if applicable |
+| `content` | Raw source text |
+| `contextContent` | Embedding input: `content` prefixed with breadcrumb, file imports, and (for methods) the class header |
+| `startLine` / `endLine` | 1-based line range in the original file |
+| `metadata` | Extra data, e.g. `{ className: "UserService", breadcrumb: "// Class: UserService" }` on method chunks |
+
+## Chunk types
+
+| Type | Produced from |
+|---|---|
+| `function` | Function declarations, generator functions, arrow functions, Rust/Go/Python/Bash functions |
+| `class` | Class declarations; also Rust `struct` and `impl` blocks, Ruby/Python `module` |
+| `method` | Individual methods inside a class (Java, C#, PHP, Go receiver methods, …) |
+| `interface` | TypeScript `interface`; also Rust `trait`, Swift `protocol` |
+| `type` | TypeScript `type` alias; also Rust/Java/Kotlin `enum` |
+| `variable` | Variable declarations |
+| `import` | All import statements in a file, grouped as one chunk |
+| `section` | Markdown heading section (H1–H3) |
+| `file` | Whole-file fallback for small or structureless files (e.g. SQL) |

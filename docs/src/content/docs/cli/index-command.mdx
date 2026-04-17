@@ -1,0 +1,33 @@
+---
+title: lucerna index
+description: One-shot indexing of a project directory.
+---
+
+Index an entire project directory in one pass.
+
+```bash
+lucerna index /path/to/project
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--storage-dir <dir>` | Override storage directory (default: `<root>/.lucerna`) |
+| `--include <globs>` | Comma-separated include glob patterns (default: `**/*`) |
+| `--exclude <globs>` | Additional comma-separated exclude glob patterns |
+| `--no-semantic` | Disable semantic search (BM25 only, skips model download) |
+| `--embedder <name>` | Built-in embedder: `cloudflare`, `local`, `bge-small`, `nomic` |
+| `--reranker <name>` | Built-in reranker: `cloudflare`, `jina`, `voyage` |
+| `--config <path>` | Path to a `lucerna.config.ts` / `lucerna.config.js` (default: auto-detected at project root) |
+
+## Example output
+
+```
+Indexing /path/to/project...
+Done. 142 files, 3817 chunks indexed.
+```
+
+:::tip
+Place a `lucerna.config.ts` at the project root to configure embeddings and reranking without passing flags every time. See [Configuration](/configuration/overview).
+:::

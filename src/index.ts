@@ -54,6 +54,7 @@ export type {
   IndexEvent,
   IndexStats,
   Language,
+  LucernaConfig,
   // Graph types
   RelationshipType,
   RepoMapOptions,

@@ -1,0 +1,43 @@
+---
+title: Quick Start
+description: Get up and running with the Lucerna programmatic API in minutes.
+---
+
+:::caution[Most users don't need this]
+The Library API is for advanced use cases where you need to embed Lucerna directly into your own application — for example, building a custom MCP server or integrating search into a tool.
+
+**If you just want to index and search a codebase**, the [MCP server](/quickstart) and [CLI](/cli/overview) are the right choice. They require no code, handle provider configuration via [`lucerna.config.ts`](/configuration/overview), and are kept up to date automatically.
+:::
+
+Install Lucerna as a library dependency:
+
+```bash
+pnpm add @upstart.gg/lucerna
+# or
+npm install @upstart.gg/lucerna
+# or
+bun add @upstart.gg/lucerna
+```
+
+Then index and search your project:
+
+```ts
+import { CodeIndexer } from '@upstart.gg/lucerna';
+
+const indexer = new CodeIndexer({
+  projectRoot: '/path/to/your/project',
+});
+
+await indexer.initialize();   // open DB, init tree-sitter
+await indexer.indexProject(); // walk and chunk all matching files
+
+// Hybrid search (semantic + BM25 fused via RRF)
+const results = await indexer.search('authentication middleware', { limit: 5 });
+
+for (const r of results) {
+  console.log(`${r.chunk.filePath}:${r.chunk.startLine}  [${r.chunk.type}] ${r.chunk.name ?? ''}`);
+  console.log(r.chunk.content.slice(0, 200));
+}
+
+await indexer.close();
+```

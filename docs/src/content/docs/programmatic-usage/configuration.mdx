@@ -1,0 +1,55 @@
+---
+title: Configuration
+description: All CodeIndexer constructor options.
+---
+
+## `new CodeIndexer(options)`
+
+```ts
+const indexer = new CodeIndexer({
+  // --- Required ---
+  projectRoot: string,
+
+  // --- Identity ---
+  projectId?: string,           // stable ID for namespacing; default: sha1(projectRoot).slice(0,12)
+
+  // --- Storage ---
+  storageDir?: string,          // default: <projectRoot>/.lucerna
+
+  // --- File selection ---
+  include?: string[],           // default: **/* (all files — language detection filters unknowns)
+  exclude?: string[],           // appended to defaults (node_modules, .git, dist, build, …)
+                                // .gitignore at any depth is always applied automatically
+
+  // --- Embeddings ---
+  embeddingFunction?:
+    | EmbeddingFunction         // custom instance
+    | false,                    // disable semantic search, BM25 only
+                                // undefined → auto: CloudflareEmbeddings if env vars set, else NomicCodeEmbeddings
+
+  // --- Reranking ---
+  rerankingFunction?:
+    | RerankingFunction         // custom instance
+    | false,                    // default: false (no reranking)
+
+  // --- Chunking ---
+  maxChunkTokens?: number,      // soft max tokens per chunk (1 token ≈ 4 chars); default: 1500
+
+  // --- Watching ---
+  watch?: boolean,              // start watching on initialize(); default: false
+  watchDebounce?: number,       // debounce delay in ms; default: 500
+
+  // --- Callbacks ---
+  onIndexed?: (event: IndexEvent) => void,
+  // IndexEvent: { type: 'indexed' | 'removed' | 'error', filePath, chunksAffected?, error? }
+});
+```
+
+## Embedding auto-detection
+
+When `embeddingFunction` is not set, the indexer auto-selects:
+
+1. **`CloudflareEmbeddings`** — if `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` are set
+2. **`NomicCodeEmbeddings`** — otherwise (local ONNX model, no API key required)
+
+See [Embeddings](/embeddings/overview) for all options.

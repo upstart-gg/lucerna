@@ -1,0 +1,81 @@
+---
+title: How It Works
+description: Architecture and data flow for indexing and search.
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    FILES([source files]) --> TSC
+
+    TSC["TreeSitterChunker
+    parse AST → extract symbols/sections"]
+
+    TSC -->|"CodeChunk[]"| EMB
+    TSC -->|"RawEdge[]"| SR
+
+    EMB["EmbeddingFunction
+    Nomic / HF / CF / custom / disabled"]
+    SR["SymbolResolver
+    resolves symbols to real chunk IDs"]
+
+    EMB -->|"float32[][]"| LDB
+    SR -->|"GraphEdge[]"| GS
+
+    LDB["LanceDBStore
+    vector + FTS index"]
+    GS["GraphStore
+    edges (LanceDB)"]
+
+    LDB --> VS["vector search (semantic)"]
+    LDB --> BM25["BM25 / FTS (lexical)"]
+    GS --> GT["graph traversal
+    getNeighborhood() · getCallers() …"]
+
+    VS -->|RRF| RRF((" "))
+    BM25 -->|RRF| RRF
+
+    RRF --> RE["RerankingFunction (optional)"]
+    RE --> SR2["SearchResult[]"]
+
+    SR2 --> SWC["searchWithContext()"]
+    GT --> SWC
+    SWC --> SR3["SearchResult[] (with context)"]
+```
+
+## Indexing data flow
+
+```mermaid
+flowchart LR
+    A([Files on disk]) --> B["TreeSitterChunker\n.chunkFileWithEdges()"]
+    B --> C["tree-sitter parse\n→ AST walk\n→ CodeChunk[]"]
+    B --> D["SymbolResolver.resolve()\n→ raw graph edges"]
+    C --> E["CodeIndexer\n.normalizeResult()\nabs paths → rel paths"]
+    D --> E
+    E --> F["LanceDBStore\n.upsertChunks()\nvector embed + BM25"]
+    E --> G["GraphStore\n.upsertEdges()\nknowledge graph"]
+    E --> H[".lucerna/hashes.json"]
+```
+
+## Search data flow
+
+```mermaid
+flowchart LR
+    A([query string]) --> B["LanceDBStore.search()"]
+    B --> C["vector search (ANN)"]
+    B --> D["BM25 text search\nvia DataFusion"]
+    C --> E["Reciprocal Rank Fusion\nk=45"]
+    D --> E
+    E --> F{"reranker\nconfigured?"}
+    F -->|yes| G["JinaReranker /\nVoyageReranker"]
+    F -->|no| H
+    G --> H(["SearchResult[]"])
+```
+
+## Chunking strategy
+
+- **TS/JS/TSX/JSX** — tree-sitter queries extract imports, functions, generator functions, arrow functions, classes, methods, interfaces, and type aliases. Each chunk's `contextContent` prepends a breadcrumb, the import block, and (for methods) the class header for better embedding signal. Adjacent tiny chunks (below `minChunkTokens`) are merged to avoid low-quality micro-embeddings.
+- **JSON** — files with ≤3 top-level keys or under the size threshold: single chunk. Larger files: one chunk per top-level key.
+- **Markdown** — split at H1/H2/H3 headings; each section carries its full breadcrumb (`# Guide > ## Setup > ### Config`).
+- **Other languages (305 total)** — grammar loaded lazily on first encounter; structure extraction (functions, classes, methods) where the grammar supports it, whole-file fallback otherwise.

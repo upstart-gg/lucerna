@@ -291,6 +291,43 @@ export interface SearchWithContextOptions extends SearchOptions {
 }
 
 // ---------------------------------------------------------------------------
+// Config file
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape of `lucerna.config.ts` / `lucerna.config.js`.
+ * Place this file at the project root to configure the embedding and reranking
+ * providers used by the CLI and MCP server — no code changes required.
+ *
+ * @example
+ * ```ts
+ * // lucerna.config.ts
+ * import type { LucernaConfig } from '@upstart.gg/lucerna';
+ * import { MyEmbeddings } from './my-embeddings.ts';
+ *
+ * export default {
+ *   embeddingFunction: new MyEmbeddings(),
+ * } satisfies LucernaConfig;
+ * ```
+ */
+export interface LucernaConfig {
+  /**
+   * Custom embedding function.
+   *   - An `EmbeddingFunction` instance: use this provider
+   *   - `false`: disable semantic search (lexical/BM25 only)
+   *   - `undefined`: use the CLI/MCP default (auto-detect from env vars)
+   */
+  embeddingFunction?: EmbeddingFunction | false;
+  /**
+   * Custom reranking function.
+   *   - A `RerankingFunction` instance: apply as a second stage after RRF fusion
+   *   - `false`: explicitly disable reranking
+   *   - `undefined`: no reranking (default)
+   */
+  rerankingFunction?: RerankingFunction | false;
+}
+
+// ---------------------------------------------------------------------------
 // Stats
 // ---------------------------------------------------------------------------
 

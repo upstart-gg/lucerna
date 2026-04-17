@@ -4,7 +4,17 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { CodeIndexer } from "../CodeIndexer.js";
-import type { SearchOptions, SearchWithContextOptions } from "../types.js";
+import {
+  loadConfig,
+  resolveBuiltinEmbedder,
+  resolveBuiltinReranker,
+} from "../config.js";
+import type {
+  EmbeddingFunction,
+  RerankingFunction,
+  SearchOptions,
+  SearchWithContextOptions,
+} from "../types.js";
 import pkg from "../../package.json";
 
 // ---------------------------------------------------------------------------
@@ -45,7 +55,13 @@ export function createMcpServer(
         "Optionally expands results with graph context (callers, callees, imports). " +
         "Returns an empty array with a warning message while the project is being indexed for the first time.",
       inputSchema: {
-        query: z.string().describe("The search query"),
+        query: z
+          .string()
+          .describe(
+            "The search query. Include both intent and relevant technical terms or identifiers — " +
+              "e.g. 'JWT token verify session middleware' rather than 'where is authentication implemented'. " +
+              "Mixing natural language with concrete keywords improves both semantic and lexical (BM25) ranking.",
+          ),
         includeGraphContext: z
           .boolean()
           .optional()
@@ -194,14 +210,38 @@ export function createMcpServer(
 
 export async function startMcpServer(
   projectRoot: string,
-  opts: { storageDir?: string; semantic?: boolean } = {},
+  opts: {
+    storageDir?: string;
+    semantic?: boolean;
+    embedder?: string;
+    reranker?: string;
+    config?: string;
+  } = {},
 ): Promise<void> {
   const resolvedRoot = resolve(projectRoot);
+
+  // Load lucerna.config.ts / .js, then apply flag overrides on top.
+  const cfg = await loadConfig(resolvedRoot, opts.config);
+
+  let embeddingFunction: EmbeddingFunction | false | undefined =
+    cfg.embeddingFunction;
+  if (opts.semantic === false) {
+    embeddingFunction = false;
+  } else if (opts.embedder) {
+    embeddingFunction = await resolveBuiltinEmbedder(opts.embedder);
+  }
+
+  let rerankingFunction: RerankingFunction | false | undefined =
+    cfg.rerankingFunction;
+  if (opts.reranker) {
+    rerankingFunction = await resolveBuiltinReranker(opts.reranker);
+  }
 
   const indexer = new CodeIndexer({
     projectRoot: resolvedRoot,
     ...(opts.storageDir !== undefined ? { storageDir: opts.storageDir } : {}),
-    ...(opts.semantic === false ? { embeddingFunction: false } : {}),
+    ...(embeddingFunction !== undefined ? { embeddingFunction } : {}),
+    ...(rerankingFunction !== undefined ? { rerankingFunction } : {}),
     onIndexed: (event) => {
       if (event.type === "indexed") {
         log(`indexed ${event.filePath} (${event.chunksAffected ?? 0} chunks)`);

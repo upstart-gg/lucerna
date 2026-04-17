@@ -1,0 +1,30 @@
+---
+title: lucerna watch
+description: Index a project and re-index on file changes.
+---
+
+Index a project and automatically re-index files as they change. `.gitignore` files at any depth are respected automatically.
+
+```bash
+lucerna watch /path/to/project
+```
+
+## Options
+
+All options from [`index`](/cli/index-command) (`--storage-dir`, `--include`, `--exclude`, `--no-semantic`, `--embedder`, `--reranker`, `--config`), plus:
+
+| Option | Description |
+|--------|-------------|
+| `--debounce <ms>` | File-change debounce delay (default: `500`) |
+
+## Example output
+
+```
+Indexing /path/to/project...
+Initial index complete. 142 files, 3817 chunks.
+Watching for changes. Press Ctrl+C to stop.
+[indexed] src/auth/middleware.ts (12 chunks)
+[indexed] src/db/pool.ts (8 chunks)
+[removed] src/legacy/old-auth.ts
+[error]   src/broken.ts: Unexpected token at line 42
+```

@@ -128,7 +128,7 @@ lucerna search /repos/my-app "cache invalidation" --storage-dir /var/indexes/my-
 
 ## Best practices
 
-- **Query with intent, not just keywords.** "function that retries HTTP requests with exponential backoff" retrieves better than "retry".
+- **Combine intent with technical terms.** Before searching, mentally rewrite the query to include both the goal and relevant identifiers or keywords. "JWT token verify session middleware auth" retrieves better than "where is authentication implemented". Mix natural language with concrete terms — semantic search handles intent, BM25 handles exact identifiers.
 - **Use `--no-semantic` for identifiers.** Exact names like `UserRepository` or `ERR_CONN_RESET` match better with BM25.
 - **Narrow with `--type` before raising `--limit`.** Filtering to `method` or `function` reduces noise more reliably than increasing result count.
 - **Use `--format json` in scripts.** The raw format truncates content; `--format json` gives compact single-line JSON ideal for piping, and `--format pretty-json` gives the same data indented for human inspection.

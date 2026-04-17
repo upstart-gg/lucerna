@@ -55,7 +55,13 @@ export function createMcpServer(
         "Optionally expands results with graph context (callers, callees, imports). " +
         "Returns an empty array with a warning message while the project is being indexed for the first time.",
       inputSchema: {
-        query: z.string().describe("The search query"),
+        query: z
+          .string()
+          .describe(
+            "The search query. Include both intent and relevant technical terms or identifiers — " +
+              "e.g. 'JWT token verify session middleware' rather than 'where is authentication implemented'. " +
+              "Mixing natural language with concrete keywords improves both semantic and lexical (BM25) ranking.",
+          ),
         includeGraphContext: z
           .boolean()
           .optional()

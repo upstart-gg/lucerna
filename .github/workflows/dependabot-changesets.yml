@@ -15,6 +15,10 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.CHANGESET_GITHUB_TOKEN }}
+
+      - name: Pull latest changes
+        run: git pull --rebase origin ${{ github.event.pull_request.head.ref }}
 
       - uses: StafflinePeoplePlus/dependabot-changesets@v0.1.5
         with:

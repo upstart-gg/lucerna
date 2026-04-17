@@ -6,7 +6,7 @@ export default defineConfig({
   site: "https://lucerna.upstart.gg",
   integrations: [
     starlight({
-      title: "Lucerna",
+      title: "Lucerna", // Lucerna
       description: "AST-aware semantic + lexical code indexer for AI agents",
       social: [
         {

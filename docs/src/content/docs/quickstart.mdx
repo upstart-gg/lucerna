@@ -17,6 +17,29 @@ npx add-mcp "@upstart.gg/lucerna mcp-server" --name lucerna
 
 `add-mcp` will prompt you to choose which clients to configure (Claude Code, Claude Desktop, Cursor, VS Code, Zed, etc.). The MCP server will use **the working directory of the client** as the project root — no hardcoded paths needed.
 
+## Configuring embeddings and reranking
+
+Place a `lucerna.config.ts` at the project root to configure providers — the MCP server picks it up automatically:
+
+```ts
+// lucerna.config.ts
+import { CloudflareEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
+
+export default {
+  embeddingFunction: new CloudflareEmbeddings(),
+  rerankingFunction: new VoyageReranker(),
+};
+```
+
+Or pass flags directly in the MCP server command:
+
+```bash
+npx @upstart.gg/lucerna mcp-server --embedder cloudflare --reranker voyage
+npx @upstart.gg/lucerna mcp-server --config /path/to/lucerna.config.ts
+```
+
+See [Configuration](/configuration/overview) and [Custom Providers](/configuration/custom-providers) for full details.
+
 ## MCP tools
 
 | Tool | Description |

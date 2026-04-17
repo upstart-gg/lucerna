@@ -1,0 +1,88 @@
+---
+title: Built-in Providers
+description: Select embedding and reranking providers via CLI flags or the config file.
+---
+
+Lucerna ships several embedding and reranking providers. You can select them with CLI flags (no config file needed) or instantiate them in `lucerna.config.ts`.
+
+## Embedders
+
+Pass `--embedder <name>` to any command, or use `new ProviderClass()` in your config file:
+
+| Name | Class | Notes |
+|------|-------|-------|
+| `cloudflare` | `CloudflareEmbeddings` | Requires `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` |
+| `local` / `hf` | `HFEmbeddings` | Local ONNX via @huggingface/transformers, no API key |
+| `bge-small` | `BGESmallEmbeddings` | Local BGE-small model |
+| `nomic` | `NomicCodeEmbeddings` | Local Nomic code model (default when no env vars set) |
+
+### Via CLI flag
+
+```bash
+lucerna mcp-server /path/to/project --embedder cloudflare
+lucerna index /path/to/project --embedder local
+```
+
+### Via config file
+
+```ts
+// lucerna.config.ts
+import { CloudflareEmbeddings } from '@upstart.gg/lucerna';
+
+export default {
+  embeddingFunction: new CloudflareEmbeddings(),
+};
+```
+
+### Disable semantic search
+
+```bash
+lucerna mcp-server /path/to/project --no-semantic   # BM25 only
+```
+
+## Rerankers
+
+Pass `--reranker <name>` or use `new RerankerClass()` in your config:
+
+| Name | Class | Notes |
+|------|-------|-------|
+| `cloudflare` | `CloudflareReranker` | Requires `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` |
+| `jina` | `JinaReranker` | Requires `JINA_API_KEY` |
+| `voyage` | `VoyageReranker` | Requires `VOYAGE_API_KEY` |
+
+### Via CLI flag
+
+```bash
+lucerna mcp-server /path/to/project --reranker voyage
+lucerna search /path/to/project "auth middleware" --reranker jina
+```
+
+### Via config file
+
+```ts
+// lucerna.config.ts
+import { VoyageReranker } from '@upstart.gg/lucerna';
+
+export default {
+  rerankingFunction: new VoyageReranker(),
+};
+```
+
+## Combining embedder + reranker
+
+```bash
+lucerna mcp-server /path/to/project \
+  --embedder cloudflare \
+  --reranker voyage
+```
+
+Or in `lucerna.config.ts`:
+
+```ts
+import { CloudflareEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
+
+export default {
+  embeddingFunction: new CloudflareEmbeddings(),
+  rerankingFunction: new VoyageReranker(),
+};
+```

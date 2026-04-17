@@ -3,38 +3,56 @@ title: Reranking
 description: Second-stage cross-encoder reranking to improve search precision.
 ---
 
+import { LinkCard } from '@astrojs/starlight/components';
+
 After RRF fusion, a cross-encoder reranker scores each candidate against the query and re-sorts results by relevance. This improves precision at the cost of an additional inference pass.
 
-Reranking is applied automatically in `search()` and `searchWithContext()` when a `rerankingFunction` is configured. Opt out per-query with `{ rerank: false }`.
+Reranking is applied automatically in `search()` and `searchWithContext()` when a reranker is configured. Opt out per-query with `{ rerank: false }`.
 
-## CloudflareReranker
+## Enabling a reranker
 
-Uses Cloudflare Workers AI (`@cf/baai/bge-reranker-base`, 512-token cross-encoder):
+The easiest way is via `lucerna.config.ts` at your project root — the MCP server and CLI pick it up automatically:
 
 ```ts
-import { CodeIndexer, CloudflareEmbeddings, CloudflareReranker } from '@upstart.gg/lucerna';
+// lucerna.config.ts
+import { VoyageReranker } from '@upstart.gg/lucerna';
 
-const indexer = new CodeIndexer({
-  projectRoot: '.',
-  embeddingFunction: new CloudflareEmbeddings(),
-  rerankingFunction: new CloudflareReranker(),
-});
+export default {
+  rerankingFunction: new VoyageReranker(),
+};
 ```
 
-## Other rerankers
+Or use the `--reranker` flag for a one-off run:
 
-`JinaReranker` and `VoyageReranker` are also provided and follow the same interface.
+```bash
+lucerna mcp-server /path/to/project --reranker voyage
+lucerna search /path/to/project "auth middleware" --reranker jina
+```
+
+## Built-in rerankers
+
+| Name | Class | Env vars required |
+|------|-------|-------------------|
+| `cloudflare` | `CloudflareReranker` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` |
+| `jina` | `JinaReranker` | `JINA_API_KEY` |
+| `voyage` | `VoyageReranker` | `VOYAGE_API_KEY` |
+
+See [Built-in Providers](/configuration/built-in-providers) for flag usage.
 
 ## Custom reranker
 
-Implement `RerankingFunction` to use any provider:
+<LinkCard
+  title="Custom Providers"
+  description="Implement RerankingFunction in a local file or npm package and wire it up in lucerna.config.ts."
+  href="/configuration/custom-providers"
+/>
 
 ```ts
 import type { RerankingFunction } from '@upstart.gg/lucerna';
 
 class MyReranker implements RerankingFunction {
   async rerank(query: string, texts: string[]): Promise<number[]> {
-    // return a relevance score (0–1) for each text in the same order
+    // Return one relevance score (0–1) per text, in the same order.
   }
 }
 ```

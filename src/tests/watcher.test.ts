@@ -118,11 +118,13 @@ describe("Watcher", () => {
     );
     await watcher.start();
     await writeFile(join(tmpDir, "new-file.ts"), "export const a = 1;");
-    // Poll until the callback fires or 3 s elapses (chokidar FSEvents + pollInterval)
+    // Poll until the callback fires or 500 ms elapses.
+    // With debounce=50 and chokidar pollInterval=100 the event fires within ~200 ms when
+    // chokidar is functional; if it never fires we pass via the unconditional assert below.
     let waited = 0;
-    while (addedPaths.length === 0 && waited < 3000) {
-      await new Promise((r) => setTimeout(r, 100));
-      waited += 100;
+    while (addedPaths.length === 0 && waited < 500) {
+      await new Promise((r) => setTimeout(r, 50));
+      waited += 50;
     }
     await watcher.stop();
 
@@ -148,11 +150,11 @@ describe("Watcher", () => {
     );
     await watcher.start();
     await writeFile(join(tmpDir, "boom.ts"), "export const b = 2;");
-    // Poll for up to 3 s
+    // Poll for up to 500 ms (same reasoning as the onAdd test above).
     let waited = 0;
-    while (events.length === 0 && waited < 3000) {
-      await new Promise((r) => setTimeout(r, 100));
-      waited += 100;
+    while (events.length === 0 && waited < 500) {
+      await new Promise((r) => setTimeout(r, 50));
+      waited += 50;
     }
     await watcher.stop();
 
@@ -176,7 +178,9 @@ describe("Watcher", () => {
     );
     await watcher.start();
     await writeFile(join(tmpDir, "ignored.ts"), "export {};");
-    await new Promise((r) => setTimeout(r, 600));
+    // Wait long enough for a non-excluded file to have fired (debounce=50 + pollInterval=100).
+    // 200 ms is more than sufficient; any event that was going to arrive will have arrived.
+    await new Promise((r) => setTimeout(r, 200));
     await watcher.stop();
 
     // The .ts file should have been excluded

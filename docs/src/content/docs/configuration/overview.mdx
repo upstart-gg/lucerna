@@ -1,0 +1,64 @@
+---
+title: Configuration
+description: Configure embedding and reranking providers via lucerna.config.ts.
+---
+
+Lucerna picks up a **config file** from your project root, so you can configure embedding and reranking providers for the CLI and MCP server without writing any integration code.
+
+Supported filenames (checked in order):
+
+- `lucerna.config.ts`
+- `lucerna.config.js`
+- `lucerna.config.mjs`
+
+The file must export a default object that satisfies `LucernaConfig`:
+
+```ts
+// lucerna.config.ts
+import type { LucernaConfig } from '@upstart.gg/lucerna';
+import { VoyageReranker } from '@upstart.gg/lucerna';
+
+export default {
+  // Use Cloudflare for embeddings (reads CLOUDFLARE_* env vars automatically)
+  embeddingFunction: 'cloudflare',   // ← shorthand; see Built-in Providers
+  rerankingFunction: new VoyageReranker(),
+} satisfies LucernaConfig;
+```
+
+## How config is applied
+
+The config file is loaded by both `lucerna mcp-server` and all other CLI commands. CLI flags always take priority over config file settings:
+
+| Priority | Source |
+|----------|--------|
+| 1 (highest) | `--no-semantic` flag (disables embeddings entirely) |
+| 2 | `--embedder` / `--reranker` CLI flags |
+| 3 | `lucerna.config.ts` / `.js` |
+| 4 (lowest) | Auto-detection from environment variables |
+
+## Pointing to a custom path
+
+If your config isn't at the project root, pass `--config`:
+
+```bash
+lucerna mcp-server /path/to/project --config /path/to/my.config.ts
+lucerna index /path/to/project --config ./configs/lucerna.dev.ts
+```
+
+## Type reference
+
+```ts
+interface LucernaConfig {
+  /**
+   * Custom embedding function, or `false` to disable semantic search.
+   * Omit to use the default (auto-detected from env vars).
+   */
+  embeddingFunction?: EmbeddingFunction | false;
+
+  /**
+   * Custom reranking function, or `false` to disable reranking.
+   * Omit to use no reranking (the default).
+   */
+  rerankingFunction?: RerankingFunction | false;
+}
+```

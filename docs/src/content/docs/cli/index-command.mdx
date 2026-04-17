@@ -17,6 +17,9 @@ lucerna index /path/to/project
 | `--include <globs>` | Comma-separated include glob patterns (default: `**/*`) |
 | `--exclude <globs>` | Additional comma-separated exclude glob patterns |
 | `--no-semantic` | Disable semantic search (BM25 only, skips model download) |
+| `--embedder <name>` | Built-in embedder: `cloudflare`, `local`, `bge-small`, `nomic` |
+| `--reranker <name>` | Built-in reranker: `cloudflare`, `jina`, `voyage` |
+| `--config <path>` | Path to a `lucerna.config.ts` / `lucerna.config.js` (default: auto-detected at project root) |
 
 ## Example output
 
@@ -26,5 +29,5 @@ Done. 142 files, 3817 chunks indexed.
 ```
 
 :::tip
-Set `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` to use Cloudflare embeddings automatically; otherwise a local HuggingFace model is used.
+Place a `lucerna.config.ts` at the project root to configure embeddings and reranking without passing flags every time. See [Configuration](/configuration/overview).
 :::

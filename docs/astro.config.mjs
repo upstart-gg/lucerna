@@ -25,6 +25,35 @@ export default defineConfig({
           ],
         },
         {
+          label: "Configuration",
+          collapsed: true,
+          items: [
+            { label: "Overview", slug: "configuration/overview" },
+            {
+              label: "Built-in Providers",
+              slug: "configuration/built-in-providers",
+            },
+            {
+              label: "Custom Providers",
+              slug: "configuration/custom-providers",
+            },
+          ],
+        },
+        {
+          label: "CLI",
+          collapsed: true,
+          items: [
+            { label: "Overview", slug: "cli/overview" },
+            { label: "index", slug: "cli/index-command" },
+            { label: "watch", slug: "cli/watch" },
+            { label: "search", slug: "cli/search" },
+            { label: "graph", slug: "cli/graph" },
+            { label: "stats", slug: "cli/stats" },
+            { label: "clear", slug: "cli/clear" },
+            { label: "eval", slug: "cli/eval" },
+          ],
+        },
+        {
           label: "Concepts",
           collapsed: true,
           items: [
@@ -36,22 +65,7 @@ export default defineConfig({
           ],
         },
         {
-          label: "Embeddings",
-          collapsed: true,
-          items: [
-            { label: "Overview", slug: "embeddings/overview" },
-            { label: "Local Models", slug: "embeddings/local" },
-            { label: "Cloudflare", slug: "embeddings/cloudflare" },
-            { label: "Custom", slug: "embeddings/custom" },
-          ],
-        },
-        {
-          label: "Reranking",
-          collapsed: true,
-          items: [{ label: "Overview", slug: "reranking/overview" }],
-        },
-        {
-          label: "Programmatic Usage",
+          label: "Library API",
           collapsed: true,
           items: [
             { label: "Quick Start", slug: "programmatic-usage/quickstart" },
@@ -68,6 +82,21 @@ export default defineConfig({
             { label: "File Watching", slug: "programmatic-usage/watching" },
             { label: "Inspection", slug: "programmatic-usage/inspection" },
             {
+              label: "Embeddings",
+              collapsed: true,
+              items: [
+                { label: "Overview", slug: "embeddings/overview" },
+                { label: "Local Models", slug: "embeddings/local" },
+                { label: "Cloudflare", slug: "embeddings/cloudflare" },
+                { label: "Custom", slug: "embeddings/custom" },
+              ],
+            },
+            {
+              label: "Reranking",
+              collapsed: true,
+              items: [{ label: "Overview", slug: "reranking/overview" }],
+            },
+            {
               label: "Integrations",
               collapsed: true,
               items: [
@@ -79,20 +108,6 @@ export default defineConfig({
                 },
               ],
             },
-          ],
-        },
-        {
-          label: "CLI",
-          collapsed: true,
-          items: [
-            { label: "Overview", slug: "cli/overview" },
-            { label: "index", slug: "cli/index-command" },
-            { label: "watch", slug: "cli/watch" },
-            { label: "search", slug: "cli/search" },
-            { label: "graph", slug: "cli/graph" },
-            { label: "stats", slug: "cli/stats" },
-            { label: "clear", slug: "cli/clear" },
-            { label: "eval", slug: "cli/eval" },
           ],
         },
       ],

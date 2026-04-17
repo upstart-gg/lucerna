@@ -42,14 +42,19 @@ jobs:
       - run: pnpm ci:lint
       - run: pnpm typecheck
       - run: pnpm ci:test
-      - run: pnpm test:integration
       - run: pnpm test:dist
 
   integration-test:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    # Secrets are only available on push to main, not on fork PRs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Integration Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # Run on push to main, or on PRs from the same repo (forks don't have secret access)
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: pnpm/action-setup@v5.0.0

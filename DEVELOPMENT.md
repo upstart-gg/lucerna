@@ -107,4 +107,4 @@ pnpm changeset:version
 pnpm changeset publish --no-git-tag
 ```
 
-> Make sure you are authenticated with npm (`npm login`) and have publish access to the `@upstart.gg/lucerna` package.
+> Make sure you are authenticated with npm (`npm login`) and have publish access to the `lucerna` package.

@@ -1,5 +1,5 @@
 ---
-"@upstart.gg/lucerna": patch
+"lucerna": patch
 ---
 
 Fix canary snapshot publishing

@@ -1,5 +1,5 @@
 {
-  "name": "@upstart.gg/lucerna",
+  "name": "lucerna",
   "version": "0.1.0",
   "description": "AST-aware semantic + lexical code indexer for AI agents",
   "type": "module",

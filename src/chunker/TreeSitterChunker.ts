@@ -8,17 +8,23 @@ import { extractC } from "./languages/c.js";
 import { extractClojure } from "./languages/clojure.js";
 import { extractCpp } from "./languages/cpp.js";
 import { extractCSharp } from "./languages/csharp.js";
+import { extractCss } from "./languages/css.js";
 import { extractDart } from "./languages/dart.js";
 import { extractElixir } from "./languages/elixir.js";
+import { extractErlang } from "./languages/erlang.js";
 import { extractGo } from "./languages/go.js";
 import { extractGroovy } from "./languages/groovy.js";
 import { extractHaskell } from "./languages/haskell.js";
+import { extractHtml } from "./languages/html.js";
 import { extractJava } from "./languages/java.js";
 import { processJson } from "./languages/json.js";
+import { extractJulia } from "./languages/julia.js";
 import { extractKotlin } from "./languages/kotlin.js";
 import { extractLua } from "./languages/lua.js";
 import { extractMarkdown } from "./languages/markdown.js";
 import { extractMatlab } from "./languages/matlab.js";
+import { extractObjc } from "./languages/objc.js";
+import { extractOcaml } from "./languages/ocaml.js";
 import { extractPerl } from "./languages/perl.js";
 import { extractPhp } from "./languages/php.js";
 import { extractPowerShell } from "./languages/powershell.js";
@@ -27,11 +33,16 @@ import { extractR } from "./languages/r.js";
 import { extractRuby } from "./languages/ruby.js";
 import { extractRust } from "./languages/rust.js";
 import { extractScala } from "./languages/scala.js";
+import { extractScss } from "./languages/scss.js";
 import { extractSolidity } from "./languages/solidity.js";
 import { extractSql } from "./languages/sql.js";
+import { extractSvelte } from "./languages/svelte.js";
 import { extractSwift } from "./languages/swift.js";
+import { extractToml } from "./languages/toml.js";
 import { extractTsJs } from "./languages/typescript.js";
+import { extractVue } from "./languages/vue.js";
 import { extractXml } from "./languages/xml.js";
+import { extractYaml } from "./languages/yaml.js";
 import { extractZig } from "./languages/zig.js";
 
 // Languages pre-initialized with the language pack (all tree-sitter grammars)
@@ -43,6 +54,7 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   jsx: "javascript",
   sh: "bash",
   shellscript: "bash",
+  ocaml_interface: "ocaml",
 };
 
 export interface ChunkerOptions {
@@ -100,6 +112,8 @@ export class TreeSitterChunker {
   }
 
   static detectLanguage(filePath: string): Language | null {
+    // .mm (Objective-C++) is not in the pack manifest — handle manually
+    if (filePath.endsWith(".mm")) return "objc";
     const raw = languagePack.detectLanguage(filePath);
     if (!raw) return null;
     return LANGUAGE_ALIASES[raw] ?? raw;
@@ -395,6 +409,48 @@ export class TreeSitterChunker {
         projectId,
         this.minMergeChars,
       ));
+    } else if (language === "julia") {
+      ({ chunks, rawEdges } = extractJulia(
+        source,
+        filePath,
+        projectId,
+        this.minMergeChars,
+      ));
+    } else if (language === "ocaml") {
+      ({ chunks, rawEdges } = extractOcaml(
+        source,
+        filePath,
+        projectId,
+        this.minMergeChars,
+      ));
+    } else if (language === "erlang") {
+      ({ chunks, rawEdges } = extractErlang(
+        source,
+        filePath,
+        projectId,
+        this.minMergeChars,
+      ));
+    } else if (language === "objc") {
+      ({ chunks, rawEdges } = extractObjc(
+        source,
+        filePath,
+        projectId,
+        this.minMergeChars,
+      ));
+    } else if (language === "toml") {
+      ({ chunks, rawEdges } = extractToml(source, filePath, projectId));
+    } else if (language === "yaml") {
+      ({ chunks, rawEdges } = extractYaml(source, filePath, projectId));
+    } else if (language === "html") {
+      ({ chunks, rawEdges } = extractHtml(source, filePath, projectId));
+    } else if (language === "css") {
+      ({ chunks, rawEdges } = extractCss(source, filePath, projectId));
+    } else if (language === "scss") {
+      ({ chunks, rawEdges } = extractScss(source, filePath, projectId));
+    } else if (language === "vue") {
+      ({ chunks, rawEdges } = extractVue(source, filePath, projectId));
+    } else if (language === "svelte") {
+      ({ chunks, rawEdges } = extractSvelte(source, filePath, projectId));
     } else {
       return { chunks: [], rawEdges: [] };
     }

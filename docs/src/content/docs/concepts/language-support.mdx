@@ -41,6 +41,17 @@ Lucerna ships custom AST-aware chunkers for popular languages. Files in any othe
 | JSON | `.json` | Top-level key splitting for large files; single chunk for small files | — |
 | Markdown | `.md`, `.mdx` | Heading-based sections (H1–H3) with full breadcrumbs | — |
 | XML | `.xml`, `.xsd`, `.xsl` | Top-level element splitting for large files; single chunk for small files | — |
+| TOML | `.toml` | Table splitting by `[section]` / `[[array]]` headers | — |
+| YAML | `.yaml`, `.yml` | Top-level key splitting | — |
+| HTML | `.html`, `.htm` | Top-level element splitting (like XML) | — |
+| CSS | `.css` | Rule-set splitting by selector | — |
+| SCSS | `.scss` | Rule-set splitting; named `@mixin` and `@function` definitions | — |
+| Vue | `.vue` | One chunk per top-level block: `<script>`, `<template>`, `<style>` | — |
+| Svelte | `.svelte` | One chunk per block: `<script>`, `<style>`, remaining markup as `template` | — |
+| Julia | `.jl` | Imports, functions, structs (`class`), modules (`class`) | `IMPORTS`, `DEFINES`, `CALLS` |
+| OCaml | `.ml`, `.mli` | Imports (`open`), let bindings, type definitions, modules | `IMPORTS`, `DEFINES` |
+| Erlang | `.erl` | Module/export attributes (import), functions | `IMPORTS`, `DEFINES`, `CALLS` |
+| Objective-C | `.m`, `.mm` | Imports (`#import`), interfaces, implementations, methods | `IMPORTS`, `DEFINES`, `CALLS` |
 | All other languages | — | Not indexed | — |
 
 `DEFINES` edges link the import chunk to every named symbol in the same file. `EXTENDS`/`IMPLEMENTS` edges are emitted when inheritance syntax is present and the grammar supports it.

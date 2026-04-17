@@ -1,21 +1,25 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
 
-permissions: read-all
+# Prevent concurrent runs so a version bump and a publish don't race.
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write       # push version commit, create git tags + GitHub Releases
+  pull-requests: write  # open / update the "Version Packages" PR
+  id-token: write       # npm SLSA provenance
 
 jobs:
   release:
-    name: Publish to npm
+    name: Version or Publish
     runs-on: ubuntu-latest
-    environment: npm-publish
-    permissions:
-      contents: read
-      id-token: write # npm SLSA provenance
     steps:
       - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0 # full history required for changeset detection
 
       - uses: pnpm/action-setup@v5.0.0
         with:
@@ -24,17 +28,27 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2.2.0
 
-      # setup-node is required to configure ~/.npmrc for NODE_AUTH_TOKEN
+      # setup-node configures ~/.npmrc so NODE_AUTH_TOKEN is used for publish
       - uses: actions/setup-node@v6.3.0
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm build
 
-      - run: pnpm changeset publish --no-git-tag
+      # On every push to main:
+      #   • If changeset files exist  → create / update the "Version Packages" PR
+      #   • If no changeset files left → run publish, create git tags + GitHub Releases
+      - uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
+        with:
+          version: pnpm changeset:version
+          publish: pnpm changeset:publish
+          title: "chore: version packages"
+          commit: "chore: version packages"
+          createGithubReleases: true
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"

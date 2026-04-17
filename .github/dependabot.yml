@@ -1,22 +1,47 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    labels: ["dependencies"]
-    groups:
-      dev-dependencies:
-        dependency-type: "development"
 
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: github-actions
+    directory: /
+    labels: ["dependencies", "github-actions"]
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "00:00"
+
+  - package-ecosystem: "npm" # See documentation for possible values
     directory: "/"
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 1
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    labels: ["dependencies", "github-actions"]
+
+    # Update `dependencies` and `devDependencies` separately
+    # Create grouped PRs for minor/patch updates
+    # Major version updates will get individual PRs
+    versioning-strategy: increase
+    groups:
+      production:
+        patterns:
+          - "*"
+        dependency-type: production
+        update-types:
+          - patch
+          - minor
+      development:
+        patterns:
+          - "*"
+        dependency-type: development
+        update-types:
+          - patch
+          - minor
+
+

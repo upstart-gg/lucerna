@@ -11,3 +11,4 @@ benchmark-results.jsonl
 .bench-index-bge
 .bench-index-coderank
 .DS_Store
+.astro/

@@ -517,6 +517,27 @@ function printChunks(chunks: CodeChunk[], labels?: string[]): void {
   console.log(`${chunks.length} result(s)`);
 }
 
+// ---------------------------------------------------------------------------
+// mcp-server command
+// ---------------------------------------------------------------------------
+
+program
+  .command("mcp-server [project-root]")
+  .description(
+    "Start an MCP stdio server for the project — indexes on start, watches for changes",
+  )
+  .option("--storage-dir <dir>", "Override storage directory")
+  .option("--no-semantic", "Disable semantic/vector search (lexical only)")
+  .action(async (projectRoot = ".", opts: Record<string, unknown>) => {
+    const { startMcpServer } = await import("../mcp/server.js");
+    await startMcpServer(resolve(projectRoot), {
+      ...(opts.storageDir
+        ? { storageDir: resolve(String(opts.storageDir)) }
+        : {}),
+      ...(opts.semantic === false ? { semantic: false } : {}),
+    });
+  });
+
 program.parseAsync(process.argv).catch((err) => {
   console.error(err instanceof Error ? err.message : String(err));
   process.exit(1);

@@ -230,7 +230,7 @@ describe("Watcher — event handler internals (whitebox)", () => {
     await new Promise((r) => setTimeout(r, 50));
     await watcher.stop();
 
-    expect(added.some((p) => p.endsWith("src/a.ts"))).toBe(true);
+    expect(added.some((p) => p.endsWith(join("src", "a.ts")))).toBe(true);
   });
 
   test("'change' event handler calls onChange", async () => {
@@ -249,7 +249,7 @@ describe("Watcher — event handler internals (whitebox)", () => {
     await new Promise((r) => setTimeout(r, 50));
     await watcher.stop();
 
-    expect(changed.some((p) => p.endsWith("src/b.ts"))).toBe(true);
+    expect(changed.some((p) => p.endsWith(join("src", "b.ts")))).toBe(true);
   });
 
   test("'unlink' event handler calls onRemove", async () => {
@@ -268,7 +268,7 @@ describe("Watcher — event handler internals (whitebox)", () => {
     await new Promise((r) => setTimeout(r, 50));
     await watcher.stop();
 
-    expect(removed.some((p) => p.endsWith("src/c.ts"))).toBe(true);
+    expect(removed.some((p) => p.endsWith(join("src", "c.ts")))).toBe(true);
   });
 
   test("debounce cancels an in-flight timer when the same key fires again", async () => {
@@ -292,7 +292,9 @@ describe("Watcher — event handler internals (whitebox)", () => {
     await watcher.stop();
 
     // Should have been called exactly once (debounce deduplicated)
-    expect(calls.filter((p) => p.endsWith("src/d.ts"))).toHaveLength(1);
+    expect(calls.filter((p) => p.endsWith(join("src", "d.ts")))).toHaveLength(
+      1,
+    );
   });
 
   test("debounce: callback error is captured via onEvent", async () => {

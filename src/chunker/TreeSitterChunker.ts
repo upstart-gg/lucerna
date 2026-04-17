@@ -50,6 +50,14 @@ export class TreeSitterChunker {
   private minMergeChars: number;
   /** Languages that have been passed to packInit and are ready to use. */
   private initializedLanguages: Set<string> = new Set();
+  /**
+   * All languages listed in the pack manifest. Populated once in initialize().
+   * Used instead of hasLanguage() to guard lazy-init: hasLanguage() only returns
+   * true for already-cached grammars, so it silently skips valid languages on a
+   * cold cache (e.g. a fresh CI runner). manifestLanguages() reflects the full
+   * set of supported languages regardless of local cache state.
+   */
+  private supportedLanguages: Set<string> = new Set();
   private initialized = false;
 
   constructor(options: ChunkerOptions = {}) {
@@ -60,6 +68,11 @@ export class TreeSitterChunker {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    // Cache the manifest once so the lazy-init guard below doesn't need to call
+    // hasLanguage(), which requires the grammar to already be cached locally.
+    for (const lang of languagePack.manifestLanguages()) {
+      this.supportedLanguages.add(lang);
+    }
     // Pre-warm the default languages; all others are initialized lazily on first encounter.
     packInit({ languages: DEFAULT_LANGUAGES });
     for (const lang of DEFAULT_LANGUAGES) this.initializedLanguages.add(lang);
@@ -146,11 +159,15 @@ export class TreeSitterChunker {
     // Markdown is handled inline — no grammar initialization needed.
     // For all other languages, lazily initialize via packInit on first encounter.
     if (language !== "markdown" && !this.initializedLanguages.has(language)) {
-      if (!languagePack.hasLanguage(language)) {
+      // Guard against truly unsupported languages using the manifest, not hasLanguage().
+      // hasLanguage() returns false for languages that haven't been downloaded to the
+      // local cache yet — this would silently produce 0 chunks on a cold cache (CI).
+      // manifestLanguages() reflects all supported languages regardless of cache state.
+      if (!this.supportedLanguages.has(language)) {
         return { chunks: [], rawEdges: [] };
       }
-      // packInit is synchronous; safe to call from concurrent Promise.all paths
-      // because the check+init+add block has no await — JS won't context-switch.
+      // packInit downloads + initializes the grammar; safe to call from concurrent
+      // Promise.all paths — no await means JS won't context-switch mid-block.
       packInit({ languages: [language] });
       this.initializedLanguages.add(language);
     }

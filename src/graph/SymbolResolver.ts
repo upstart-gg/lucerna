@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { dirname, extname, relative, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 import type { CodeChunk, GraphEdge } from "../types.js";
 import { hashEdgeId } from "./types.js";
 import type { RawEdge } from "./types.js";
@@ -168,8 +168,9 @@ export class SymbolResolver {
       if (existsSync(base + probe)) return base + probe;
     }
     // Try index files
-    for (const probe of ["/index.ts", "/index.tsx", "/index.js"]) {
-      if (existsSync(base + probe)) return base + probe;
+    for (const idxFile of ["index.ts", "index.tsx", "index.js"]) {
+      const p = join(base, idxFile);
+      if (existsSync(p)) return p;
     }
     return null;
   }

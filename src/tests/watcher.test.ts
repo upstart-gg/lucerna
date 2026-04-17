@@ -292,7 +292,9 @@ describe("Watcher — event handler internals (whitebox)", () => {
     await watcher.stop();
 
     // Should have been called exactly once (debounce deduplicated)
-    expect(calls.filter((p) => p.endsWith(join("src", "d.ts")))).toHaveLength(1);
+    expect(calls.filter((p) => p.endsWith(join("src", "d.ts")))).toHaveLength(
+      1,
+    );
   });
 
   test("debounce: callback error is captured via onEvent", async () => {

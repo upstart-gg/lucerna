@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.2
+
+### Patch Changes
+
+- [#19](https://github.com/upstart-gg/lucerna/pull/19) [`75fef64`](https://github.com/upstart-gg/lucerna/commit/75fef64092e5bbe3ab001f458aa716224b349483) Thanks [@mattallty](https://github.com/mattallty)! - Fix release workflow
+
 ## 0.1.1
 
 ### Patch Changes

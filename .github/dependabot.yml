@@ -18,7 +18,7 @@ updates:
     cooldown:
       semver-major-days: 30
       semver-minor-days: 7
-      semver-patch-days: 0
+      semver-patch-days: 1
     open-pull-requests-limit: 10
     labels: ["dependencies"]
     schedule:

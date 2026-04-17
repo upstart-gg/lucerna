@@ -47,11 +47,11 @@ Or download a prebuilt binary directly from [GitHub Releases](https://github.com
 Run the CLI directly without a global install:
 
 ```bash
-npx lucerna index /path/to/project
+npx @upstart.gg/lucerna index /path/to/project
 # or
-pnpx lucerna search /path/to/project "my query"
+pnpx @upstart.gg/lucerna search /path/to/project "my query"
 # or
-bunx lucerna index /path/to/project
+bunx @upstart.gg/lucerna index /path/to/project
 ```
 
 > **Runtime requirement:** Node.js ≥ 20 or Bun ≥ 1.0.
@@ -318,17 +318,17 @@ Per-query breakdown:
 Install as a library dependency:
 
 ```bash
-pnpm add lucerna
+pnpm add @upstart.gg/lucerna
 # or
-npm install lucerna
+npm install @upstart.gg/lucerna
 # or
-bun add lucerna
+bun add @upstart.gg/lucerna
 ```
 
 ### Quick start
 
 ```ts
-import { CodeIndexer } from 'lucerna';
+import { CodeIndexer } from '@upstart.gg/lucerna';
 
 const indexer = new CodeIndexer({
   projectRoot: '/path/to/your/project',
@@ -541,7 +541,7 @@ When `embeddingFunction` is not set, the indexer auto-selects:
 ### Local models
 
 ```ts
-import { CodeIndexer, BGESmallEmbeddings, HFEmbeddings, NomicCodeEmbeddings } from 'lucerna';
+import { CodeIndexer, BGESmallEmbeddings, HFEmbeddings, NomicCodeEmbeddings } from '@upstart.gg/lucerna';
 
 // Code-optimised local model (default when no Cloudflare env vars)
 const indexer = new CodeIndexer({
@@ -573,7 +573,7 @@ All local models run via `@huggingface/transformers` + ONNX. Models are download
 Uses Cloudflare Workers AI (`@cf/baai/bge-m3`, 1024 dimensions). Requires a Cloudflare account with Workers AI enabled.
 
 ```ts
-import { CodeIndexer, CloudflareEmbeddings } from 'lucerna';
+import { CodeIndexer, CloudflareEmbeddings } from '@upstart.gg/lucerna';
 
 const indexer = new CodeIndexer({
   projectRoot: '.',
@@ -609,7 +609,7 @@ const indexer = new CodeIndexer({
 ### Custom embedding function
 
 ```ts
-import type { EmbeddingFunction } from 'lucerna';
+import type { EmbeddingFunction } from '@upstart.gg/lucerna';
 
 class OpenAIEmbeddings implements EmbeddingFunction {
   readonly dimensions = 1536;
@@ -641,7 +641,7 @@ After RRF fusion, a cross-encoder reranker scores each candidate against the que
 Uses Cloudflare Workers AI (`@cf/baai/bge-reranker-base`, 512-token cross-encoder).
 
 ```ts
-import { CodeIndexer, CloudflareEmbeddings, CloudflareReranker } from 'lucerna';
+import { CodeIndexer, CloudflareEmbeddings, CloudflareReranker } from '@upstart.gg/lucerna';
 
 const indexer = new CodeIndexer({
   projectRoot: '.',
@@ -657,7 +657,7 @@ Reranking is applied automatically in `search()` and `searchWithContext()` when 
 `JinaReranker` and `VoyageReranker` are also provided and follow the same interface. Bring your own by implementing `RerankingFunction`:
 
 ```ts
-import type { RerankingFunction } from 'lucerna';
+import type { RerankingFunction } from '@upstart.gg/lucerna';
 
 class MyReranker implements RerankingFunction {
   async rerank(query: string, texts: string[]): Promise<number[]> {
@@ -786,7 +786,7 @@ const backendResults  = await backend.search('authentication handler');
 ```ts
 import { tool } from 'ai';
 import { z } from 'zod';
-import { CodeIndexer } from 'lucerna';
+import { CodeIndexer } from '@upstart.gg/lucerna';
 
 const indexer = new CodeIndexer({ projectRoot: process.cwd() });
 await indexer.initialize();
@@ -819,7 +819,7 @@ export const searchCodeTool = tool({
 
 ```ts
 import Anthropic from '@anthropic-ai/sdk';
-import { CodeIndexer } from 'lucerna';
+import { CodeIndexer } from '@upstart.gg/lucerna';
 
 const indexer = new CodeIndexer({ projectRoot: process.cwd() });
 await indexer.initialize();

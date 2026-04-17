@@ -259,7 +259,6 @@ export async function startMcpServer(
       resolvePromise();
     });
   });
-
   await indexer.close();
 }
 

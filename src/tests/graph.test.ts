@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { CodeIndexer } from "../CodeIndexer.js";
 import { TreeSitterChunker } from "../chunker/index.js";
 import { GraphTraverser } from "../graph/GraphTraverser.js";
@@ -1037,7 +1037,7 @@ describe("SymbolResolver — buildExportMap", () => {
       },
     ];
     const map = resolver.buildExportMap(chunks);
-    const absPath = join("/proj", "src/utils.ts");
+    const absPath = resolve("/proj", "src/utils.ts");
     expect(map.get(absPath)?.get("formatDate")).toBe("chunk-1");
   });
 
@@ -1059,7 +1059,7 @@ describe("SymbolResolver — buildExportMap", () => {
       },
     ];
     const map = resolver.buildExportMap(chunks);
-    const absPath = join("/proj", "src/svc.ts");
+    const absPath = resolve("/proj", "src/svc.ts");
     expect(map.get(absPath)?.get("UserService#getUser")).toBe("chunk-2");
     expect(map.get(absPath)?.get("getUser")).toBe("chunk-2");
   });
@@ -1160,7 +1160,7 @@ describe("SymbolResolver — resolveAll", () => {
       {
         id: "imp-chunk",
         projectId: "proj",
-        filePath: "src/app.ts",
+        filePath: join("src", "app.ts"),
         language: "typescript" as const,
         type: "import" as const,
         content: "",
@@ -1172,7 +1172,7 @@ describe("SymbolResolver — resolveAll", () => {
       {
         id: "utils-import-chunk",
         projectId: "proj",
-        filePath: "src/utils.ts",
+        filePath: join("src", "utils.ts"),
         language: "typescript" as const,
         type: "import" as const,
         content: "",

@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.3
+
+### Patch Changes
+
+- [#28](https://github.com/upstart-gg/lucerna/pull/28) [`e81db25`](https://github.com/upstart-gg/lucerna/commit/e81db25b55f6d49ba5981079266a0f3cde687a94) Thanks [@mattallty](https://github.com/mattallty)! - Tst release workflow with changeset
+
 ## 0.1.2
 
 ### Patch Changes

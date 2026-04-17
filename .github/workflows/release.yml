@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0 # full history required for changeset detection
 
-      - uses: pnpm/action-setup@v5.0.0
+      - uses: pnpm/action-setup@v6.0.1
         with:
           version: "10"
           cache: true

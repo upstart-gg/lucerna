@@ -28,7 +28,7 @@
     "lint": "biome check --write",
     "ci:lint": "biome ci .",
     "dev": "bun run src/cli/index.ts",
-"bench": "bun scripts/benchmark.ts",
+    "bench": "bun scripts/benchmark.ts",
     "bench:no-semantic": "BENCH_SEMANTIC=0 bun scripts/benchmark.ts",
     "changeset": "changeset",
     "changeset:version": "changeset version",

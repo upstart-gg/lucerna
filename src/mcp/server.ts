@@ -98,7 +98,9 @@ export async function startMcpServer(
         .max(3)
         .optional()
         .default(1)
-        .describe("How many graph hops to follow when expanding context (default: 1)"),
+        .describe(
+          "How many graph hops to follow when expanding context (default: 1)",
+        ),
       limit: z
         .number()
         .int()
@@ -141,10 +143,9 @@ export async function startMcpServer(
       type,
       filePath,
     }) => {
-      const warning =
-        !indexingComplete
-          ? "Lucerna is still indexing this project for the first time. Results may be incomplete — please retry in a few seconds."
-          : undefined;
+      const warning = !indexingComplete
+        ? "Lucerna is still indexing this project for the first time. Results may be incomplete — please retry in a few seconds."
+        : undefined;
 
       const baseOpts: SearchOptions = {
         limit,
@@ -153,16 +154,12 @@ export async function startMcpServer(
         ...(filePath !== undefined ? { filePath } : {}),
       };
 
-      let results;
-      if (includeGraphContext) {
-        const ctxOpts: SearchWithContextOptions = {
-          ...baseOpts,
-          graphDepth: graphDepth ?? 1,
-        };
-        results = await indexer.searchWithContext(query, ctxOpts);
-      } else {
-        results = await indexer.search(query, baseOpts);
-      }
+      const results = await (includeGraphContext
+        ? indexer.searchWithContext(query, {
+            ...baseOpts,
+            graphDepth: graphDepth ?? 1,
+          } satisfies SearchWithContextOptions)
+        : indexer.search(query, baseOpts));
 
       const payload: {
         results: typeof results;

@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.4
+
+### Patch Changes
+
+- [#30](https://github.com/upstart-gg/lucerna/pull/30) [`9b14189`](https://github.com/upstart-gg/lucerna/commit/9b14189202aa54a64d8358185624256018f58dcd) Thanks [@mattallty](https://github.com/mattallty)! - Implement custom languages & add docs
+
 ## 0.1.3
 
 ### Patch Changes

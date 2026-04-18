@@ -1,5 +1,6 @@
 {
   "name": "lucerna-docs",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "astro dev",

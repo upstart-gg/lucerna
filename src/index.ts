@@ -32,7 +32,6 @@ export { CloudflareReranker } from "./embeddings/CloudflareReranker.js";
 export { HFEmbeddings } from "./embeddings/HFEmbeddings.js";
 export { JinaCodeEmbeddings } from "./embeddings/JinaCodeEmbeddings.js";
 export { JinaReranker } from "./embeddings/JinaReranker.js";
-export { NomicCodeEmbeddings } from "./embeddings/NomicCodeEmbeddings.js";
 export { VoyageReranker } from "./embeddings/VoyageReranker.js";
 // Graph (for standalone use)
 export { GraphTraverser, SymbolResolver } from "./graph/index.js";

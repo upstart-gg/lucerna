@@ -5,16 +5,16 @@ description: Run embedding models locally via ONNX with no API key.
 
 All local models run via `@huggingface/transformers` + ONNX. Models are downloaded from Hugging Face Hub on first use and cached locally.
 
-## NomicCodeEmbeddings (default)
+## JinaCodeEmbeddings (default)
 
-A code-optimised model. This is the default when no Cloudflare env vars are set.
+A code-optimised model (`jinaai/jina-embeddings-v2-base-code`). This is the default when no Cloudflare env vars are set. Produces 768-dimensional embeddings with an 8K token context window across 30+ programming languages.
 
 ```ts
-import { CodeIndexer, NomicCodeEmbeddings } from '@upstart.gg/lucerna';
+import { CodeIndexer, JinaCodeEmbeddings } from '@upstart.gg/lucerna';
 
 const indexer = new CodeIndexer({
   projectRoot: '.',
-  embeddingFunction: new NomicCodeEmbeddings(),
+  embeddingFunction: new JinaCodeEmbeddings(),
 });
 ```
 

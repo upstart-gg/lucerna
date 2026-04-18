@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // ---------------------------------------------------------------------------
-// Mock @huggingface/transformers — same pattern as NomicCodeEmbeddings.test.ts
+// Mock @huggingface/transformers — same pattern as HFEmbeddings.test.ts
 // ---------------------------------------------------------------------------
 
 const mockDispose = mock(async () => {});

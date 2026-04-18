@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // ---------------------------------------------------------------------------
-// Mock @huggingface/transformers — same pattern as NomicCodeEmbeddings.test.ts
+// Mock @huggingface/transformers — same pattern as HFEmbeddings.test.ts
 // ---------------------------------------------------------------------------
 
 const mockDispose = mock(async () => {});
@@ -56,13 +56,13 @@ describe("JinaCodeEmbeddings", () => {
     }
   });
 
-  test("uses jinaai/jina-embeddings-v2-base-code model with fp32 dtype", async () => {
+  test("uses jinaai/jina-embeddings-v2-base-code model with q8 dtype", async () => {
     const e = new JinaCodeEmbeddings();
     await e.generate(["x"]);
     expect(mockPipelineFactory).toHaveBeenCalledWith(
       "feature-extraction",
       "jinaai/jina-embeddings-v2-base-code",
-      expect.objectContaining({ dtype: "fp32" }),
+      expect.objectContaining({ dtype: "q8" }),
     );
   });
 

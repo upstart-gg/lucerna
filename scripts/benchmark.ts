@@ -22,6 +22,7 @@ import {
   CodeIndexer,
   HFEmbeddings,
   BGESmallEmbeddings,
+  JinaCodeEmbeddings,
   CloudflareReranker,
 } from "../src/index.js";
 import type { EmbeddingFunction } from "../src/index.js";
@@ -196,7 +197,10 @@ async function main() {
   const indexer = new CodeIndexer({
     projectRoot: PROJECT_ROOT,
     storageDir: STORAGE_DIR,
-    embeddingFunction: SEMANTIC_ENABLED ? undefined : false,
+    // Use BGESmallEmbeddings (~33 MB) rather than the production default
+    // JinaCodeEmbeddings (~162 MB q8) to avoid OOM during the main benchmark.
+    // JinaCodeEmbeddings is covered separately in the BENCH_MODELS comparison.
+    embeddingFunction: SEMANTIC_ENABLED ? new BGESmallEmbeddings() : false,
     // Exclude the bench storage dir and test fixtures
     exclude: [
       "**/node_modules/**",
@@ -688,7 +692,7 @@ async function main() {
       };
     }
 
-    hr("Model comparison — all-MiniLM-L6-v2 vs bge-small-en-v1.5");
+    hr("Model comparison — MiniLM vs BGE-small vs Jina-code");
     console.log(
       dim("│  (models are downloaded on first run and cached locally)"),
     );
@@ -697,14 +701,19 @@ async function main() {
 
     for (const [label, embFn, dir] of [
       [
-        "all-MiniLM-L6-v2 (default)",
+        "all-MiniLM-L6-v2 (384-dim)",
         new HFEmbeddings(),
         resolve(import.meta.dirname, "..", ".bench-index-minilm"),
       ],
       [
-        "bge-small-en-v1.5",
+        "bge-small-en-v1.5 (384-dim)",
         new BGESmallEmbeddings(),
         resolve(import.meta.dirname, "..", ".bench-index-bge"),
+      ],
+      [
+        "jina-embeddings-v2-base-code q8 (768-dim, default)",
+        new JinaCodeEmbeddings(),
+        resolve(import.meta.dirname, "..", ".bench-index-jina"),
       ],
     ] as [string, EmbeddingFunction, string][]) {
       console.log(dim(`│\n│  ▶ ${label}`));
@@ -717,25 +726,30 @@ async function main() {
       modelResults.push(r);
     }
 
-    // Side-by-side delta summary
-    if (modelResults.length === 2) {
-      const [base, bge] = modelResults as [ModelResult, ModelResult];
-      console.log(dim("│\n│  ── delta (bge vs MiniLM) ──"));
-      const indexDelta = ((bge.indexMs / base.indexMs - 1) * 100).toFixed(0);
-      const searchDelta = (
-        (bge.searchMean / base.searchMean - 1) *
-        100
-      ).toFixed(0);
-      row(
-        "  index time",
-        `${Number(indexDelta) > 0 ? "+" : ""}${indexDelta}%`,
-        `${formatMs(base.indexMs)} → ${formatMs(bge.indexMs)}`,
-      );
-      row(
-        "  search latency",
-        `${Number(searchDelta) > 0 ? "+" : ""}${searchDelta}%`,
-        `${formatMs(base.searchMean)} → ${formatMs(bge.searchMean)}`,
-      );
+    // Side-by-side delta summary (each model vs the first/baseline)
+    if (modelResults.length >= 2) {
+      const base = modelResults[0] as ModelResult;
+      console.log(dim(`│\n│  ── delta vs ${base.label} ──`));
+      for (const other of modelResults.slice(1)) {
+        const indexDelta = ((other.indexMs / base.indexMs - 1) * 100).toFixed(
+          0,
+        );
+        const searchDelta = (
+          (other.searchMean / base.searchMean - 1) *
+          100
+        ).toFixed(0);
+        console.log(dim(`│  ${other.label}`));
+        row(
+          "    index time",
+          `${Number(indexDelta) > 0 ? "+" : ""}${indexDelta}%`,
+          `${formatMs(base.indexMs)} → ${formatMs(other.indexMs)}`,
+        );
+        row(
+          "    search latency",
+          `${Number(searchDelta) > 0 ? "+" : ""}${searchDelta}%`,
+          `${formatMs(base.searchMean)} → ${formatMs(other.searchMean)}`,
+        );
+      }
     }
 
     results.modelComparison = modelResults;

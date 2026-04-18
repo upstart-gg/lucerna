@@ -3,7 +3,30 @@ title: Configuration
 description: Configure embedding and reranking providers via lucerna.config.ts.
 ---
 
-Lucerna picks up a **config file** from your project root, so you can configure embedding and reranking providers for the CLI and MCP server without writing any integration code.
+:::tip[Optional]
+A config file is not required. Lucerna works out of the box with no configuration — this is only needed if you want to enable semantic search with a specific embedding provider or improve result ranking with a reranker.
+:::
+
+Lucerna picks up an optional **config file** from your project root to configure embedding and reranking providers for the CLI and MCP server without writing any integration code.
+
+Place a `lucerna.config.ts` at the project root — the MCP server and all CLI commands pick it up automatically:
+
+```ts
+// lucerna.config.ts
+import { CloudflareEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
+
+export default {
+  embeddingFunction: new CloudflareEmbeddings(),
+  rerankingFunction: new VoyageReranker(),
+};
+```
+
+You can also pass providers as CLI flags instead of a config file:
+
+```bash
+npx @upstart.gg/lucerna mcp-server --embedder cloudflare --reranker voyage
+npx @upstart.gg/lucerna mcp-server --config /path/to/lucerna.config.ts
+```
 
 Supported filenames (checked in order):
 

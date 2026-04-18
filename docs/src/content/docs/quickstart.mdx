@@ -5,7 +5,9 @@ description: Install and configure the Lucerna MCP server for AI coding assistan
 
 Lucerna ships a built-in [Model Context Protocol](https://modelcontextprotocol.io/) server so AI coding assistants (Claude Code, Cursor, Windsurf, Zed, VS Code, and more) can search your codebase directly.
 
-When the MCP server starts it **indexes the project and begins watching for file changes automatically** — no separate `lucerna watch` process needed.
+:::tip[Works out of the box]
+The MCP server requires **no configuration**. When it starts, it indexes the project and begins watching for file changes automatically — no separate `lucerna watch` process needed, no API keys required.
+:::
 
 ## Setup
 
@@ -16,29 +18,6 @@ npx add-mcp "@upstart.gg/lucerna mcp-server" --name lucerna
 ```
 
 `add-mcp` will prompt you to choose which clients to configure (Claude Code, Claude Desktop, Cursor, VS Code, Zed, etc.). The MCP server will use **the working directory of the client** as the project root — no hardcoded paths needed.
-
-## Configuring embeddings and reranking
-
-Place a `lucerna.config.ts` at the project root to configure providers — the MCP server picks it up automatically:
-
-```ts
-// lucerna.config.ts
-import { CloudflareEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
-
-export default {
-  embeddingFunction: new CloudflareEmbeddings(),
-  rerankingFunction: new VoyageReranker(),
-};
-```
-
-Or pass flags directly in the MCP server command:
-
-```bash
-npx @upstart.gg/lucerna mcp-server --embedder cloudflare --reranker voyage
-npx @upstart.gg/lucerna mcp-server --config /path/to/lucerna.config.ts
-```
-
-See [Configuration](/configuration/overview) and [Custom Providers](/configuration/custom-providers) for full details.
 
 ## MCP tools
 
@@ -62,3 +41,5 @@ See [Configuration](/configuration/overview) and [Custom Providers](/configurati
 :::note
 **First-time indexing:** If the project has never been indexed, `search_codebase` returns `{ results: [], warning: "Lucerna is still indexing…" }`. Results become available once the initial index completes (typically a few seconds for small projects).
 :::
+
+To improve search quality with custom embedding or reranking providers, see [Configuration](/configuration/overview).

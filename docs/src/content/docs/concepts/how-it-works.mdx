@@ -16,7 +16,7 @@ flowchart TD
     TSC -->|"RawEdge[]"| SR
 
     EMB["EmbeddingFunction
-    Gemma / Nomic / Jina / HF / CF / custom / disabled"]
+    Voyage / OpenAI / Cohere / Gemini / Ollama / custom / disabled"]
     SR["SymbolResolver
     resolves symbols to real chunk IDs"]
 
@@ -68,7 +68,7 @@ flowchart LR
     C --> E["Reciprocal Rank Fusion\nk=45"]
     D --> E
     E --> F{"reranker\nconfigured?"}
-    F -->|yes| G["JinaReranker /\nVoyageReranker"]
+    F -->|yes| G["VoyageReranker /\nCohereReranker / …"]
     F -->|no| H
     G --> H(["SearchResult[]"])
 ```

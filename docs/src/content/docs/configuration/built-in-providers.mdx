@@ -1,91 +1,333 @@
 ---
 title: Built-in Providers
-description: Select embedding and reranking providers via CLI flags or the config file.
+description: Embedding and reranking providers with recommended models and pricing.
 ---
 
-Lucerna ships several embedding and reranking providers. You can select them with CLI flags (no config file needed) or instantiate them in `lucerna.config.ts`.
+Lucerna supports multiple remote embedding and reranking providers. The recommended way to configure them is via your `.mcp.json` file — see [Env Vars](/configuration/env-vars) for the full variable reference, or [Custom Providers](/configuration/custom-providers) for the `lucerna.config.ts` approach.
 
-## Embedders
+:::note[Pricing]
+Prices shown are approximate as of April 2026 and subject to change. Always verify at the provider's pricing page before budgeting.
+:::
 
-Pass `--embedder <name>` to any command, or use `new ProviderClass()` in your config file:
+---
 
-| Name | Class | Notes |
-|------|-------|-------|
-| `cloudflare` | `CloudflareEmbeddings` | Requires `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` |
-| `gemma` | `GemmaEmbeddings` | Local Gemma 300M model, MTEB 68.4 — **default** (Gemma ToU) |
-| `nomic-text` | `NomicTextEmbeddings` | Local Nomic text model, 8K ctx, MTEB 62.3, Apache 2.0 |
-| `jina-code` | `JinaCodeEmbeddings` | Local Jina code model, 8K ctx, code-optimised |
-| `bge-small` | `BGESmallEmbeddings` | Local BGE-small model, 384-dim, lightest option |
-| `local` / `hf` | `HFEmbeddings` | Any local ONNX model via @huggingface/transformers |
+## Embedding providers
 
-### Via CLI flag
+Each snippet below shows the `env` block to add to your `.mcp.json`:
 
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "lucerna": {
+      "command": "npx",
+      "args": ["-y", "@upstart.gg/lucerna", "mcp-server"],
+      "env": {
+        "LUCERNA_EMBEDDING": "voyage:voyage-code-3",
+        "VOYAGE_API_KEY": "your-key"
+      }
+    }
+  }
+}
+```
+
+:::tip[Using unlisted models]
+For models not in the tables below, pass dimensions as a third segment:
+
+```json
+{ "LUCERNA_EMBEDDING": "ollama:my-custom-model:768" }
+```
+
+OpenAI's `text-embedding-3` models also support server-side Matryoshka truncation — passing a smaller dimension produces shorter vectors directly from the API (better quality than post-hoc truncation):
+
+```json
+{ "LUCERNA_EMBEDDING": "openai:text-embedding-3-large:256" }
+```
+:::
+
+---
+
+### Voyage ⭐ recommended for code
+
+Best-in-class for code retrieval. `voyage-code-3` is purpose-trained on code with a 32K context window.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "voyage:voyage-code-3",
+  "VOYAGE_API_KEY": "your-key"
+}
+```
+
+| Model | Dimensions | Price per 1M tokens | Notes |
+|-------|-----------|---------------------|-------|
+| `voyage-code-3` | 1024 | $0.18 | Best for code, 32K ctx — **top pick** |
+| `voyage-3` | 1024 | $0.06 | General text |
+| `voyage-3-lite` | 512 | $0.02 | Faster, lower cost |
+
+---
+
+### OpenAI
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "openai:text-embedding-3-small",
+  "OPENAI_API_KEY": "your-key"
+}
+```
+
+| Model | Dimensions | Price per 1M tokens | Notes |
+|-------|-----------|---------------------|-------|
+| `text-embedding-3-small` | 1536 | $0.02 | Good quality/cost balance |
+| `text-embedding-3-large` | 3072 | $0.13 | Higher quality |
+| `text-embedding-ada-002` | 1536 | $0.10 | Legacy |
+
+---
+
+### Cohere
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "cohere:embed-english-v3.0",
+  "COHERE_API_KEY": "your-key"
+}
+```
+
+| Model | Dimensions | Price per 1M tokens | Notes |
+|-------|-----------|---------------------|-------|
+| `embed-english-v3.0` | 1024 | $0.10 | English only |
+| `embed-multilingual-v3.0` | 1024 | $0.10 | Multilingual codebases |
+
+---
+
+### Jina
+
+First 10M tokens free per API key.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "jina:jina-embeddings-v3",
+  "JINA_API_KEY": "your-key"
+}
+```
+
+| Model | Dimensions | Price per 1M tokens | Notes |
+|-------|-----------|---------------------|-------|
+| `jina-embeddings-v3` | 1024 | ~$0.02 | 8K ctx, good for long code chunks |
+
+---
+
+### Mistral
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "mistral:codestral-embed",
+  "MISTRAL_API_KEY": "your-key"
+}
+```
+
+| Model | Dimensions | Price per 1M tokens | Notes |
+|-------|-----------|---------------------|-------|
+| `codestral-embed` | 1024 | $0.15 | Code-specific — **recommended** |
+| `mistral-embed` | 1024 | $0.10 | Mixed text + code |
+
+---
+
+### Google Gemini
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "gemini:gemini-embedding-001",
+  "GOOGLE_API_KEY": "your-key"
+}
+```
+
+| Model | Dimensions | Price per 1M tokens | Notes |
+|-------|-----------|---------------------|-------|
+| `gemini-embedding-001` | 3072 | $0.15 (batch $0.075) | Current model, higher quality |
+| `text-embedding-004` | 768 | $0.15 | 2048-token ctx |
+
+---
+
+### GCP Vertex AI
+
+Requires a GCP project and an access token. `GOOGLE_CLOUD_LOCATION` is optional (default: `us-central1`).
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "vertex:text-embedding-005",
+  "GOOGLE_CLOUD_PROJECT": "my-gcp-project",
+  "GOOGLE_ACCESS_TOKEN": "obtain via: gcloud auth print-access-token"
+}
+```
+
+| Model | Dimensions | Price per 1M tokens | Notes |
+|-------|-----------|---------------------|-------|
+| `text-embedding-005` | 768 | $0.10 | Latest, recommended |
+| `text-embedding-004` | 768 | $0.10 | Previous generation |
+| `text-multilingual-embedding-002` | 768 | $0.10 | Multilingual |
+
+---
+
+### Cloudflare Workers AI
+
+Free tier: 10K neurons/day (~9M tokens/day for bge-m3).
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "cloudflare:@cf/baai/bge-m3",
+  "CLOUDFLARE_ACCOUNT_ID": "your-account-id",
+  "CLOUDFLARE_API_TOKEN": "your-token"
+}
+```
+
+| Model | Price per 1M tokens | Notes |
+|-------|---------------------|-------|
+| `@cf/baai/bge-m3` | ~$0.012 (free tier applies) | Multilingual, good baseline |
+
+---
+
+### Ollama (local GPU)
+
+No API key required. Requires a running Ollama server. `OLLAMA_HOST` is optional (default: `http://localhost:11434`).
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "ollama:nomic-embed-text"
+}
+```
+
+| Model | Dimensions | Price | Notes |
+|-------|-----------|-------|-------|
+| `nomic-embed-text` | 768 | Free | Popular, fast |
+| `mxbai-embed-large` | 1024 | Free | Higher quality, GPU recommended |
+
+---
+
+## Reranking providers
+
+Re-ranks top results from hybrid search using a cross-encoder, improving precision at the cost of additional latency.
+
+---
+
+### Voyage ⭐ recommended
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "voyage:rerank-2",
+  "VOYAGE_API_KEY": "your-key"
+}
+```
+
+| Model | Price per 1K queries | Notes |
+|-------|---------------------|-------|
+| `rerank-2` | $0.05 | Best quality, 16K ctx per pair |
+| `rerank-2-lite` | $0.02 | Lower latency |
+
+---
+
+### Cohere
+
+1 search = 1 query against up to 100 documents.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "cohere:rerank-english-v3.0",
+  "COHERE_API_KEY": "your-key"
+}
+```
+
+| Model | Price per 1K searches | Notes |
+|-------|----------------------|-------|
+| `rerank-english-v3.0` | $2.00 | Strong English reranker |
+| `rerank-multilingual-v3.0` | $2.00 | Multilingual |
+
+---
+
+### Jina
+
+First 10M tokens free per API key · Token-based billing.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "jina:jina-reranker-v2-base-multilingual",
+  "JINA_API_KEY": "your-key"
+}
+```
+
+| Model | Price per 1M tokens | Notes |
+|-------|---------------------|-------|
+| `jina-reranker-v2-base-multilingual` | ~$0.02 | Fast, multilingual, good for code |
+
+---
+
+### GCP Vertex AI Ranking
+
+Proper cross-encoder using Google's dedicated Ranking API. No data store or app needed — just a GCP project with the Discovery Engine API enabled.
+
+:::note[One-time setup]
+Enable the Discovery Engine API in your GCP project before first use:
 ```bash
-lucerna mcp-server /path/to/project --embedder cloudflare
-lucerna index /path/to/project --embedder local
+gcloud services enable discoveryengine.googleapis.com
+```
+:::
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "vertex:semantic-ranker-default-004",
+  "GOOGLE_CLOUD_PROJECT": "my-gcp-project",
+  "GOOGLE_ACCESS_TOKEN": "obtain via: gcloud auth print-access-token"
+}
 ```
 
-### Via config file
+| Model | Price per 1K queries | Notes |
+|-------|---------------------|-------|
+| `semantic-ranker-default-004` | $1.00 | Recommended, 1024 token ctx per doc |
+| `semantic-ranker-fast-004` | $1.00 | Lower latency |
 
-```ts
-// lucerna.config.ts
-import { CloudflareEmbeddings } from '@upstart.gg/lucerna';
+1 query = up to 100 documents; every additional 100 docs counts as +1 query.
 
-export default {
-  embeddingFunction: new CloudflareEmbeddings(),
-};
+---
+
+### Gemini
+
+Prompt-based relevance scoring using a Gemini generative model. Not a cross-encoder — uses `GOOGLE_API_KEY`, no GCP project required.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "gemini:gemini-2.0-flash-lite",
+  "GOOGLE_API_KEY": "your-key"
+}
 ```
 
-### Disable semantic search
+| Model | Price per 100 docs | Notes |
+|-------|-------------------|-------|
+| `gemini-2.0-flash-lite` | ~$0.0002 | Cheapest; good enough for most use cases |
 
-```bash
-lucerna mcp-server /path/to/project --no-semantic   # BM25 only
+---
+
+### Cloudflare Workers AI
+
+Free tier: 10K neurons/day (shared with embeddings).
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "cloudflare:@cf/baai/bge-reranker-base",
+  "CLOUDFLARE_ACCOUNT_ID": "your-account-id",
+  "CLOUDFLARE_API_TOKEN": "your-token"
+}
 ```
 
-## Rerankers
+| Model | Price per 1M tokens | Notes |
+|-------|---------------------|-------|
+| `@cf/baai/bge-reranker-base` | ~$0.003 (free tier applies) | No extra key if already using Cloudflare |
 
-Pass `--reranker <name>` or use `new RerankerClass()` in your config:
-
-| Name | Class | Notes |
-|------|-------|-------|
-| `local` | `LocalReranker` | Local ONNX, no API key — `jina-reranker-v1-turbo-en`, 8K ctx, ~38 MB |
-| `cloudflare` | `CloudflareReranker` | Requires `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` |
-| `jina` | `JinaReranker` | Requires `JINA_API_KEY` |
-| `voyage` | `VoyageReranker` | Requires `VOYAGE_API_KEY` |
-
-### Via CLI flag
-
-```bash
-lucerna mcp-server /path/to/project --reranker voyage
-lucerna search /path/to/project "auth middleware" --reranker jina
-```
-
-### Via config file
-
-```ts
-// lucerna.config.ts
-import { VoyageReranker } from '@upstart.gg/lucerna';
-
-export default {
-  rerankingFunction: new VoyageReranker(),
-};
-```
+---
 
 ## Combining embedder + reranker
 
-```bash
-lucerna mcp-server /path/to/project \
-  --embedder cloudflare \
-  --reranker voyage
-```
-
-Or in `lucerna.config.ts`:
-
-```ts
-import { CloudflareEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
-
-export default {
-  embeddingFunction: new CloudflareEmbeddings(),
-  rerankingFunction: new VoyageReranker(),
-};
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "voyage:voyage-code-3",
+  "LUCERNA_RERANKING": "voyage:rerank-2",
+  "VOYAGE_API_KEY": "your-key"
+}
 ```

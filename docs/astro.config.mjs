@@ -27,31 +27,18 @@ export default defineConfig({
         },
         {
           label: "Configuration",
-          collapsed: true,
+          collapsed: false,
           items: [
             { label: "Overview", slug: "configuration/overview" },
             {
               label: "Built-in Providers",
               slug: "configuration/built-in-providers",
             },
+            { label: "Env Vars", slug: "configuration/env-vars" },
             {
               label: "Custom Providers",
               slug: "configuration/custom-providers",
             },
-          ],
-        },
-        {
-          label: "CLI",
-          collapsed: true,
-          items: [
-            { label: "Overview", slug: "cli/overview" },
-            { label: "index", slug: "cli/index-command" },
-            { label: "watch", slug: "cli/watch" },
-            { label: "search", slug: "cli/search" },
-            { label: "graph", slug: "cli/graph" },
-            { label: "stats", slug: "cli/stats" },
-            { label: "clear", slug: "cli/clear" },
-            { label: "eval", slug: "cli/eval" },
           ],
         },
         {
@@ -66,49 +53,17 @@ export default defineConfig({
           ],
         },
         {
-          label: "Library API",
+          label: "CLI",
           collapsed: true,
           items: [
-            { label: "Quick Start", slug: "programmatic-usage/quickstart" },
-            {
-              label: "Configuration",
-              slug: "programmatic-usage/configuration",
-            },
-            { label: "Indexing", slug: "programmatic-usage/indexing" },
-            { label: "Searching", slug: "programmatic-usage/searching" },
-            {
-              label: "Graph Traversal",
-              slug: "programmatic-usage/graph-traversal",
-            },
-            { label: "File Watching", slug: "programmatic-usage/watching" },
-            { label: "Inspection", slug: "programmatic-usage/inspection" },
-            {
-              label: "Embeddings",
-              collapsed: true,
-              items: [
-                { label: "Overview", slug: "embeddings/overview" },
-                { label: "Local Models", slug: "embeddings/local" },
-                { label: "Cloudflare", slug: "embeddings/cloudflare" },
-                { label: "Custom", slug: "embeddings/custom" },
-              ],
-            },
-            {
-              label: "Reranking",
-              collapsed: true,
-              items: [{ label: "Overview", slug: "reranking/overview" }],
-            },
-            {
-              label: "Integrations",
-              collapsed: true,
-              items: [
-                { label: "Vercel AI SDK", slug: "integrations/vercel-ai-sdk" },
-                { label: "Anthropic / Claude", slug: "integrations/anthropic" },
-                {
-                  label: "Multiple Projects",
-                  slug: "integrations/multiple-projects",
-                },
-              ],
-            },
+            { label: "Overview", slug: "cli/overview" },
+            { label: "index", slug: "cli/index-command" },
+            { label: "watch", slug: "cli/watch" },
+            { label: "search", slug: "cli/search" },
+            { label: "graph", slug: "cli/graph" },
+            { label: "stats", slug: "cli/stats" },
+            { label: "clear", slug: "cli/clear" },
+            { label: "eval", slug: "cli/eval" },
           ],
         },
       ],

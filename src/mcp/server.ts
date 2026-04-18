@@ -8,6 +8,8 @@ import {
   loadConfig,
   resolveBuiltinEmbedder,
   resolveBuiltinReranker,
+  resolveEmbedderFromEnv,
+  resolveRerankerFromEnv,
 } from "../config.js";
 import type {
   EmbeddingFunction,
@@ -34,9 +36,15 @@ function log(msg: string): void {
  * `getIndexingComplete` is called on each tool invocation so the warning
  * reflects the current indexing state at call time.
  */
+const SEMANTIC_DISABLED_WARNING =
+  "⚠️ Semantic search is disabled — no embedding provider configured. " +
+  "Set LUCERNA_EMBEDDING=provider:model (e.g. LUCERNA_EMBEDDING=voyage:voyage-code-3) " +
+  "and the provider's API key to enable vector search. Results are lexical (BM25) only.";
+
 export function createMcpServer(
   indexer: CodeIndexer,
   getIndexingComplete: () => boolean,
+  semanticEnabled = true,
 ): McpServer {
   const server = new McpServer({
     name: "lucerna",
@@ -124,7 +132,9 @@ export function createMcpServer(
     }) => {
       const warning = !getIndexingComplete()
         ? "Lucerna is still indexing this project for the first time. Results may be incomplete — please retry in a few seconds."
-        : undefined;
+        : !semanticEnabled
+          ? SEMANTIC_DISABLED_WARNING
+          : undefined;
 
       const baseOpts: SearchOptions = {
         limit,
@@ -223,19 +233,30 @@ export async function startMcpServer(
   // Load lucerna.config.ts / .js, then apply flag overrides on top.
   const cfg = await loadConfig(resolvedRoot, opts.config);
 
+  // Priority: --no-semantic > --embedder flag > config file > LUCERNA_EMBEDDING env var.
   let embeddingFunction: EmbeddingFunction | false | undefined =
     cfg.embeddingFunction;
   if (opts.semantic === false) {
     embeddingFunction = false;
   } else if (opts.embedder) {
     embeddingFunction = await resolveBuiltinEmbedder(opts.embedder);
+  } else if (embeddingFunction === undefined) {
+    const fromEnv = await resolveEmbedderFromEnv();
+    if (fromEnv !== false) embeddingFunction = fromEnv;
   }
 
+  // Priority: --reranker flag > config file > LUCERNA_RERANKING env var.
   let rerankingFunction: RerankingFunction | false | undefined =
     cfg.rerankingFunction;
   if (opts.reranker) {
     rerankingFunction = await resolveBuiltinReranker(opts.reranker);
+  } else if (rerankingFunction === undefined) {
+    const fromEnv = await resolveRerankerFromEnv();
+    if (fromEnv !== false) rerankingFunction = fromEnv;
   }
+
+  const semanticEnabled =
+    embeddingFunction !== false && embeddingFunction !== undefined;
 
   const indexer = new CodeIndexer({
     projectRoot: resolvedRoot,
@@ -277,7 +298,11 @@ export async function startMcpServer(
   // Keep a reference so the promise isn't GC'd before it resolves.
   void indexingPromise;
 
-  const server = createMcpServer(indexer, () => indexingComplete);
+  const server = createMcpServer(
+    indexer,
+    () => indexingComplete,
+    semanticEnabled,
+  );
 
   // -------------------------------------------------------------------------
   // Connect via stdio and keep running

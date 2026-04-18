@@ -3,7 +3,7 @@ title: Knowledge Graph
 description: Symbol relationship graph extracted from the AST.
 ---
 
-Lucerna extracts a directed relationship graph from the AST alongside chunks. Edges are stored in a LanceDB table and can be traversed with the [graph traversal API](/programmatic-usage/graph-traversal) or the [`lucerna graph`](/cli/graph) CLI command.
+Lucerna extracts a directed relationship graph from the AST alongside chunks. Edges are stored in a LanceDB table and can be traversed with the [`lucerna graph`](/cli/graph) CLI command.
 
 ## Relationship types
 
@@ -15,10 +15,6 @@ Lucerna extracts a directed relationship graph from the AST alongside chunks. Ed
 | `EXTENDS` | A class extends another class |
 | `IMPLEMENTS` | A class implements an interface |
 | `USES` | A chunk references a type or variable defined elsewhere |
-
-## Cross-file resolution
-
-The `SymbolResolver` resolves import edges across files, handling TypeScript path aliases (`tsconfig` paths + `extends`) and relative imports. Unresolved symbols (e.g. third-party packages) are stored as dangling edges with no target chunk.
 
 ## Edge IDs
 

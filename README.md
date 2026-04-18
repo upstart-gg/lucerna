@@ -31,7 +31,7 @@ Parses your codebase with [tree-sitter](https://tree-sitter.github.io/tree-sitte
 Register Lucerna as an MCP server with your AI client (Claude Code, Cursor, Windsurf, Zed, VS Code, and more):
 
 ```bash
-npx add-mcp "@upstart.gg/lucerna mcp-server" --name lucerna
+npx add-mcp "npx -y @upstart.gg/lucerna mcp-server" --name lucerna
 ```
 
 ---

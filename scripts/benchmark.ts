@@ -14,20 +14,12 @@
  *   BENCH_RUNS           number of search iterations per query (default: 10)
  *   BENCH_GRAPH_DEPTH    graph traversal depth for neighbourhood bench (default: 1)
  *   BENCH_OUTPUT         path to append results JSON (default: benchmark-results.jsonl)
- *   BENCH_SKIP_MODELS    set to "1" to skip the per-model comparison section
  */
 import { existsSync } from "node:fs";
 import { appendFile, stat } from "node:fs/promises";
 import { relative, resolve } from "node:path";
-import {
-  CodeIndexer,
-  HFEmbeddings,
-  BGESmallEmbeddings,
-  NomicTextEmbeddings,
-  GemmaEmbeddings,
-  CloudflareReranker,
-} from "../src/index.js";
-import type { EmbeddingFunction } from "../src/index.js";
+import { CodeIndexer, CloudflareReranker } from "../src/index.js";
+import { resolveEmbedderFromEnv } from "../src/config.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -37,7 +29,9 @@ const PROJECT_ROOT = process.argv[2]
   ? resolve(process.argv[2])
   : resolve(import.meta.dirname, "..");
 
-const SEMANTIC_ENABLED = process.env.BENCH_SEMANTIC !== "0";
+const mainEmbeddingFn =
+  process.env.BENCH_SEMANTIC !== "0" ? await resolveEmbedderFromEnv() : false;
+const SEMANTIC_ENABLED = mainEmbeddingFn !== false;
 const RERANK_ENABLED =
   SEMANTIC_ENABLED &&
   !!process.env.CLOUDFLARE_ACCOUNT_ID &&
@@ -49,7 +43,6 @@ const OUTPUT_FILE =
   resolve(import.meta.dirname, "..", "benchmark-results.jsonl");
 
 const STORAGE_DIR = resolve(import.meta.dirname, "..", ".bench-index");
-const MODELS_ENABLED = process.env.BENCH_SKIP_MODELS !== "1";
 
 const SEARCH_QUERIES = [
   "initialize parser and load grammar",
@@ -170,11 +163,6 @@ async function main() {
   );
   console.log(dim(`  runs    : ${SEARCH_RUNS} per query`));
   console.log(dim(`  graph depth: ${GRAPH_DEPTH}`));
-  console.log(
-    dim(
-      `  models  : ${MODELS_ENABLED ? "enabled" : "disabled (set BENCH_SKIP_MODELS=0 to enable)"}`,
-    ),
-  );
 
   const results: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
@@ -196,15 +184,9 @@ async function main() {
     await rm(STORAGE_DIR, { recursive: true, force: true });
   }
 
-  // Keep a reference so we can explicitly dispose after indexer.close() —
-  // CodeIndexer.close() does not dispose the embedding function.
-  const mainEmbeddingFn = SEMANTIC_ENABLED ? new BGESmallEmbeddings() : false;
   const indexer = new CodeIndexer({
     projectRoot: PROJECT_ROOT,
     storageDir: STORAGE_DIR,
-    // Use BGESmallEmbeddings (~33 MB) rather than the production default
-    // GemmaEmbeddings (~175 MB q4f16) to avoid OOM during the main benchmark.
-    // GemmaEmbeddings is covered separately in the BENCH_MODELS comparison.
     embeddingFunction: mainEmbeddingFn,
     // Exclude the bench storage dir and test fixtures
     exclude: [
@@ -613,177 +595,9 @@ async function main() {
     );
   }
 
-  // ── 12. Model comparison ────────────────────────────────────────────────
+  // ── 12. Close indexer ───────────────────────────────────────────────────
 
-  // Release the main indexer before loading additional models.
-  // Also explicitly dispose the embedding function — CodeIndexer.close()
-  // does not call dispose(), so the ONNX session would otherwise linger.
   await indexer.close();
-  if (mainEmbeddingFn && "dispose" in mainEmbeddingFn) {
-    await mainEmbeddingFn.dispose();
-  }
-  (globalThis as { Bun?: { gc(full: boolean): void } }).Bun?.gc(true);
-
-  if (MODELS_ENABLED) {
-    interface ModelResult {
-      label: string;
-      dimensions: number;
-      initMs: number;
-      indexMs: number;
-      searchMean: number;
-      searchP95: number;
-    }
-
-    async function benchmarkModel(
-      label: string,
-      embeddingFn: EmbeddingFunction,
-      storageDir: string,
-    ): Promise<ModelResult> {
-      // Fresh storage dir for each model
-      if (existsSync(storageDir)) {
-        const { rm } = await import("node:fs/promises");
-        await rm(storageDir, { recursive: true, force: true });
-      }
-
-      const idx = new CodeIndexer({
-        projectRoot: PROJECT_ROOT,
-        storageDir,
-        embeddingFunction: embeddingFn,
-        exclude: [
-          "**/node_modules/**",
-          "**/.git/**",
-          "**/dist/**",
-          "**/.bench-index/**",
-          "**/.bench-index-*/**",
-          "**/benchmark-results.jsonl",
-        ],
-      });
-
-      const { ms: modelInitMs } = await time(() => idx.initialize());
-      const { ms: modelIndexMs } = await time(() => idx.indexProject());
-
-      // Discard the very first search query — it may carry residual cold-start cost
-      await idx.searchSemantic(SEARCH_QUERIES[0] ?? "", { limit: 10 });
-
-      // Benchmark warmed search latency across all queries
-      const modelTimings: number[] = [];
-      for (const query of SEARCH_QUERIES) {
-        const s = await bench(
-          () => idx.searchSemantic(query, { limit: 10 }),
-          SEARCH_RUNS,
-        );
-        modelTimings.push(s.mean);
-      }
-      modelTimings.sort((a, b) => a - b);
-      const modelSearchMean =
-        modelTimings.reduce((a, b) => a + b, 0) / modelTimings.length;
-      const modelSearchP95 = p(modelTimings, 95);
-
-      await idx.close();
-
-      // Release ONNX pipeline memory before the next model loads
-      if (
-        "dispose" in embeddingFn &&
-        typeof embeddingFn.dispose === "function"
-      ) {
-        await embeddingFn.dispose();
-      }
-      (globalThis as { Bun?: { gc(full: boolean): void } }).Bun?.gc(true);
-
-      if (existsSync(storageDir)) {
-        const { rm } = await import("node:fs/promises");
-        await rm(storageDir, { recursive: true, force: true });
-      }
-
-      return {
-        label,
-        dimensions: embeddingFn.dimensions,
-        initMs: modelInitMs,
-        indexMs: modelIndexMs,
-        searchMean: modelSearchMean,
-        searchP95: modelSearchP95,
-      };
-    }
-
-    hr(
-      "Model comparison — MiniLM vs BGE-small vs Nomic-text vs Gemma",
-    );
-    console.log(
-      dim("│  (models are downloaded on first run and cached locally)"),
-    );
-    console.log(
-      dim("│  Note: jina-embeddings-v2-base-code (q8, 162 MB) is excluded —"),
-    );
-    console.log(
-      dim("│  it OOMs during indexing on machines with limited RAM."),
-    );
-
-    const modelResults: ModelResult[] = [];
-
-    for (const [label, embFn, dir] of [
-      [
-        "all-MiniLM-L6-v2 (384-dim)",
-        new HFEmbeddings(),
-        resolve(import.meta.dirname, "..", ".bench-index-minilm"),
-      ],
-      [
-        "bge-small-en-v1.5 (384-dim)",
-        new BGESmallEmbeddings(),
-        resolve(import.meta.dirname, "..", ".bench-index-bge"),
-      ],
-      [
-        "nomic-embed-text-v1.5 q8 (768-dim)",
-        new NomicTextEmbeddings(),
-        resolve(import.meta.dirname, "..", ".bench-index-nomic"),
-      ],
-      [
-        "embeddinggemma-300m q4f16 (768-dim, default)",
-        new GemmaEmbeddings(),
-        resolve(import.meta.dirname, "..", ".bench-index-gemma"),
-      ],
-    ] as [string, EmbeddingFunction, string][]) {
-      console.log(dim(`│\n│  ▶ ${label}`));
-      const r = await benchmarkModel(label, embFn, dir);
-      row("  dimensions", String(r.dimensions));
-      row("  initialize (incl. warmup)", formatMs(r.initMs));
-      row("  indexProject (embed pass)", formatMs(r.indexMs));
-      row("  semantic search mean", green(formatMs(r.searchMean)));
-      row("  semantic search p95", formatMs(r.searchP95));
-      modelResults.push(r);
-    }
-
-    // Side-by-side delta summary (each model vs the first/baseline)
-    if (modelResults.length >= 2) {
-      const base = modelResults[0] as ModelResult;
-      console.log(dim(`│\n│  ── delta vs ${base.label} ──`));
-      for (const other of modelResults.slice(1)) {
-        const indexDelta = ((other.indexMs / base.indexMs - 1) * 100).toFixed(
-          0,
-        );
-        const searchDelta = (
-          (other.searchMean / base.searchMean - 1) *
-          100
-        ).toFixed(0);
-        console.log(dim(`│  ${other.label}`));
-        row(
-          "    index time",
-          `${Number(indexDelta) > 0 ? "+" : ""}${indexDelta}%`,
-          `${formatMs(base.indexMs)} → ${formatMs(other.indexMs)}`,
-        );
-        row(
-          "    search latency",
-          `${Number(searchDelta) > 0 ? "+" : ""}${searchDelta}%`,
-          `${formatMs(base.searchMean)} → ${formatMs(other.searchMean)}`,
-        );
-      }
-    }
-
-    results.modelComparison = modelResults;
-  } else {
-    console.log(
-      dim("\n│  Model comparison skipped (unset BENCH_SKIP_MODELS to enable)"),
-    );
-  }
 
   // ── 13. Summary ─────────────────────────────────────────────────────────
 
@@ -842,8 +656,6 @@ async function main() {
   );
 
   // ── Cleanup ──────────────────────────────────────────────────────────────
-
-  // (indexer was already closed before section 12)
 
   // Remove the bench storage dir so it doesn't pollute the repo
   if (existsSync(STORAGE_DIR)) {

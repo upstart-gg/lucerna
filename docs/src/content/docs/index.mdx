@@ -5,13 +5,11 @@ description: AST-aware semantic + lexical code indexer and knowledge graph for A
 
 Lucerna is an **AST-aware semantic + lexical code indexer** designed as middleware for AI coding agents. It combines:
 
-- **Vector search** — HuggingFace Transformers embeddings via `@huggingface/transformers`
+- **Vector search** — remote embedding providers (Voyage, OpenAI, Cohere, Gemini, Mistral, Ollama, etc.)
 - **BM25 full-text search** — code-aware tokenization that splits identifiers on camelCase/underscores
 - **Knowledge graph** — symbol relationships: calls, implements, extends, uses, imports
 
-All three are stored in a single embedded [LanceDB](https://lancedb.com/) database at `<project-root>/.lucerna/`. There are no external services, no servers, no configuration files — just the library or CLI.
-
-Parsing is done by [tree-sitter](https://tree-sitter.github.io/) via `@kreuzberg/tree-sitter-language-pack`. Lucerna ships custom AST-aware chunkers for **popular languages** — files in any other language are not indexed. `.gitignore` files at any depth are always respected.
+All three are stored in a single embedded [LanceDB](https://lancedb.com/) database at `<project-root>/.lucerna/`. Parsing is done by [tree-sitter](https://tree-sitter.github.io/) via `@kreuzberg/tree-sitter-language-pack`. Lucerna ships custom AST-aware chunkers for **popular languages** — files in other languages are not indexed. `.gitignore` files at any depth are always respected.
 
 ## Features
 
@@ -23,9 +21,9 @@ Parsing is done by [tree-sitter](https://tree-sitter.github.io/) via `@kreuzberg
 - **Recall evaluation** — built-in `eval` command measures recall@k against a JSONL query set
 - **Fully embedded** — uses LanceDB; the index is a directory on disk, one per project
 - **Multi-project** — multiple `CodeIndexer` instances in the same process, each fully isolated
-- **File watching** — debounced incremental re-indexing via chokidar; watcher path uses an in-memory chunk cache (no full DB scan per file change)
-- **Pluggable embeddings** — local (`GemmaEmbeddings`, `NomicTextEmbeddings`, `JinaCodeEmbeddings`, `BGESmallEmbeddings`, `HFEmbeddings`) or remote (`CloudflareEmbeddings`); swap or disable entirely
+- **File watching** — debounced incremental re-indexing via chokidar
+- **Pluggable embeddings** — remote API providers (Voyage, OpenAI, Cohere, Jina, Mistral, Gemini, Vertex AI, Cloudflare, Ollama); or disable entirely for BM25-only mode
 - **Popular languages** — custom AST-aware chunkers for Python, Java, Go, Rust, TypeScript/JavaScript, C/C++, C#, Swift, Kotlin, Ruby, PHP, and more; see [language support](/concepts/language-support/)
 - **Gitignore-aware** — `.gitignore` files at any depth are always respected during indexing and watching
 - **CLI** — `lucerna index / watch / search / graph / stats / clear / eval`
-
+- **MCP server** — built-in Model Context Protocol server for AI coding assistants

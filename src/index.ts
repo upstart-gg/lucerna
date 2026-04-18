@@ -26,16 +26,20 @@ export { CodeIndexer } from "./CodeIndexer.js";
 export { TreeSitterChunker } from "./chunker/index.js";
 
 // Embeddings
-export { BGESmallEmbeddings } from "./embeddings/BGESmallEmbeddings.js";
 export { CloudflareEmbeddings } from "./embeddings/CloudflareEmbeddings.js";
 export { CloudflareReranker } from "./embeddings/CloudflareReranker.js";
-export { GemmaEmbeddings } from "./embeddings/GemmaEmbeddings.js";
-export { HFEmbeddings } from "./embeddings/HFEmbeddings.js";
-export { HFReranker } from "./embeddings/HFReranker.js";
-export { JinaCodeEmbeddings } from "./embeddings/JinaCodeEmbeddings.js";
+export { CohereEmbeddings } from "./embeddings/CohereEmbeddings.js";
+export { CohereReranker } from "./embeddings/CohereReranker.js";
+export { GeminiEmbeddings } from "./embeddings/GeminiEmbeddings.js";
+export { GeminiReranker } from "./embeddings/GeminiReranker.js";
+export { JinaEmbeddings } from "./embeddings/JinaEmbeddings.js";
 export { JinaReranker } from "./embeddings/JinaReranker.js";
-export { LocalReranker } from "./embeddings/LocalReranker.js";
-export { NomicTextEmbeddings } from "./embeddings/NomicTextEmbeddings.js";
+export { MistralEmbeddings } from "./embeddings/MistralEmbeddings.js";
+export { OllamaEmbeddings } from "./embeddings/OllamaEmbeddings.js";
+export { OpenAIEmbeddings } from "./embeddings/OpenAIEmbeddings.js";
+export { VertexAIEmbeddings } from "./embeddings/VertexAIEmbeddings.js";
+export { VertexAIReranker } from "./embeddings/VertexAIReranker.js";
+export { VoyageEmbeddings } from "./embeddings/VoyageEmbeddings.js";
 export { VoyageReranker } from "./embeddings/VoyageReranker.js";
 // Graph (for standalone use)
 export { GraphTraverser, SymbolResolver } from "./graph/index.js";

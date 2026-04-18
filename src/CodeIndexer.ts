@@ -1,10 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import fastGlob from "fast-glob";
 import { TreeSitterChunker } from "./chunker/index.js";
-import { CloudflareEmbeddings } from "./embeddings/CloudflareEmbeddings.js";
-import { GemmaEmbeddings } from "./embeddings/GemmaEmbeddings.js";
+
 import { GraphTraverser } from "./graph/GraphTraverser.js";
 import { SymbolResolver } from "./graph/SymbolResolver.js";
 import type { ChunkingWithEdgesResult, RawEdge } from "./graph/types.js";
@@ -137,14 +136,11 @@ export class CodeIndexer {
       this.exclude.push(...options.exclude);
     }
 
-    // Resolve embedding function
-    if (options.embeddingFunction === false) {
-      this.embeddingFn = false;
-    } else if (options.embeddingFunction) {
-      this.embeddingFn = options.embeddingFunction;
-    } else {
-      this.embeddingFn = createDefaultEmbedding();
-    }
+    // Resolve embedding function — no default; must be configured explicitly
+    this.embeddingFn =
+      options.embeddingFunction === false || !options.embeddingFunction
+        ? false
+        : options.embeddingFunction;
 
     // Resolve reranking function
     if (options.rerankingFunction === false) {
@@ -165,6 +161,38 @@ export class CodeIndexer {
     if (this.initialized) return;
 
     await mkdir(this.storageDir, { recursive: true });
+
+    // Auto-clear stale index when the embedding model or dimensions change
+    const metaPath = join(this.storageDir, "index-meta.json");
+    const currentDimensions =
+      this.embeddingFn !== false ? this.embeddingFn.dimensions : 384;
+    const currentModelId =
+      this.embeddingFn !== false ? this.embeddingFn.modelId : undefined;
+    try {
+      const raw = await readFile(metaPath, "utf8");
+      const meta = JSON.parse(raw) as { modelId?: string; dimensions: number };
+      const dimChanged = meta.dimensions !== currentDimensions;
+      const modelChanged =
+        meta.modelId !== undefined &&
+        currentModelId !== undefined &&
+        meta.modelId !== currentModelId;
+      if (dimChanged || modelChanged) {
+        const reason = dimChanged
+          ? `dimensions changed (${meta.dimensions} → ${currentDimensions})`
+          : `model changed ("${meta.modelId}" → "${currentModelId}")`;
+        console.warn(
+          `[lucerna] Embedding ${reason} — clearing index for full reindex.`,
+        );
+        await rm(join(this.storageDir, "lance"), {
+          recursive: true,
+          force: true,
+        });
+        await rm(metaPath, { force: true });
+        await rm(join(this.storageDir, "file-hashes.json"), { force: true });
+      }
+    } catch {
+      // No meta file yet — fresh index, nothing to clear
+    }
 
     this.chunker = new TreeSitterChunker({
       ...(this.options.maxChunkTokens !== undefined
@@ -906,15 +934,6 @@ export class CodeIndexer {
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
-
-function createDefaultEmbedding(): EmbeddingFunction {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-  if (accountId && apiToken) {
-    return new CloudflareEmbeddings(accountId, apiToken);
-  }
-  return new GemmaEmbeddings();
-}
 
 function hashProjectRoot(projectRoot: string): string {
   return createHash("sha1").update(projectRoot).digest("hex").slice(0, 12);

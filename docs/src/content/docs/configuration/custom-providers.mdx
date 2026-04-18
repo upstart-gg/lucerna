@@ -12,7 +12,7 @@ Implement `EmbeddingFunction`:
 ```ts
 import type { EmbeddingFunction } from '@upstart.gg/lucerna';
 
-export class OpenAIEmbeddings implements EmbeddingFunction {
+export class MyCustomEmbeddings implements EmbeddingFunction {
   readonly dimensions = 1536;
   readonly modelId = 'text-embedding-3-small';
 

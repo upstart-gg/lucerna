@@ -71,9 +71,8 @@ export class HFEmbeddings implements EmbeddingFunction {
       // Dynamic import to keep it optional at compile time
       const { pipeline, env } = await import("@huggingface/transformers");
 
-      // Disable remote model fetching in CI/offline environments when not needed
-      // Users can override this by setting env.allowRemoteModels = true before calling generate()
       env.allowLocalModels = true;
+      env.allowRemoteModels = true;
 
       this.pipeline = await pipeline("feature-extraction", this.modelId, {
         dtype: this.dtype,

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // ---------------------------------------------------------------------------
-// Mock @huggingface/transformers — same pattern as HFEmbeddings.test.ts
+// Mock @huggingface/transformers — same pattern as NomicCodeEmbeddings.test.ts
 // ---------------------------------------------------------------------------
 
 const mockDispose = mock(async () => {});
 
 const mockPipelineInstance = Object.assign(
   mock(async (inputs: string[], _opts: unknown) => ({
-    tolist: () => inputs.map((_: string) => new Array(768).fill(0.1)),
+    tolist: () => inputs.map((_: string) => new Array(384).fill(0.1)),
   })),
   { dispose: mockDispose },
 );
@@ -23,49 +23,41 @@ mock.module("@huggingface/transformers", () => ({
 }));
 
 // Import AFTER mock.module() registration.
-// NomicCodeEmbeddings is a backwards-compat alias for JinaCodeEmbeddings.
-import { NomicCodeEmbeddings } from "../embeddings/NomicCodeEmbeddings.js";
+import { BGESmallEmbeddings } from "../embeddings/BGESmallEmbeddings.js";
 
 // ---------------------------------------------------------------------------
-// Tests
+// Unit tests
 // ---------------------------------------------------------------------------
 
-describe("NomicCodeEmbeddings", () => {
+describe("BGESmallEmbeddings", () => {
   beforeEach(() => {
     mockPipelineInstance.mockClear();
     mockPipelineFactory.mockClear();
     mockDispose.mockClear();
   });
 
-  test("dimensions is 768", () => {
-    expect(new NomicCodeEmbeddings().dimensions).toBe(768);
+  test("dimensions is 384", () => {
+    expect(new BGESmallEmbeddings().dimensions).toBe(384);
   });
 
-  test("generate() returns 768-dimensional vectors", async () => {
-    const e = new NomicCodeEmbeddings();
-    const result = await e.generate(["some code"]);
-    expect(result).toHaveLength(1);
-    expect(result[0]).toHaveLength(768);
-  });
-
-  test("uses jinaai/jina-embeddings-v2-base-code model", async () => {
-    const e = new NomicCodeEmbeddings();
+  test("uses Xenova/bge-small-en-v1.5 model with fp32 dtype", async () => {
+    const e = new BGESmallEmbeddings();
     await e.generate(["x"]);
     expect(mockPipelineFactory).toHaveBeenCalledWith(
       "feature-extraction",
-      "jinaai/jina-embeddings-v2-base-code",
+      "Xenova/bge-small-en-v1.5",
       expect.objectContaining({ dtype: "fp32" }),
     );
   });
 
   test("warmup() pre-loads the pipeline", async () => {
-    const e = new NomicCodeEmbeddings();
+    const e = new BGESmallEmbeddings();
     await e.warmup();
     expect(mockPipelineFactory).toHaveBeenCalledTimes(1);
   });
 
   test("dispose() clears the cached pipeline", async () => {
-    const e = new NomicCodeEmbeddings();
+    const e = new BGESmallEmbeddings();
     await e.warmup();
     await e.dispose();
     expect(mockDispose).toHaveBeenCalledTimes(1);

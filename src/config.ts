@@ -68,6 +68,7 @@ const VALID_EMBEDDERS = [
   "local",
   "hf",
   "bge-small",
+  "jina-code",
   "nomic",
 ] as const;
 const VALID_RERANKERS = ["cloudflare", "jina", "voyage"] as const;
@@ -101,11 +102,12 @@ export async function resolveBuiltinEmbedder(
       );
       return new BGESmallEmbeddings();
     }
+    case "jina-code":
     case "nomic": {
-      const { NomicCodeEmbeddings } = await import(
-        "./embeddings/NomicCodeEmbeddings.js"
+      const { JinaCodeEmbeddings } = await import(
+        "./embeddings/JinaCodeEmbeddings.js"
       );
-      return new NomicCodeEmbeddings();
+      return new JinaCodeEmbeddings();
     }
     default:
       throw new Error(

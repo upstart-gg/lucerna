@@ -1,4 +1,5 @@
 export { BGESmallEmbeddings } from "./BGESmallEmbeddings.js";
+export { JinaCodeEmbeddings } from "./JinaCodeEmbeddings.js";
 export { CloudflareEmbeddings } from "./CloudflareEmbeddings.js";
 export { CloudflareReranker } from "./CloudflareReranker.js";
 export { HFEmbeddings } from "./HFEmbeddings.js";

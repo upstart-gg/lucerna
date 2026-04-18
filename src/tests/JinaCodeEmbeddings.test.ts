@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // ---------------------------------------------------------------------------
-// Mock @huggingface/transformers — same pattern as HFEmbeddings.test.ts
+// Mock @huggingface/transformers — same pattern as NomicCodeEmbeddings.test.ts
 // ---------------------------------------------------------------------------
 
 const mockDispose = mock(async () => {});
@@ -23,14 +23,13 @@ mock.module("@huggingface/transformers", () => ({
 }));
 
 // Import AFTER mock.module() registration.
-// NomicCodeEmbeddings is a backwards-compat alias for JinaCodeEmbeddings.
-import { NomicCodeEmbeddings } from "../embeddings/NomicCodeEmbeddings.js";
+import { JinaCodeEmbeddings } from "../embeddings/JinaCodeEmbeddings.js";
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("NomicCodeEmbeddings", () => {
+describe("JinaCodeEmbeddings", () => {
   beforeEach(() => {
     mockPipelineInstance.mockClear();
     mockPipelineFactory.mockClear();
@@ -38,18 +37,27 @@ describe("NomicCodeEmbeddings", () => {
   });
 
   test("dimensions is 768", () => {
-    expect(new NomicCodeEmbeddings().dimensions).toBe(768);
+    expect(new JinaCodeEmbeddings().dimensions).toBe(768);
   });
 
   test("generate() returns 768-dimensional vectors", async () => {
-    const e = new NomicCodeEmbeddings();
+    const e = new JinaCodeEmbeddings();
     const result = await e.generate(["some code"]);
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveLength(768);
   });
 
-  test("uses jinaai/jina-embeddings-v2-base-code model", async () => {
-    const e = new NomicCodeEmbeddings();
+  test("generate() returns multiple 768-dim vectors for multiple inputs", async () => {
+    const e = new JinaCodeEmbeddings();
+    const result = await e.generate(["a", "b", "c"]);
+    expect(result).toHaveLength(3);
+    for (const v of result) {
+      expect(v).toHaveLength(768);
+    }
+  });
+
+  test("uses jinaai/jina-embeddings-v2-base-code model with fp32 dtype", async () => {
+    const e = new JinaCodeEmbeddings();
     await e.generate(["x"]);
     expect(mockPipelineFactory).toHaveBeenCalledWith(
       "feature-extraction",
@@ -59,13 +67,13 @@ describe("NomicCodeEmbeddings", () => {
   });
 
   test("warmup() pre-loads the pipeline", async () => {
-    const e = new NomicCodeEmbeddings();
+    const e = new JinaCodeEmbeddings();
     await e.warmup();
     expect(mockPipelineFactory).toHaveBeenCalledTimes(1);
   });
 
   test("dispose() clears the cached pipeline", async () => {
-    const e = new NomicCodeEmbeddings();
+    const e = new JinaCodeEmbeddings();
     await e.warmup();
     await e.dispose();
     expect(mockDispose).toHaveBeenCalledTimes(1);

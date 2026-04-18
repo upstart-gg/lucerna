@@ -40,7 +40,7 @@ const RERANK_ENABLED =
   SEMANTIC_ENABLED &&
   !!process.env.CLOUDFLARE_ACCOUNT_ID &&
   !!process.env.CLOUDFLARE_API_TOKEN;
-const SEARCH_RUNS = parseInt(process.env.BENCH_RUNS ?? "20", 10);
+const SEARCH_RUNS = parseInt(process.env.BENCH_RUNS ?? "10", 10);
 const GRAPH_DEPTH = parseInt(process.env.BENCH_GRAPH_DEPTH ?? "1", 10);
 const OUTPUT_FILE =
   process.env.BENCH_OUTPUT ??

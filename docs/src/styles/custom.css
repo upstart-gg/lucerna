@@ -5,10 +5,26 @@
   --sl-color-accent-low: #e7ecf8; /* upstart-100 */
   --sl-color-accent: #7270c6; /* upstart-600 */
   --sl-color-accent-high: #40406f; /* upstart-900 */
+
+  /* Remap aside (tip/note) colors to brand palette */
+  --sl-color-purple-low: #e7ecf8;  /* upstart-100 */
+  --sl-color-purple: #7270c6;      /* upstart-600 */
+  --sl-color-purple-high: #40406f; /* upstart-900 */
+  --sl-color-blue-low: #eef0fa;
+  --sl-color-blue: #9ba3de;        /* upstart-400 */
+  --sl-color-blue-high: #40406f;   /* upstart-900 */
 }
 
 [data-theme="dark"] {
   --sl-color-accent-low: #40406f; /* upstart-900 */
   --sl-color-accent: #9ba3de; /* upstart-400 */
   --sl-color-accent-high: #d3daf2; /* upstart-200 */
+
+  /* Remap aside (tip/note) colors to brand palette */
+  --sl-color-purple-low: #2e2e56;
+  --sl-color-purple: #9ba3de;      /* upstart-400 */
+  --sl-color-purple-high: #d3daf2; /* upstart-200 */
+  --sl-color-blue-low: #2a2a4e;
+  --sl-color-blue: #9ba3de;        /* upstart-400 */
+  --sl-color-blue-high: #d3daf2;   /* upstart-200 */
 }

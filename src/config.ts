@@ -72,7 +72,7 @@ const VALID_EMBEDDERS = [
   "nomic-text",
   "gemma",
 ] as const;
-const VALID_RERANKERS = ["cloudflare", "jina", "voyage"] as const;
+const VALID_RERANKERS = ["cloudflare", "jina", "voyage", "local"] as const;
 
 export type BuiltinEmbedder = (typeof VALID_EMBEDDERS)[number];
 export type BuiltinReranker = (typeof VALID_RERANKERS)[number];
@@ -149,6 +149,10 @@ export async function resolveBuiltinReranker(
     case "voyage": {
       const { VoyageReranker } = await import("./embeddings/VoyageReranker.js");
       return new VoyageReranker();
+    }
+    case "local": {
+      const { LocalReranker } = await import("./embeddings/LocalReranker.js");
+      return new LocalReranker();
     }
     default:
       throw new Error(

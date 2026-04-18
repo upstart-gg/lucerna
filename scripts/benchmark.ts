@@ -23,7 +23,6 @@ import {
   CodeIndexer,
   HFEmbeddings,
   BGESmallEmbeddings,
-  JinaCodeEmbeddings,
   NomicTextEmbeddings,
   GemmaEmbeddings,
   CloudflareReranker,
@@ -197,13 +196,16 @@ async function main() {
     await rm(STORAGE_DIR, { recursive: true, force: true });
   }
 
+  // Keep a reference so we can explicitly dispose after indexer.close() —
+  // CodeIndexer.close() does not dispose the embedding function.
+  const mainEmbeddingFn = SEMANTIC_ENABLED ? new BGESmallEmbeddings() : false;
   const indexer = new CodeIndexer({
     projectRoot: PROJECT_ROOT,
     storageDir: STORAGE_DIR,
     // Use BGESmallEmbeddings (~33 MB) rather than the production default
     // GemmaEmbeddings (~175 MB q4f16) to avoid OOM during the main benchmark.
     // GemmaEmbeddings is covered separately in the BENCH_MODELS comparison.
-    embeddingFunction: SEMANTIC_ENABLED ? new BGESmallEmbeddings() : false,
+    embeddingFunction: mainEmbeddingFn,
     // Exclude the bench storage dir and test fixtures
     exclude: [
       "**/node_modules/**",
@@ -613,9 +615,14 @@ async function main() {
 
   // ── 12. Model comparison ────────────────────────────────────────────────
 
-  // Release the main indexer (LanceDB + ONNX pipeline) before loading
-  // additional models — it is not used in this section.
+  // Release the main indexer before loading additional models.
+  // Also explicitly dispose the embedding function — CodeIndexer.close()
+  // does not call dispose(), so the ONNX session would otherwise linger.
   await indexer.close();
+  if (mainEmbeddingFn && "dispose" in mainEmbeddingFn) {
+    await mainEmbeddingFn.dispose();
+  }
+  (globalThis as { Bun?: { gc(full: boolean): void } }).Bun?.gc(true);
 
   if (MODELS_ENABLED) {
     interface ModelResult {
@@ -681,6 +688,7 @@ async function main() {
       ) {
         await embeddingFn.dispose();
       }
+      (globalThis as { Bun?: { gc(full: boolean): void } }).Bun?.gc(true);
 
       if (existsSync(storageDir)) {
         const { rm } = await import("node:fs/promises");
@@ -698,10 +706,16 @@ async function main() {
     }
 
     hr(
-      "Model comparison — MiniLM vs BGE-small vs Jina-code vs Nomic-text vs Gemma",
+      "Model comparison — MiniLM vs BGE-small vs Nomic-text vs Gemma",
     );
     console.log(
       dim("│  (models are downloaded on first run and cached locally)"),
+    );
+    console.log(
+      dim("│  Note: jina-embeddings-v2-base-code (q8, 162 MB) is excluded —"),
+    );
+    console.log(
+      dim("│  it OOMs during indexing on machines with limited RAM."),
     );
 
     const modelResults: ModelResult[] = [];
@@ -716,11 +730,6 @@ async function main() {
         "bge-small-en-v1.5 (384-dim)",
         new BGESmallEmbeddings(),
         resolve(import.meta.dirname, "..", ".bench-index-bge"),
-      ],
-      [
-        "jina-embeddings-v2-base-code q8 (768-dim)",
-        new JinaCodeEmbeddings(),
-        resolve(import.meta.dirname, "..", ".bench-index-jina"),
       ],
       [
         "nomic-embed-text-v1.5 q8 (768-dim)",

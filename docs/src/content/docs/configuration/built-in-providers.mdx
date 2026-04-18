@@ -48,6 +48,7 @@ Pass `--reranker <name>` or use `new RerankerClass()` in your config:
 
 | Name | Class | Notes |
 |------|-------|-------|
+| `local` | `LocalReranker` | Local ONNX, no API key — `jina-reranker-v1-turbo-en`, 8K ctx, ~38 MB |
 | `cloudflare` | `CloudflareReranker` | Requires `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` |
 | `jina` | `JinaReranker` | Requires `JINA_API_KEY` |
 | `voyage` | `VoyageReranker` | Requires `VOYAGE_API_KEY` |

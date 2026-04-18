@@ -31,8 +31,10 @@ export { CloudflareEmbeddings } from "./embeddings/CloudflareEmbeddings.js";
 export { CloudflareReranker } from "./embeddings/CloudflareReranker.js";
 export { GemmaEmbeddings } from "./embeddings/GemmaEmbeddings.js";
 export { HFEmbeddings } from "./embeddings/HFEmbeddings.js";
+export { HFReranker } from "./embeddings/HFReranker.js";
 export { JinaCodeEmbeddings } from "./embeddings/JinaCodeEmbeddings.js";
 export { JinaReranker } from "./embeddings/JinaReranker.js";
+export { LocalReranker } from "./embeddings/LocalReranker.js";
 export { NomicTextEmbeddings } from "./embeddings/NomicTextEmbeddings.js";
 export { VoyageReranker } from "./embeddings/VoyageReranker.js";
 // Graph (for standalone use)

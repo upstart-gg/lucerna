@@ -1,6 +1,6 @@
 ---
 title: Local Models
-description: Run embedding models locally via ONNX with no API key.
+description: Run embedding and reranking models locally via ONNX with no API key.
 ---
 
 All local models run via `@huggingface/transformers` + ONNX. Models are downloaded from Hugging Face Hub on first use and cached locally.
@@ -72,6 +72,42 @@ const indexer = new CodeIndexer({
     'Xenova/bge-small-en-v1.5', // modelId
     384,                         // dimensions — must match model output
     'fp32',                      // dtype: 'auto' | 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16' | …
+  ),
+});
+```
+
+---
+
+## Local Rerankers
+
+All local models run via `@huggingface/transformers` + ONNX. Models are downloaded on first use and cached locally.
+
+## LocalReranker
+
+`jinaai/jina-reranker-v1-turbo-en` — a cross-encoder reranker with no API key required. Uses the q8 quantized ONNX variant (~38 MB). Achieves BEIR NDCG@10 of 49.60 with an 8K token context window, so code chunks fit without truncation.
+
+```ts
+import { CodeIndexer, LocalReranker } from '@upstart.gg/lucerna';
+
+const indexer = new CodeIndexer({
+  projectRoot: '.',
+  rerankingFunction: new LocalReranker(),
+});
+```
+
+## HFReranker
+
+Use any ONNX cross-encoder model from the Hugging Face Hub:
+
+```ts
+import { CodeIndexer, HFReranker } from '@upstart.gg/lucerna';
+
+const indexer = new CodeIndexer({
+  projectRoot: '.',
+  rerankingFunction: new HFReranker(
+    'jinaai/jina-reranker-v1-turbo-en', // modelId
+    'q8',                                // dtype: 'fp32' | 'q8' | 'q4f16' | …
+    8192,                                // maxLength in tokens
   ),
 });
 ```

@@ -28,7 +28,7 @@ import { HFEmbeddings } from "./HFEmbeddings.js";
  */
 export class JinaCodeEmbeddings extends HFEmbeddings {
   constructor() {
-    // q8 uses model_quantized.onnx (162 MB) instead of fp32 model.onnx (642 MB)
+    // q8 uses model_quantized.onnx (~162 MB); smallest available quantization for this model
     super("jinaai/jina-embeddings-v2-base-code", 768, "q8");
   }
 }

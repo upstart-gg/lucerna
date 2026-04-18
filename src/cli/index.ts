@@ -40,7 +40,10 @@ program
     "--embedder <name>",
     "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Built-in reranker: cloudflare, jina, voyage, local",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
     const indexer = await buildIndexer(projectRoot, opts);
@@ -71,7 +74,10 @@ program
     "--embedder <name>",
     "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Built-in reranker: cloudflare, jina, voyage, local",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--debounce <ms>", "Debounce delay in milliseconds", "500")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
@@ -126,7 +132,10 @@ program
     "--embedder <name>",
     "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Built-in reranker: cloudflare, jina, voyage, local",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--limit <n>", "Max results", "10")
   .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
@@ -353,7 +362,10 @@ program
     "--embedder <name>",
     "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Built-in reranker: cloudflare, jina, voyage, local",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(
     async (
@@ -591,7 +603,10 @@ program
     "--embedder <name>",
     "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Built-in reranker: cloudflare, jina, voyage, local",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot = ".", opts: Record<string, unknown>) => {
     const { startMcpServer } = await import("../mcp/server.js");

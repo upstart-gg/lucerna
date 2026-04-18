@@ -11,9 +11,10 @@
  * Options (env vars):
  *   BENCH_PROJECT        path to the project to index (default: this repo)
  *   BENCH_SEMANTIC       set to "0" to skip semantic search (avoids model download)
- *   BENCH_RUNS           number of search iterations per query (default: 20)
+ *   BENCH_RUNS           number of search iterations per query (default: 10)
  *   BENCH_GRAPH_DEPTH    graph traversal depth for neighbourhood bench (default: 1)
  *   BENCH_OUTPUT         path to append results JSON (default: benchmark-results.jsonl)
+ *   BENCH_SKIP_MODELS    set to "1" to skip the per-model comparison section
  */
 import { existsSync } from "node:fs";
 import { appendFile, stat } from "node:fs/promises";
@@ -23,6 +24,8 @@ import {
   HFEmbeddings,
   BGESmallEmbeddings,
   JinaCodeEmbeddings,
+  NomicTextEmbeddings,
+  GemmaEmbeddings,
   CloudflareReranker,
 } from "../src/index.js";
 import type { EmbeddingFunction } from "../src/index.js";
@@ -47,7 +50,7 @@ const OUTPUT_FILE =
   resolve(import.meta.dirname, "..", "benchmark-results.jsonl");
 
 const STORAGE_DIR = resolve(import.meta.dirname, "..", ".bench-index");
-const MODELS_ENABLED = process.env.BENCH_MODELS === "1";
+const MODELS_ENABLED = process.env.BENCH_SKIP_MODELS !== "1";
 
 const SEARCH_QUERIES = [
   "initialize parser and load grammar",
@@ -170,7 +173,7 @@ async function main() {
   console.log(dim(`  graph depth: ${GRAPH_DEPTH}`));
   console.log(
     dim(
-      `  models  : ${MODELS_ENABLED ? "enabled" : "disabled (set BENCH_MODELS=1 to enable)"}`,
+      `  models  : ${MODELS_ENABLED ? "enabled" : "disabled (set BENCH_SKIP_MODELS=0 to enable)"}`,
     ),
   );
 
@@ -198,8 +201,8 @@ async function main() {
     projectRoot: PROJECT_ROOT,
     storageDir: STORAGE_DIR,
     // Use BGESmallEmbeddings (~33 MB) rather than the production default
-    // JinaCodeEmbeddings (~162 MB q8) to avoid OOM during the main benchmark.
-    // JinaCodeEmbeddings is covered separately in the BENCH_MODELS comparison.
+    // GemmaEmbeddings (~175 MB q4f16) to avoid OOM during the main benchmark.
+    // GemmaEmbeddings is covered separately in the BENCH_MODELS comparison.
     embeddingFunction: SEMANTIC_ENABLED ? new BGESmallEmbeddings() : false,
     // Exclude the bench storage dir and test fixtures
     exclude: [
@@ -211,6 +214,8 @@ async function main() {
       "**/.bench-index/**",
       "**/.bench-index-coderank/**",
       "**/.bench-index-jina/**",
+      "**/.bench-index-nomic/**",
+      "**/.bench-index-gemma/**",
       "**/.lucerna/**",
       "**/benchmark-results.jsonl",
     ],
@@ -692,7 +697,9 @@ async function main() {
       };
     }
 
-    hr("Model comparison — MiniLM vs BGE-small vs Jina-code");
+    hr(
+      "Model comparison — MiniLM vs BGE-small vs Jina-code vs Nomic-text vs Gemma",
+    );
     console.log(
       dim("│  (models are downloaded on first run and cached locally)"),
     );
@@ -711,9 +718,19 @@ async function main() {
         resolve(import.meta.dirname, "..", ".bench-index-bge"),
       ],
       [
-        "jina-embeddings-v2-base-code q8 (768-dim, default)",
+        "jina-embeddings-v2-base-code q8 (768-dim)",
         new JinaCodeEmbeddings(),
         resolve(import.meta.dirname, "..", ".bench-index-jina"),
+      ],
+      [
+        "nomic-embed-text-v1.5 q8 (768-dim)",
+        new NomicTextEmbeddings(),
+        resolve(import.meta.dirname, "..", ".bench-index-nomic"),
+      ],
+      [
+        "embeddinggemma-300m q4f16 (768-dim, default)",
+        new GemmaEmbeddings(),
+        resolve(import.meta.dirname, "..", ".bench-index-gemma"),
       ],
     ] as [string, EmbeddingFunction, string][]) {
       console.log(dim(`│\n│  ▶ ${label}`));
@@ -755,7 +772,7 @@ async function main() {
     results.modelComparison = modelResults;
   } else {
     console.log(
-      dim("\n│  Model comparison skipped (set BENCH_MODELS=1 to enable)"),
+      dim("\n│  Model comparison skipped (unset BENCH_SKIP_MODELS to enable)"),
     );
   }
 

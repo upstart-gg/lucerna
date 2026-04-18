@@ -15,6 +15,8 @@ type Dtype =
   | "q4f16"
   | "bnb4";
 
+type Pooling = "none" | "mean" | "cls" | "last_token";
+
 /**
  * Default embedding function using @huggingface/transformers.
  *
@@ -28,6 +30,7 @@ export class HFEmbeddings implements EmbeddingFunction {
   readonly modelId: string;
   private readonly dtype: Dtype;
   private readonly maxBatchSize: number;
+  private readonly pooling: Pooling;
   private pipeline: FeatureExtractionPipeline | null = null;
 
   constructor(
@@ -35,11 +38,13 @@ export class HFEmbeddings implements EmbeddingFunction {
     dimensions = 384,
     dtype: Dtype = "fp32",
     maxBatchSize = 32,
+    pooling: Pooling = "mean",
   ) {
     this.modelId = modelId;
     this.dimensions = dimensions;
     this.dtype = dtype;
     this.maxBatchSize = maxBatchSize;
+    this.pooling = pooling;
   }
 
   async generate(texts: string[]): Promise<number[][]> {
@@ -52,7 +57,7 @@ export class HFEmbeddings implements EmbeddingFunction {
       const batch = texts.slice(i, i + this.maxBatchSize);
 
       const output = (await pipeline(batch, {
-        pooling: "mean",
+        pooling: this.pooling,
         normalize: true,
       })) as Tensor;
       // Tensor.tolist() returns any[] — cast to the expected shape

@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import fastGlob from "fast-glob";
 import { TreeSitterChunker } from "./chunker/index.js";
 import { CloudflareEmbeddings } from "./embeddings/CloudflareEmbeddings.js";
-import { JinaCodeEmbeddings } from "./embeddings/JinaCodeEmbeddings.js";
+import { GemmaEmbeddings } from "./embeddings/GemmaEmbeddings.js";
 import { GraphTraverser } from "./graph/GraphTraverser.js";
 import { SymbolResolver } from "./graph/SymbolResolver.js";
 import type { ChunkingWithEdgesResult, RawEdge } from "./graph/types.js";
@@ -913,7 +913,7 @@ function createDefaultEmbedding(): EmbeddingFunction {
   if (accountId && apiToken) {
     return new CloudflareEmbeddings(accountId, apiToken);
   }
-  return new JinaCodeEmbeddings();
+  return new GemmaEmbeddings();
 }
 
 function hashProjectRoot(projectRoot: string): string {

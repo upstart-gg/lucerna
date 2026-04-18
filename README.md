@@ -19,7 +19,7 @@ Parses your codebase with [tree-sitter](https://tree-sitter.github.io/tree-sitte
 - **Fully embedded** — uses LanceDB; the index is a directory on disk, one per project
 - **Multi-project** — multiple `CodeIndexer` instances in the same process, each fully isolated
 - **File watching** — debounced incremental re-indexing via chokidar; watcher path uses an in-memory chunk cache (no full DB scan per file change)
-- **Pluggable embeddings** — local (`HFEmbeddings`, `BGESmallEmbeddings`, `JinaCodeEmbeddings`) or remote (`CloudflareEmbeddings`); swap or disable entirely
+- **Pluggable embeddings** — local (`GemmaEmbeddings`, `NomicTextEmbeddings`, `JinaCodeEmbeddings`, `BGESmallEmbeddings`, `HFEmbeddings`) or remote (`CloudflareEmbeddings`); swap or disable entirely
 - **Popular languages** — custom AST-aware chunkers for Python, Java, Go, Rust, TypeScript/JavaScript, C/C++, C#, Swift, Kotlin, Ruby, PHP, Bash, Scala, Lua, R, Dart, Haskell, Elixir, Clojure, Groovy, Perl, PowerShell, MATLAB, Zig, Solidity, SQL, JSON, Markdown, XML, and more
 - **Gitignore-aware** — `.gitignore` files at any depth are always respected during indexing and watching
 - **CLI** — `lucerna index / watch / search / graph / stats / clear / eval`

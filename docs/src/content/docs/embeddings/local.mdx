@@ -5,9 +5,37 @@ description: Run embedding models locally via ONNX with no API key.
 
 All local models run via `@huggingface/transformers` + ONNX. Models are downloaded from Hugging Face Hub on first use and cached locally.
 
-## JinaCodeEmbeddings (default)
+## GemmaEmbeddings (default)
 
-A code-optimised model (`jinaai/jina-embeddings-v2-base-code`). This is the default when no Cloudflare env vars are set. Produces 768-dimensional embeddings with an 8K token context window across 30+ programming languages.
+`onnx-community/embeddinggemma-300m-ONNX` — the default when no Cloudflare env vars are set. Achieves MTEB English 68.4 and MTEB Code 68.8, making it the highest-quality local model at this size class (~175 MB q4f16). Produces 768-dimensional embeddings.
+
+> **License**: the model weights are subject to the [Google Gemma Terms of Use](https://ai.google.dev/gemma/terms). Weights are downloaded from HuggingFace Hub at runtime and are never bundled with Lucerna. By using this embedding provider you agree to those terms.
+
+```ts
+import { CodeIndexer, GemmaEmbeddings } from '@upstart.gg/lucerna';
+
+const indexer = new CodeIndexer({
+  projectRoot: '.',
+  embeddingFunction: new GemmaEmbeddings(),
+});
+```
+
+## NomicTextEmbeddings
+
+`nomic-ai/nomic-embed-text-v1.5` — a strong general-purpose model (MTEB 62.3) with an 8K token context window. Apache 2.0 license. Uses the q8 quantized ONNX variant (~137 MB). Good alternative to `GemmaEmbeddings` when you need longer context or a fully permissive license.
+
+```ts
+import { CodeIndexer, NomicTextEmbeddings } from '@upstart.gg/lucerna';
+
+const indexer = new CodeIndexer({
+  projectRoot: '.',
+  embeddingFunction: new NomicTextEmbeddings(),
+});
+```
+
+## JinaCodeEmbeddings
+
+`jinaai/jina-embeddings-v2-base-code` — code-optimised model with an 8K context window trained on 30+ programming languages. ONNX q8 (~162 MB), 768-dimensional embeddings.
 
 ```ts
 import { CodeIndexer, JinaCodeEmbeddings } from '@upstart.gg/lucerna';
@@ -20,7 +48,7 @@ const indexer = new CodeIndexer({
 
 ## BGESmallEmbeddings
 
-General-purpose — `Xenova/bge-small-en-v1.5` (MTEB 62.17).
+General-purpose — `Xenova/bge-small-en-v1.5` (MTEB 62.17). Lightest option at ~23 MB q8, 384-dimensional embeddings.
 
 ```ts
 import { CodeIndexer, BGESmallEmbeddings } from '@upstart.gg/lucerna';
@@ -43,7 +71,7 @@ const indexer = new CodeIndexer({
   embeddingFunction: new HFEmbeddings(
     'Xenova/bge-small-en-v1.5', // modelId
     384,                         // dimensions — must match model output
-    'fp32',                      // dtype: 'auto' | 'fp32' | 'fp16' | 'q8' | 'q4' | …
+    'fp32',                      // dtype: 'auto' | 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16' | …
   ),
 });
 ```

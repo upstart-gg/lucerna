@@ -29,9 +29,11 @@ export { TreeSitterChunker } from "./chunker/index.js";
 export { BGESmallEmbeddings } from "./embeddings/BGESmallEmbeddings.js";
 export { CloudflareEmbeddings } from "./embeddings/CloudflareEmbeddings.js";
 export { CloudflareReranker } from "./embeddings/CloudflareReranker.js";
+export { GemmaEmbeddings } from "./embeddings/GemmaEmbeddings.js";
 export { HFEmbeddings } from "./embeddings/HFEmbeddings.js";
 export { JinaCodeEmbeddings } from "./embeddings/JinaCodeEmbeddings.js";
 export { JinaReranker } from "./embeddings/JinaReranker.js";
+export { NomicTextEmbeddings } from "./embeddings/NomicTextEmbeddings.js";
 export { VoyageReranker } from "./embeddings/VoyageReranker.js";
 // Graph (for standalone use)
 export { GraphTraverser, SymbolResolver } from "./graph/index.js";

@@ -12,9 +12,11 @@ Pass `--embedder <name>` to any command, or use `new ProviderClass()` in your co
 | Name | Class | Notes |
 |------|-------|-------|
 | `cloudflare` | `CloudflareEmbeddings` | Requires `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` |
-| `local` / `hf` | `HFEmbeddings` | Local ONNX via @huggingface/transformers, no API key |
-| `bge-small` | `BGESmallEmbeddings` | Local BGE-small model |
-| `jina-code` | `JinaCodeEmbeddings` | Local Jina code model (default when no env vars set) |
+| `gemma` | `GemmaEmbeddings` | Local Gemma 300M model, MTEB 68.4 — **default** (Gemma ToU) |
+| `nomic-text` | `NomicTextEmbeddings` | Local Nomic text model, 8K ctx, MTEB 62.3, Apache 2.0 |
+| `jina-code` | `JinaCodeEmbeddings` | Local Jina code model, 8K ctx, code-optimised |
+| `bge-small` | `BGESmallEmbeddings` | Local BGE-small model, 384-dim, lightest option |
+| `local` / `hf` | `HFEmbeddings` | Any local ONNX model via @huggingface/transformers |
 
 ### Via CLI flag
 

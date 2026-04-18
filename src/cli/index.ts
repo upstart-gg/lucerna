@@ -38,7 +38,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, jina-code",
+    "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
   .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
@@ -69,7 +69,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, jina-code",
+    "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
   .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
@@ -124,7 +124,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, jina-code",
+    "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
   .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
@@ -351,7 +351,7 @@ program
   .option("--no-semantic", "Disable semantic (vector) search — lexical only")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, jina-code",
+    "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
   .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
@@ -589,7 +589,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, jina-code",
+    "Built-in embedder: cloudflare, local, bge-small, jina-code, nomic-text, gemma",
   )
   .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")

@@ -25,7 +25,7 @@ const indexer = new CodeIndexer({
   embeddingFunction?:
     | EmbeddingFunction         // custom instance
     | false,                    // disable semantic search, BM25 only
-                                // undefined → auto: CloudflareEmbeddings if env vars set, else JinaCodeEmbeddings
+                                // undefined → auto: CloudflareEmbeddings if env vars set, else GemmaEmbeddings
 
   // --- Reranking ---
   rerankingFunction?:
@@ -50,6 +50,6 @@ const indexer = new CodeIndexer({
 When `embeddingFunction` is not set, the indexer auto-selects:
 
 1. **`CloudflareEmbeddings`** — if `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` are set
-2. **`JinaCodeEmbeddings`** — otherwise (local ONNX model, no API key required)
+2. **`GemmaEmbeddings`** — otherwise (local ONNX model, no API key required; subject to [Gemma Terms of Use](https://ai.google.dev/gemma/terms))
 
 See [Embeddings](/embeddings/overview) for all options.

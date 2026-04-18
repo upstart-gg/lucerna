@@ -26,10 +26,11 @@ export class VoyageReranker implements RerankingFunction {
   private readonly apiKey: string;
   private readonly model: string;
 
-  constructor(apiKey = process.env.VOYAGE_API_KEY ?? "", model = "rerank-2") {
+  constructor(options?: { model?: string; apiKey?: string }) {
+    const apiKey = options?.apiKey ?? process.env.VOYAGE_API_KEY ?? "";
     if (!apiKey) throw new Error("VOYAGE_API_KEY is required");
     this.apiKey = apiKey;
-    this.model = model;
+    this.model = options?.model ?? "rerank-2";
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {

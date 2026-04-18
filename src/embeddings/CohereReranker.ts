@@ -26,11 +26,11 @@ export class CohereReranker implements RerankingFunction {
   private readonly apiKey: string;
   private readonly model: string;
 
-  constructor(options: { model: string; apiKey?: string }) {
-    const apiKey = options.apiKey ?? process.env.COHERE_API_KEY ?? "";
+  constructor(options?: { model?: string; apiKey?: string }) {
+    const apiKey = options?.apiKey ?? process.env.COHERE_API_KEY ?? "";
     if (!apiKey) throw new Error("COHERE_API_KEY is required");
     this.apiKey = apiKey;
-    this.model = options.model;
+    this.model = options?.model ?? "rerank-english-v3.0";
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {

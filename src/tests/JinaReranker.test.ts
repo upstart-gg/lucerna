@@ -9,7 +9,7 @@ describe("JinaReranker — unit", () => {
   });
 
   test("throws if apiKey is missing", () => {
-    expect(() => new JinaReranker("")).toThrow("JINA_API_KEY");
+    expect(() => new JinaReranker({ apiKey: "" })).toThrow("JINA_API_KEY");
   });
 
   test("returns scores in original input order", async () => {
@@ -27,7 +27,7 @@ describe("JinaReranker — unit", () => {
         ),
     );
 
-    const reranker = new JinaReranker("test-key");
+    const reranker = new JinaReranker({ apiKey: "test-key" });
     const scores = await reranker.rerank("query", ["text one", "text two"]);
 
     expect(scores).toHaveLength(2);
@@ -54,7 +54,7 @@ describe("JinaReranker — unit", () => {
       },
     );
 
-    const reranker = new JinaReranker("my-jina-key");
+    const reranker = new JinaReranker({ apiKey: "my-jina-key" });
     await reranker.rerank("find auth", ["function auth() {}", "const x = 1"]);
 
     expect(capturedUrl).toBe("https://api.jina.ai/v1/rerank");
@@ -68,6 +68,43 @@ describe("JinaReranker — unit", () => {
     });
   });
 
+  test("default model jina-reranker-v3 is used when none specified", async () => {
+    let capturedBody: { model: string } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ results: [{ index: 0, relevance_score: 0.8 }] }),
+          { status: 200 },
+        );
+      },
+    );
+
+    const reranker = new JinaReranker({ apiKey: "key" });
+    await reranker.rerank("query", ["text"]);
+    expect(capturedBody?.model).toBe("jina-reranker-v3");
+  });
+
+  test("custom model is sent in request body", async () => {
+    let capturedBody: { model: string } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ results: [{ index: 0, relevance_score: 0.7 }] }),
+          { status: 200 },
+        );
+      },
+    );
+
+    const reranker = new JinaReranker({
+      apiKey: "key",
+      model: "jina-reranker-m0",
+    });
+    await reranker.rerank("query", ["text"]);
+    expect(capturedBody?.model).toBe("jina-reranker-m0");
+  });
+
   test("returns empty array without calling fetch for empty input", async () => {
     let fetchCalled = false;
     (globalThis as Record<string, unknown>).fetch = mock(async () => {
@@ -75,7 +112,7 @@ describe("JinaReranker — unit", () => {
       return new Response("{}", { status: 200 });
     });
 
-    const reranker = new JinaReranker("key");
+    const reranker = new JinaReranker({ apiKey: "key" });
     const scores = await reranker.rerank("query", []);
 
     expect(scores).toHaveLength(0);
@@ -91,25 +128,8 @@ describe("JinaReranker — unit", () => {
         }),
     );
 
-    const reranker = new JinaReranker("key");
+    const reranker = new JinaReranker({ apiKey: "key" });
     await expect(reranker.rerank("q", ["text"])).rejects.toThrow("401");
-  });
-
-  test("custom model is sent in request body", async () => {
-    let capturedBody: { model: string } | undefined;
-    (globalThis as Record<string, unknown>).fetch = mock(
-      async (_url: string, init: RequestInit) => {
-        capturedBody = JSON.parse(init.body as string);
-        return new Response(
-          JSON.stringify({ results: [{ index: 0, relevance_score: 0.7 }] }),
-          { status: 200 },
-        );
-      },
-    );
-
-    const reranker = new JinaReranker("key", "jina-reranker-m0");
-    await reranker.rerank("query", ["text"]);
-    expect(capturedBody?.model).toBe("jina-reranker-m0");
   });
 
   test("preserves order — scores[i] corresponds to texts[i]", async () => {
@@ -126,7 +146,7 @@ describe("JinaReranker — unit", () => {
         ),
     );
 
-    const reranker = new JinaReranker("key");
+    const reranker = new JinaReranker({ apiKey: "key" });
     const scores = await reranker.rerank("q", ["irrelevant", "relevant"]);
 
     expect(scores[0]).toBeCloseTo(0.05);

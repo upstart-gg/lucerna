@@ -26,13 +26,11 @@ export class JinaReranker implements RerankingFunction {
   private readonly apiKey: string;
   private readonly model: string;
 
-  constructor(
-    apiKey = process.env.JINA_API_KEY ?? "",
-    model = "jina-reranker-v3",
-  ) {
+  constructor(options?: { model?: string; apiKey?: string }) {
+    const apiKey = options?.apiKey ?? process.env.JINA_API_KEY ?? "";
     if (!apiKey) throw new Error("JINA_API_KEY is required");
     this.apiKey = apiKey;
-    this.model = model;
+    this.model = options?.model ?? "jina-reranker-v3";
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {

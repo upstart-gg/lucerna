@@ -210,11 +210,11 @@ export async function resolveBuiltinReranker(
     }
     case "jina": {
       const { JinaReranker } = await import("./embeddings/JinaReranker.js");
-      return new JinaReranker(undefined, model);
+      return new JinaReranker({ model });
     }
     case "voyage": {
       const { VoyageReranker } = await import("./embeddings/VoyageReranker.js");
-      return new VoyageReranker(undefined, model);
+      return new VoyageReranker({ model });
     }
     case "cohere": {
       const { CohereReranker } = await import("./embeddings/CohereReranker.js");

@@ -15,7 +15,6 @@
  *   BENCH_GRAPH_DEPTH    graph traversal depth for neighbourhood bench (default: 1)
  *   BENCH_OUTPUT         path to append results JSON (default: benchmark-results.jsonl)
  */
-
 import { existsSync } from "node:fs";
 import { appendFile, stat } from "node:fs/promises";
 import { relative, resolve } from "node:path";

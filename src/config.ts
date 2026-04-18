@@ -161,7 +161,7 @@ export async function resolveBuiltinEmbedder(
       const { CloudflareEmbeddings } = await import(
         "./embeddings/CloudflareEmbeddings.js"
       );
-      return new CloudflareEmbeddings();
+      return new CloudflareEmbeddings({ model, ...d });
     }
     case "mistral": {
       const { MistralEmbeddings } = await import(
@@ -206,7 +206,7 @@ export async function resolveBuiltinReranker(
       const { CloudflareReranker } = await import(
         "./embeddings/CloudflareReranker.js"
       );
-      return new CloudflareReranker();
+      return new CloudflareReranker({ model });
     }
     case "jina": {
       const { JinaReranker } = await import("./embeddings/JinaReranker.js");

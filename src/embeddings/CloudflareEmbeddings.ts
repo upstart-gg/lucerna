@@ -1,8 +1,8 @@
 import type { EmbeddingFunction } from "../types.js";
 
 const API_BASE = "https://api.cloudflare.com/client/v4/accounts";
-const MODEL = "@cf/baai/bge-m3";
-const DIMENSIONS = 1024;
+const DEFAULT_MODEL = "@cf/baai/bge-m3";
+const DEFAULT_DIMENSIONS = 1024;
 // bge-m3 hard limit: 60,000 tokens per request (all texts combined).
 // Token density varies by content:
 //   • prose / imports : ~2  tokens/char
@@ -18,9 +18,11 @@ const MAX_BATCH_ITEMS = 10;
 const MAX_RETRIES = 3;
 
 /**
- * Embedding function using Cloudflare Workers AI with the `@cf/baai/bge-m3` model.
+ * Embedding function using Cloudflare Workers AI.
  *
- * Produces 1024-dimensional embeddings via plain fetch calls to the Cloudflare AI API.
+ * Defaults to the `@cf/baai/bge-m3` model (1024 dimensions). Pass `model` and
+ * `dimensions` to use a different Cloudflare AI embedding model.
+ *
  * Requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` environment variables,
  * or explicit constructor arguments.
  *
@@ -34,23 +36,32 @@ const MAX_RETRIES = 3;
  * const indexer = new CodeIndexer({
  *   projectRoot: '.',
  *   embeddingFunction: new CloudflareEmbeddings(),
+ *   // or: new CloudflareEmbeddings({ model: '@cf/baai/bge-large-en-v1.5', dimensions: 1024 })
  * });
  * ```
  */
 export class CloudflareEmbeddings implements EmbeddingFunction {
-  readonly dimensions = DIMENSIONS;
-  readonly modelId = MODEL;
+  readonly dimensions: number;
+  readonly modelId: string;
   private readonly apiToken: string;
   private readonly endpoint: string;
 
-  constructor(
-    accountId = process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
-    apiToken = process.env.CLOUDFLARE_API_TOKEN ?? "",
-  ) {
+  constructor(options?: {
+    model?: string;
+    dimensions?: number;
+    accountId?: string;
+    apiToken?: string;
+  }) {
+    const accountId =
+      options?.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "";
+    const apiToken =
+      options?.apiToken ?? process.env.CLOUDFLARE_API_TOKEN ?? "";
     if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is required");
     if (!apiToken) throw new Error("CLOUDFLARE_API_TOKEN is required");
     this.apiToken = apiToken;
-    this.endpoint = `${API_BASE}/${accountId}/ai/run/${MODEL}`;
+    this.modelId = options?.model ?? DEFAULT_MODEL;
+    this.dimensions = options?.dimensions ?? DEFAULT_DIMENSIONS;
+    this.endpoint = `${API_BASE}/${accountId}/ai/run/${this.modelId}`;
   }
 
   async generate(texts: string[]): Promise<number[][]> {

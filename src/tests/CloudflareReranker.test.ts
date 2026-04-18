@@ -13,15 +13,15 @@ describe("CloudflareReranker — unit", () => {
   });
 
   test("throws if accountId is missing", () => {
-    expect(() => new CloudflareReranker("", "token")).toThrow(
-      "CLOUDFLARE_ACCOUNT_ID",
-    );
+    expect(
+      () => new CloudflareReranker({ accountId: "", apiToken: "token" }),
+    ).toThrow("CLOUDFLARE_ACCOUNT_ID");
   });
 
   test("throws if apiToken is missing", () => {
-    expect(() => new CloudflareReranker("account", "")).toThrow(
-      "CLOUDFLARE_API_TOKEN",
-    );
+    expect(
+      () => new CloudflareReranker({ accountId: "account", apiToken: "" }),
+    ).toThrow("CLOUDFLARE_API_TOKEN");
   });
 
   test("returns scores on success in original input order", async () => {
@@ -42,7 +42,10 @@ describe("CloudflareReranker — unit", () => {
         ),
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     const scores = await reranker.rerank("query", ["text one", "text two"]);
 
     expect(scores).toHaveLength(2);
@@ -70,7 +73,10 @@ describe("CloudflareReranker — unit", () => {
         ),
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     const scores = await reranker.rerank("q", ["a", "b", "c"]);
 
     for (const score of scores) {
@@ -101,7 +107,10 @@ describe("CloudflareReranker — unit", () => {
       },
     );
 
-    const reranker = new CloudflareReranker("my-account", "my-token");
+    const reranker = new CloudflareReranker({
+      accountId: "my-account",
+      apiToken: "my-token",
+    });
     await reranker.rerank("find auth", ["function auth() {}", "const x = 1"]);
 
     expect(capturedUrl).toContain("my-account");
@@ -121,7 +130,10 @@ describe("CloudflareReranker — unit", () => {
       return new Response("{}", { status: 200 });
     });
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     const scores = await reranker.rerank("query", []);
 
     expect(scores).toHaveLength(0);
@@ -137,7 +149,10 @@ describe("CloudflareReranker — unit", () => {
         }),
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     await expect(reranker.rerank("q", ["text"])).rejects.toThrow("401");
   });
 
@@ -154,7 +169,10 @@ describe("CloudflareReranker — unit", () => {
         ),
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     await expect(reranker.rerank("q", ["text"])).rejects.toThrow("bad model");
   });
 
@@ -174,7 +192,10 @@ describe("CloudflareReranker — unit", () => {
       },
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     await reranker.rerank("query", [shortText]);
     expect(capturedBody?.contexts[0]?.text).toBe(shortText);
   });
@@ -200,7 +221,10 @@ describe("CloudflareReranker — unit", () => {
       },
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     await reranker.rerank("query", [longText]);
 
     const sent = capturedBody?.contexts[0]?.text ?? "";
@@ -227,7 +251,10 @@ describe("CloudflareReranker — unit", () => {
       },
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     await reranker.rerank("query", [exactText]);
     expect(capturedBody?.contexts[0]?.text).toBe(exactText); // sent as-is, no marker
   });
@@ -250,7 +277,10 @@ describe("CloudflareReranker — unit", () => {
         ),
     );
 
-    const reranker = new CloudflareReranker("account", "token");
+    const reranker = new CloudflareReranker({
+      accountId: "account",
+      apiToken: "token",
+    });
     const scores = await reranker.rerank("q", ["irrelevant", "relevant"]);
 
     // scores[0] = id:0 = 0.05 (irrelevant), scores[1] = id:1 = 0.95 (relevant)

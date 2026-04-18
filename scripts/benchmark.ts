@@ -10,7 +10,7 @@
  *
  * Options (env vars):
  *   BENCH_PROJECT        path to the project to index (default: this repo)
- *   BENCH_SEMANTIC       set to "0" to skip semantic search (avoids model download)
+ *   BENCH_SEMANTIC       set to "0" to skip semantic search (avoids model download; enabled by default)
  *   BENCH_RUNS           number of search iterations per query (default: 10)
  *   BENCH_GRAPH_DEPTH    graph traversal depth for neighbourhood bench (default: 1)
  *   BENCH_OUTPUT         path to append results JSON (default: benchmark-results.jsonl)
@@ -30,7 +30,7 @@ const PROJECT_ROOT = process.argv[2]
   : resolve(import.meta.dirname, "..");
 
 const mainEmbeddingFn =
-  process.env.BENCH_SEMANTIC !== "0" ? await resolveEmbedderFromEnv() : false;
+  process.env.BENCH_SEMANTIC === "0" ? false : await resolveEmbedderFromEnv();
 const SEMANTIC_ENABLED = mainEmbeddingFn !== false;
 const RERANK_ENABLED =
   SEMANTIC_ENABLED &&
@@ -158,7 +158,7 @@ async function main() {
   console.log(dim(`  project : ${PROJECT_ROOT}`));
   console.log(
     dim(
-      `  semantic: ${SEMANTIC_ENABLED ? "enabled" : "disabled (set BENCH_SEMANTIC=1 to enable)"}`,
+      `  semantic: ${SEMANTIC_ENABLED ? "enabled" : "disabled (LUCERNA_EMBEDDING not set)"}`,
     ),
   );
   console.log(dim(`  runs    : ${SEARCH_RUNS} per query`));
@@ -590,7 +590,7 @@ async function main() {
   } else {
     console.log(
       dim(
-        "\n│  Semantic + hybrid + searchWithContext skipped (BENCH_SEMANTIC=0)",
+        "\n│  Semantic + hybrid + searchWithContext skipped (set LUCERNA_EMBEDDING to enable, e.g. LUCERNA_EMBEDDING=openai:text-embedding-3-small)",
       ),
     );
   }

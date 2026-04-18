@@ -1,5 +1,13 @@
 # @upstart.gg/lucerna
 
+## 0.1.5
+
+### Patch Changes
+
+- [#35](https://github.com/upstart-gg/lucerna/pull/35) [`e4c0809`](https://github.com/upstart-gg/lucerna/commit/e4c0809ba0f69a8c7aec2c9c3ccad5c91e096533) Thanks [@mattallty](https://github.com/mattallty)! - chore: fix release PR system
+
+- [`c558b59`](https://github.com/upstart-gg/lucerna/commit/c558b592f042c669f121bbcc9b510eb19bcccec3) Thanks [@mattallty](https://github.com/mattallty)! - Set docs package as private
+
 ## 0.1.4
 
 ### Patch Changes

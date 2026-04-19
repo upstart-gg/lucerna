@@ -508,7 +508,7 @@ export class CodeIndexer {
         await this.indexProject();
         await this.startLeaderWatching();
       })();
-    }, 10_000);
+    }, this.options.leaderPollMs ?? 10_000);
   }
 
   async stopWatching(): Promise<void> {

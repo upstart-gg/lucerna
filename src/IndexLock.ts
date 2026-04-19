@@ -55,10 +55,16 @@ export class IndexLock {
 
 function isAlive(pid: number): boolean {
   try {
+    // Signal 0 checks process existence without sending a real signal.
+    // Works on POSIX (Linux, macOS) and Node's libuv emulation on Windows.
     process.kill(pid, 0);
     return true;
   } catch (e) {
-    // EPERM means the process exists but we can't signal it — still alive.
-    return (e as NodeJS.ErrnoException).code === "EPERM";
+    const code = (e as NodeJS.ErrnoException).code;
+    // EPERM: process exists but we lack permission to signal it — still alive.
+    // On Windows, Node maps ERROR_ACCESS_DENIED to EPERM via libuv.
+    if (code === "EPERM") return true;
+    // ESRCH (POSIX) or ENOENT (Windows fallback): no such process.
+    return false;
   }
 }

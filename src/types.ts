@@ -223,6 +223,12 @@ export interface CodeIndexOptions {
   watch?: boolean;
   /** Debounce delay in ms for file-watch events. Default: 500 */
   watchDebounce?: number;
+  /**
+   * How often (ms) a follower process polls to check if the indexing leader
+   * has exited and leadership can be claimed. Default: 10_000.
+   * Override in tests to speed up leader-transfer checks.
+   */
+  leaderPollMs?: number;
   /** Called after each file is indexed, removed, or errors during indexing */
   onIndexed?: (event: IndexEvent) => void;
 }

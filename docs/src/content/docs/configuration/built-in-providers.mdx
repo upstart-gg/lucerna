@@ -320,14 +320,4 @@ Free tier: 10K neurons/day (shared with embeddings).
 |-------|---------------------|-------|
 | `@cf/baai/bge-reranker-base` | ~$0.003 (free tier applies) | No extra key if already using Cloudflare |
 
----
 
-## Combining embedder + reranker
-
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "voyage:voyage-code-3",
-  "LUCERNA_RERANKING": "voyage:rerank-2",
-  "VOYAGE_API_KEY": "your-key"
-}
-```

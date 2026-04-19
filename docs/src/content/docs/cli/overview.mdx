@@ -14,11 +14,11 @@ The `lucerna` CLI lets you index, search, and inspect codebases directly from th
 Use a package manager's runner to execute Lucerna as a one-off command:
 
 ```bash
-npx @upstart.gg/lucerna <command>
+npx -y @upstart.gg/lucerna@latest <command>
 # or
-pnpm dlx @upstart.gg/lucerna <command>
+pnpm dlx @upstart.gg/lucerna@latest <command>
 # or
-bunx @upstart.gg/lucerna <command>
+bunx @upstart.gg/lucerna@latest <command>
 ```
 
 ## Installing globally
@@ -43,6 +43,7 @@ lucerna <command>
 
 | Command | Description |
 |---------|-------------|
+| [`install`](/cli/install) | Interactive setup wizard (MCP registration + embedding config) |
 | [`index`](/cli/index) | One-shot indexing of a project |
 | [`watch`](/cli/watch) | Index and re-index on file changes |
 | [`search`](/cli/search) | Search an existing index |

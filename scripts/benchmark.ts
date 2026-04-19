@@ -19,7 +19,7 @@ import { existsSync } from "node:fs";
 import { appendFile, stat } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { CodeIndexer, CloudflareReranker } from "../src/index.js";
-import { resolveEmbedderFromEnv } from "../src/config.js";
+import { loadConfig, resolveEmbeddingConfig } from "../src/config.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -29,8 +29,11 @@ const PROJECT_ROOT = process.argv[2]
   ? resolve(process.argv[2])
   : resolve(import.meta.dirname, "..");
 
+const { config: benchCfg } = await loadConfig(PROJECT_ROOT);
 const mainEmbeddingFn =
-  process.env.BENCH_SEMANTIC === "0" ? false : await resolveEmbedderFromEnv();
+  process.env.BENCH_SEMANTIC === "0"
+    ? false
+    : await resolveEmbeddingConfig(benchCfg.embedding);
 const SEMANTIC_ENABLED = mainEmbeddingFn !== false;
 const RERANK_ENABLED =
   SEMANTIC_ENABLED &&
@@ -158,7 +161,7 @@ async function main() {
   console.log(dim(`  project : ${PROJECT_ROOT}`));
   console.log(
     dim(
-      `  semantic: ${SEMANTIC_ENABLED ? "enabled" : "disabled (LUCERNA_EMBEDDING not set)"}`,
+      `  semantic: ${SEMANTIC_ENABLED ? "enabled" : "disabled (no embedding in lucerna.config.ts)"}`,
     ),
   );
   console.log(dim(`  runs    : ${SEARCH_RUNS} per query`));
@@ -470,7 +473,10 @@ async function main() {
       const rerankIndexer = new CodeIndexer({
         projectRoot: PROJECT_ROOT,
         storageDir: STORAGE_DIR,
-        rerankingFunction: new CloudflareReranker(),
+        rerankingFunction: new CloudflareReranker({
+          accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+          apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+        }),
         exclude: [
           "**/node_modules/**",
           "**/.git/**",
@@ -590,7 +596,7 @@ async function main() {
   } else {
     console.log(
       dim(
-        "\n│  Semantic + hybrid + searchWithContext skipped (set LUCERNA_EMBEDDING to enable, e.g. LUCERNA_EMBEDDING=openai:text-embedding-3-small)",
+        "\n│  Semantic + hybrid + searchWithContext skipped (configure an embedding provider in lucerna.config.ts to enable)",
       ),
     );
   }

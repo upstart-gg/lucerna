@@ -23,6 +23,7 @@ export default defineConfig({
           items: [
             { label: "Introduction", link: "/" },
             { label: "Quickstart", slug: "quickstart" },
+            { label: "MCP Tools", slug: "mcp-tools" },
           ],
         },
         {
@@ -30,6 +31,8 @@ export default defineConfig({
           collapsed: false,
           items: [
             { label: "Overview", slug: "configuration/overview" },
+            { label: "Env Vars", slug: "configuration/env-vars" },
+            { label: "Config File", slug: "configuration/config-file" },
             {
               label: "Embedding Providers",
               slug: "configuration/embedding-providers",
@@ -38,7 +41,6 @@ export default defineConfig({
               label: "Reranking Providers",
               slug: "configuration/reranking-providers",
             },
-            { label: "Env Vars", slug: "configuration/env-vars" },
             {
               label: "Custom Providers",
               slug: "configuration/custom-providers",

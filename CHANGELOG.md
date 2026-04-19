@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.8
+
+### Patch Changes
+
+- [#43](https://github.com/upstart-gg/lucerna/pull/43) [`5b767ab`](https://github.com/upstart-gg/lucerna/commit/5b767ab5d73df62592b53c5ab1950368da2fa6e4) Thanks [@mattallty](https://github.com/mattallty)! - Update default models for embedding and reranking to voyage-4 and rerank-2.5
+
 ## 0.1.7
 
 ### Patch Changes

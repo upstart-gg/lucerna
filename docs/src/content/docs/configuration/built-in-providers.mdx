@@ -48,18 +48,20 @@ OpenAI's `text-embedding-3` models also support server-side Matryoshka truncatio
 
 ### Voyage ⭐ recommended for code
 
-Best-in-class for code retrieval. `voyage-code-3` is purpose-trained on code with a 32K context window.
+Best-in-class for code retrieval. `voyage-4` is the latest generation model recommended for code search.
 
 ```json title=".mcp.json → env"
 {
-  "LUCERNA_EMBEDDING": "voyage:voyage-code-3",
+  "LUCERNA_EMBEDDING": "voyage:voyage-4",
   "VOYAGE_API_KEY": "your-key"
 }
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
 |-------|-----------|---------------------|-------|
-| `voyage-code-3` | 1024 | $0.18 | Best for code, 32K ctx — **top pick** |
+| `voyage-4` | 1024 | — | Latest generation — **top pick** |
+| `voyage-4-lite` | 512 | — | Faster, lower cost |
+| `voyage-code-3` | 1024 | $0.18 | Legacy, code-optimized, 32K ctx |
 | `voyage-3` | 1024 | $0.06 | General text |
 | `voyage-3-lite` | 512 | $0.02 | Faster, lower cost |
 
@@ -212,14 +214,15 @@ Re-ranks top results from hybrid search using a cross-encoder, improving precisi
 
 ```json title=".mcp.json → env"
 {
-  "LUCERNA_RERANKING": "voyage:rerank-2",
+  "LUCERNA_RERANKING": "voyage:rerank-2.5",
   "VOYAGE_API_KEY": "your-key"
 }
 ```
 
 | Model | Price per 1K queries | Notes |
 |-------|---------------------|-------|
-| `rerank-2` | $0.05 | Best quality, 16K ctx per pair |
+| `rerank-2.5` | — | Latest generation — **top pick** |
+| `rerank-2` | $0.05 | Previous generation, 16K ctx per pair |
 | `rerank-2-lite` | $0.02 | Lower latency |
 
 ---

@@ -61,14 +61,14 @@ describe("VoyageReranker — unit", () => {
     const headers = capturedInit?.headers as Record<string, string>;
     expect(headers?.Authorization).toBe("Bearer my-voyage-key");
     expect(JSON.parse(capturedInit?.body as string)).toEqual({
-      model: "rerank-2",
+      model: "rerank-2.5",
       query: "find auth",
       documents: ["function auth() {}", "const x = 1"],
       return_documents: false,
     });
   });
 
-  test("default model rerank-2 is used when none specified", async () => {
+  test("default model rerank-2.5 is used when none specified", async () => {
     let capturedBody: { model: string } | undefined;
     (globalThis as Record<string, unknown>).fetch = mock(
       async (_url: string, init: RequestInit) => {
@@ -82,7 +82,7 @@ describe("VoyageReranker — unit", () => {
 
     const reranker = new VoyageReranker({ apiKey: "key" });
     await reranker.rerank("query", ["text"]);
-    expect(capturedBody?.model).toBe("rerank-2");
+    expect(capturedBody?.model).toBe("rerank-2.5");
   });
 
   test("custom model is sent in request body", async () => {

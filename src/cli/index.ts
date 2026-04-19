@@ -40,11 +40,11 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
   .option(
     "--reranker <name>",
-    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+    "Reranker provider:model, e.g. voyage:rerank-2.5 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
   )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
@@ -74,11 +74,11 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
   .option(
     "--reranker <name>",
-    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+    "Reranker provider:model, e.g. voyage:rerank-2.5 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
   )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--debounce <ms>", "Debounce delay in milliseconds", "500")
@@ -132,11 +132,11 @@ program
   .option("--no-semantic", "Disable semantic/vector search")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
   .option(
     "--reranker <name>",
-    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+    "Reranker provider:model, e.g. voyage:rerank-2.5 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
   )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--limit <n>", "Max results", "10")
@@ -362,11 +362,11 @@ program
   .option("--no-semantic", "Disable semantic (vector) search — lexical only")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
   .option(
     "--reranker <name>",
-    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+    "Reranker provider:model, e.g. voyage:rerank-2.5 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
   )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(
@@ -611,11 +611,11 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
   .option(
     "--reranker <name>",
-    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+    "Reranker provider:model, e.g. voyage:rerank-2.5 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
   )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot = ".", opts: Record<string, unknown>) => {

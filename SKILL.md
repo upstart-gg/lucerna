@@ -37,11 +37,23 @@ Hybrid semantic + lexical (BM25) search over the indexed codebase. The primary t
 
 | Field | Description |
 |---|---|
-| `results` | Array of `{ chunk, score, matchType }` — `chunk` has `id`, `filePath`, `name`, `type`, `language`, `content` (unless `includeContent: false`), `startLine`, `endLine`, `metadata` |
+| `results` | Array of flat result objects (see fields below) |
 | `total` | Number of results fetched before pagination (at most `offset + limit + 1`) |
 | `hasMore` | `true` if more results exist beyond the current page |
 | `offset` | Only present when non-zero — the offset used for this page |
 | `warning` | Present when indexing is still in progress or semantic search is unavailable — retry in a few seconds |
+
+Each result object has these fields:
+
+| Field | Always present | Description |
+|---|---|---|
+| `id` | yes | Chunk ID — pass to `get_neighbors` |
+| `loc` | yes | `"filePath:startLine-endLine"` — e.g. `"src/auth/middleware.ts:12-17"` |
+| `type` | yes | Chunk type: `function` · `class` · `method` · etc. |
+| `score` | yes | Relevance score 0–1, rounded to 2 decimal places |
+| `name` | when named | Symbol name (function/class/method/heading) |
+| `content` | when `includeContent: true` | Raw source code of the chunk |
+| `metadata` | when non-empty | Language-specific extra fields |
 
 ---
 
@@ -51,7 +63,7 @@ Traverses the knowledge graph for a specific chunk. Use it to explore callers, c
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `chunkId` | string | required | The `id` field from a `search_codebase` result |
+| `chunkId` | string | required | The `id` field from a `search_codebase` result (top-level, not nested) |
 | `depth` | integer 1–3 | `1` | How many hops to traverse |
 
 ---

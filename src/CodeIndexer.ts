@@ -45,6 +45,32 @@ const DEFAULT_EXCLUDE = [
   "**/.next/**",
   "**/.nuxt/**",
   "**/.lucerna/**",
+  // Lock files — never useful to search, can be very large
+  "**/pnpm-lock.yaml",
+  "**/yarn.lock",
+  "**/package-lock.json",
+  "**/bun.lockb",
+  "**/Cargo.lock",
+  "**/go.sum",
+  "**/go.work.sum",
+  "**/poetry.lock",
+  "**/Gemfile.lock",
+  "**/composer.lock",
+  // Agent instruction files — contain meta-instructions, not project code
+  "**/CLAUDE.md",
+  "**/AGENTS.md",
+  "**/GEMINI.md",
+  "**/COPILOT.md",
+  "**/.cursorrules",
+  // Workspace / tooling boilerplate
+  "**/pnpm-workspace.yaml",
+  "**/pnpm-workspace.yml",
+  "**/nx.json",
+  "**/turbo.json",
+  // Generated / minified
+  "**/*.map",
+  "**/*.min.js",
+  "**/*.min.css",
   // Common binary / media files that produce no language-detected chunks
   "**/*.png",
   "**/*.jpg",

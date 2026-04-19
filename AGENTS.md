@@ -57,9 +57,16 @@ bun run dev search /path/to/project "my query"
 
 ## Development guidelines
 
-- Strict TypeScript (never use `any` or disable rules without a very good reason)
-- Always check for existing utilities/helpers before adding new ones
-- Always check that `bun lint` and `bun typecheck` pass before committing (no warnings accepted!)
-- Make sure `bun run build` completes successfully and that the output looks correct
-- Make sure `pnpm bench` completes successfully and that benchmarks look reasonable
-- Write tests for new features and bug fixes; follow existing test patterns
+- Strict TypeScript (NEVER use `any` or disable rules without a very good reason)
+- ALWAYS check for existing utilities/helpers before adding new ones
+- ALWAYS make sure all these pass with no errors or warbings after any change to the code. Use these exact commands to verify:
+- `pnpm lint`
+- `pnpm typecheck` pass before committing (no warnings accepted!)
+- `pnpm build`
+- `pnpm test`
+- `pnpm test:dist`
+- `pnpm test:integration`
+- `pnpm bench` (for performance-sensitive changes)
+
+- AWLAYS Write tests for new features and bug fixes; follow existing test patterns
+- ALWAYS keep docs up to date when changing behavior or adding features (`./docs` directory)

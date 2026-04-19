@@ -9,69 +9,52 @@ Lucerna ships a built-in [Model Context Protocol](https://modelcontextprotocol.i
 
 ## Setup
 
-### 1. Add Lucerna to your AI coding assistant
-
-Use [`add-mcp`](https://github.com/neondatabase/add-mcp), which supports 14 clients and writes the correct config file automatically:
+Run the interactive installer from your project directory:
 
 <Tabs>
   <TabItem label="npx">
     ```bash
-    npx -y add-mcp "npx -y @upstart.gg/lucerna@latest mcp-server" --name lucerna
+    npx -y @upstart.gg/lucerna@latest install
     ```
   </TabItem>
   <TabItem label="bunx">
     ```bash
-    bunx add-mcp "bunx @upstart.gg/lucerna@latest mcp-server" --name lucerna
+    bunx @upstart.gg/lucerna@latest install
     ```
   </TabItem>
   <TabItem label="pnpx">
     ```bash
-    pnpx add-mcp "pnpx @upstart.gg/lucerna@latest mcp-server" --name lucerna
+    pnpm dlx @upstart.gg/lucerna@latest install
     ```
   </TabItem>
   <TabItem label="yarn dlx">
     ```bash
-    yarn dlx add-mcp "yarn dlx @upstart.gg/lucerna@latest mcp-server" --name lucerna
+    yarn dlx @upstart.gg/lucerna@latest install
     ```
   </TabItem>
 </Tabs>
 
-`add-mcp` will prompt you to choose which clients to configure. The MCP server uses **the working directory of the client** as the project root — no hardcoded paths needed.
+The installer will:
 
-### 2. Ignore the index directory
+1. **Detect and configure your AI clients** — registers the Lucerna MCP server with every AI coding assistant found on your machine (Claude Code, Cursor, Windsurf, Zed, VS Code, and [more](https://github.com/neondatabase/add-mcp))
+2. **Set up semantic search** *(optional)* — prompts you to choose an embedding provider and API key; writes a `lucerna.config.ts` at your project root
+3. **Update `.gitignore`** — appends `.lucerna/` so the index directory is never committed
 
-Lucerna stores its index (vector database, file hashes) in a `.lucerna` directory at your project root. Add it to your `.gitignore`:
+Restart your AI client after running the installer to load the MCP server.
+
+:::tip[Manual setup]
+Prefer to configure things yourself? Use [`add-mcp`](https://github.com/neondatabase/add-mcp) directly to register the MCP server, then create a `lucerna.config.ts` manually. See [Config File](/configuration/config-file) for the full reference.
+
+```bash
+npx -y add-mcp "npx -y @upstart.gg/lucerna@latest mcp-server" --name lucerna
+```
+
+Also add `.lucerna/` to your `.gitignore` so the index directory is never committed:
 
 ```
 # .gitignore
 .lucerna/
 ```
-
-Or, if you work across many projects, add it once to your global gitignore (`~/.gitignore_global`) instead.
-
-### 3. Enable semantic search *(optional)*
-
-:::caution[Semantic search requires an embedding provider]
-Without a provider configured, Lucerna falls back to **lexical (BM25) search only** — and the MCP tools will include a warning in their output. For best results, configure an embedding provider.
 :::
-
-Place a `lucerna.config.ts` at your project root (or any parent directory — Lucerna searches upward automatically). If none exists, it will be created automatically on first run.
-
-```ts
-// lucerna.config.ts
-import { defineConfig } from "@upstart.gg/lucerna";
-
-export default defineConfig({
-  embedding: {
-    provider: "voyage",
-    model: "voyage-code-3",
-    apiKey: process.env.VOYAGE_API_KEY!,
-  },
-});
-```
-
-Set `VOYAGE_API_KEY` in your shell (or wherever your AI client picks up environment variables), and Lucerna will use it for semantic search.
-
-For other providers (OpenAI, Cohere, Ollama, local models, and more), see [Config File](/configuration/config-file).
 
 See [MCP Tools](/mcp-tools) for the full tool reference.

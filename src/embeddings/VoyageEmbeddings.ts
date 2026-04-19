@@ -14,8 +14,7 @@ const MODEL_DIMENSIONS: Record<string, number> = {
 /**
  * Embedding function using the Voyage AI Embeddings API.
  *
- * `voyage-code-3` is the recommended model for code search — it is trained
- * specifically for code retrieval with a 32K token context window.
+ * `voyage-4` is the recommended model for code search.
  *
  * Requires a Voyage AI API key via the `VOYAGE_API_KEY` environment variable
  * or explicit `apiKey` option.
@@ -26,7 +25,7 @@ const MODEL_DIMENSIONS: Record<string, number> = {
  *
  * const indexer = new CodeIndexer({
  *   projectRoot: '.',
- *   embeddingFunction: new VoyageEmbeddings({ model: 'voyage-code-3' }),
+ *   embeddingFunction: new VoyageEmbeddings({ model: 'voyage-4' }),
  * });
  * ```
  */

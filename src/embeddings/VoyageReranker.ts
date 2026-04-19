@@ -6,8 +6,8 @@ const API_ENDPOINT = "https://api.voyageai.com/v1/rerank";
  * Reranking function using the Voyage AI rerank API.
  *
  * Supports up to 16K tokens per (query, document) pair — no truncation needed
- * for typical code chunks. Use `rerank-2` (default) for best quality or
- * `rerank-lite-1` for lower latency.
+ * for typical code chunks. Use `rerank-2.5` (default) for best quality or
+ * `rerank-2` for the previous generation.
  *
  * Requires a Voyage AI API key via the `VOYAGE_API_KEY` environment variable
  * or explicit constructor argument.
@@ -30,7 +30,7 @@ export class VoyageReranker implements RerankingFunction {
     const apiKey = options?.apiKey ?? process.env.VOYAGE_API_KEY ?? "";
     if (!apiKey) throw new Error("VOYAGE_API_KEY is required");
     this.apiKey = apiKey;
-    this.model = options?.model ?? "rerank-2";
+    this.model = options?.model ?? "rerank-2.5";
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {

@@ -1,60 +1,61 @@
 ---
 name: "lucerna"
-description: "Guide to using the `lucerna search` and `lucerna graph` CLI commands for querying and navigating a codebase index."
+description: "Guide for agents using the lucerna MCP tools to search and navigate a codebase index."
 ---
-# Lucerna — CLI skill guide
+# Lucerna — MCP tool guide
 
-## lucerna search
-
-```
-lucerna search <project-root> <query> [options]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--limit <n>` | `10` | Maximum number of results to return |
-| `--language <lang>` | *(all)* | Filter by language: `typescript`, `python`, `rust`, `go`, `java`, etc. |
-| `--type <type>` | *(all)* | Filter by chunk type: `function` · `class` · `method` · `interface` · `type` · `variable` · `import` · `section` · `file` |
-| `--no-semantic` | *(hybrid)* | Disable vector search — run BM25 lexical only |
-| `--format raw\|json\|pretty-json` | `raw` | Output format — use `json` when piping results |
-
-### Query guidance
-
-- **Combine intent with technical terms.** "JWT token verify session middleware auth" retrieves better than "where is authentication implemented". Semantic search handles intent; BM25 handles exact identifiers.
-- **Use `--no-semantic` for exact symbol names.** Identifiers like `UserRepository` or `ERR_CONN_RESET` match better with BM25 alone.
-- **Narrow with `--type` before raising `--limit`.** Filtering to `function` or `method` reduces noise more reliably than increasing result count.
+Lucerna exposes two tools: **`search_codebase`** and **`get_neighbors`**.
 
 ---
 
-## lucerna graph
+## `search_codebase`
 
-```
-lucerna graph <project-root> <chunk-id> [options]
-```
+Hybrid semantic + lexical (BM25) search over the indexed codebase. The primary tool — use it first.
 
-Traverses the knowledge graph for a chunk. The `<chunk-id>` comes from the `id` field in `lucerna search --format json` output.
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `query` | string | required | Search query |
+| `includeGraphContext` | boolean | `true` | Expand results with related symbols from the knowledge graph |
+| `graphDepth` | integer 0–3 | `1` | Hops to follow when expanding graph context |
+| `limit` | integer 1–100 | `10` | Max results to return |
+| `language` | string | *(all)* | Filter by language: `typescript`, `python`, `rust`, `go`, etc. |
+| `type` | string | *(all)* | Filter by chunk type: `function` · `class` · `method` · `interface` · `type` · `variable` · `import` · `section` · `file` |
+| `filePath` | string | *(all)* | Filter by file path (supports glob patterns) |
 
-| Flag | Default | Description |
-|---|---|---|
-| `--relation <type>` | `neighborhood` | Which relationship to traverse (see below) |
-| `--depth <n>` | `1` | BFS depth for `neighborhood` traversal |
-| `--format raw\|json\|pretty-json` | `raw` | Output format |
+Results include a `warning` field when indexing is still in progress or semantic search is unavailable — retry in a few seconds if you see it.
 
-### Relation types
+---
 
-| Relation | Description |
-|---|---|
-| `neighborhood` | BFS traversal of all edges up to `--depth` hops (default) |
-| `callers` | Chunks that call this function/method |
-| `callees` | Chunks that this function/method calls |
-| `implementors` | Classes that implement or extend this interface/class |
-| `super-types` | Interfaces/classes that this chunk extends or implements |
-| `usages` | Chunks that reference this symbol |
+## `get_neighbors`
 
-### Search → graph pipeline
+Traverses the knowledge graph for a specific chunk. Use it to explore callers, callees, imports, and other relationships that `search_codebase` didn't surface directly.
 
-```bash
-# Find callers of a function
-ID=$(lucerna search . "verifyToken" --no-semantic --type function --format json | jq -r '.[0].id')
-lucerna graph . "$ID" --relation callers --format json
-```
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `chunkId` | string | required | The `id` field from a `search_codebase` result |
+| `depth` | integer 1–3 | `1` | How many hops to traverse |
+
+---
+
+## When to use each tool
+
+- **`search_codebase` first, always.** It already includes graph context by default (`includeGraphContext: true`). For most questions about the codebase, one call is enough.
+- **`get_neighbors` when you need to go deeper.** If a result looks relevant but you need to understand what calls it, what it calls, or what it imports — fetch its neighborhood explicitly.
+- **Don't call `get_neighbors` preemptively** on every search result. Use it only when a specific chunk warrants deeper exploration.
+
+---
+
+## Query guidelines
+
+- **Mix intent with identifiers.** `"JWT token verify session middleware"` retrieves better than `"where is authentication implemented"`. Semantic search handles intent; BM25 handles exact names.
+- **Exact symbol lookups:** for known identifiers like `UserRepository` or `ERR_CONN_RESET`, a precise query with the symbol name works best.
+- **Narrow with `type` before raising `limit`.** Filtering to `function` or `method` reduces noise more reliably than increasing the result count.
+- **Use `filePath` to scope to a module.** When you already know which file or directory is relevant, filter to it.
+
+---
+
+## Best practices
+
+- If results look incomplete, check for a `warning` field in the response — indexing may still be running.
+- Prefer one well-formed query over multiple narrow ones. The hybrid ranker handles broad queries well.
+- `graphDepth: 2` is rarely needed. Start at `1`; only go deeper if the direct neighborhood is insufficient.

@@ -84,19 +84,22 @@ export class Searcher {
     const innerOpts = { ...options, limit: limit * 3 };
     const shouldRerank = this.rerankingFn !== false && options.rerank !== false;
 
-    // Run both searches concurrently
-    const [semanticResults, lexicalResults] = await Promise.all([
-      this.searchSemantic(query, innerOpts).catch(() => [] as SearchResult[]),
-      this.searchLexical(query, innerOpts).catch(() => [] as SearchResult[]),
-    ]);
+    let fused: SearchResult[];
 
-    const candidateLimit = limit;
-    const fused = reciprocalRankFusion(
-      semanticResults,
-      lexicalResults,
-      candidateLimit,
-      options.rrfK ?? DEFAULT_RRF_K,
-    );
+    if (this.store.searchHybrid) {
+      // Native path: single round-trip, LanceDB handles RRF fusion
+      const [vector] = await (this.embeddingFn as EmbeddingFunction).generate([
+        query,
+      ]);
+      if (!vector) return [];
+      fused = (
+        await this.store
+          .searchHybrid(vector, query, innerOpts)
+          .catch(() => this.fallbackTwoQuery(query, innerOpts))
+      ).map((r) => ({ ...r, matchType: "hybrid" as const }));
+    } else {
+      fused = await this.fallbackTwoQuery(query, innerOpts);
+    }
 
     if (shouldRerank && fused.length > 0) {
       const reranked = await applyReranking(
@@ -107,7 +110,24 @@ export class Searcher {
       return applyMinScore(reranked, options.minScore).slice(0, limit);
     }
 
-    return applyMinScore(fused, options.minScore);
+    return applyMinScore(fused, options.minScore).slice(0, limit);
+  }
+
+  private async fallbackTwoQuery(
+    query: string,
+    options: SearchOptions,
+  ): Promise<SearchResult[]> {
+    const limit = options.limit ?? 10;
+    const [semanticResults, lexicalResults] = await Promise.all([
+      this.searchSemantic(query, options).catch(() => [] as SearchResult[]),
+      this.searchLexical(query, options).catch(() => [] as SearchResult[]),
+    ]);
+    return reciprocalRankFusion(
+      semanticResults,
+      lexicalResults,
+      limit,
+      options.rrfK ?? DEFAULT_RRF_K,
+    );
   }
 }
 

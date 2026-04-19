@@ -31,6 +31,8 @@ interface ChunkRow extends Record<string, unknown> {
   searchContent: string; // identifier-expanded content for code-aware BM25
 }
 
+const DEFAULT_RRF_K = 45; // tuned for code retrieval (doc-IR default is 60)
+
 // ---------------------------------------------------------------------------
 // LanceDBStore
 // ---------------------------------------------------------------------------
@@ -233,6 +235,43 @@ export class LanceDBStore implements VectorStore {
       // BM25 scores are not normalised; use rank-based score
       score: 1 / (1 + idx),
       matchType: "lexical" as const,
+    }));
+  }
+
+  async searchHybrid(
+    queryVector: number[],
+    query: string,
+    options: SearchOptions,
+  ): Promise<SearchResult[]> {
+    if (!this.table) throw new Error("LanceDBStore not initialized");
+
+    await Promise.all([this.ensureVectorIndex(), this.ensureFtsIndex()]);
+
+    // FTS index may not exist (e.g. table was never FTS-indexed) — fall through
+    if (!this.ftsIndexExists) {
+      return this.searchVector(queryVector, options);
+    }
+
+    const limit = options.limit ?? 20;
+    const ftsColumn = this.searchContentAvailable ? "searchContent" : "content";
+    const rrfK = options.rrfK ?? DEFAULT_RRF_K;
+    const rrf = await lancedb.rerankers.RRFReranker.create(rrfK);
+
+    let q = this.table
+      .query()
+      .nearestTo(queryVector)
+      .fullTextSearch(query, { columns: [ftsColumn] })
+      .rerank(rrf)
+      .limit(limit);
+
+    const filter = buildFilter(options);
+    if (filter) q = q.where(filter);
+
+    const results = await q.toArray();
+    return results.map((row) => ({
+      chunk: rowToChunk(row as ChunkRow),
+      score: (row._relevance_score as number) ?? (row._score as number) ?? 0,
+      matchType: "hybrid" as const,
     }));
   }
 

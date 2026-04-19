@@ -5,6 +5,7 @@ import type {
   CodeChunk,
   EmbeddingFunction,
   RerankingFunction,
+  SearchOptions,
   SearchResult,
 } from "../types.js";
 
@@ -464,5 +465,146 @@ describe("Searcher — reranking", () => {
     const searcher = new Searcher(store, mockEmbedding, reranker);
     await searcher.search("q", { hybrid: false });
     expect(reranker.calls).toHaveLength(0);
+  });
+
+  test("reranker applied on top of native hybrid path", async () => {
+    const chunkA = { ...makeChunk("a"), contextContent: "native content a" };
+    const chunkB = { ...makeChunk("b"), contextContent: "native content b" };
+    const store = makeMockStore({
+      searchHybrid: async () => [
+        { chunk: chunkA, score: 0.8, matchType: "hybrid" as const },
+        { chunk: chunkB, score: 0.6, matchType: "hybrid" as const },
+      ],
+    });
+    const reranker = makeMockReranker([0.3, 0.95]);
+    const searcher = new Searcher(store, mockEmbedding, reranker);
+    const results = await searcher.search("q", { limit: 2 });
+    expect(reranker.calls).toHaveLength(1);
+    expect(reranker.calls[0]?.texts).toContain("native content a");
+    expect(reranker.calls[0]?.texts).toContain("native content b");
+    // b scores higher after reranking
+    expect(results[0]?.chunk.id).toBe("b");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Native hybrid path (searchHybrid)
+// ---------------------------------------------------------------------------
+
+describe("Searcher — native hybrid path (searchHybrid)", () => {
+  test("searchHybrid is called when store supports it", async () => {
+    let hybridCalled = false;
+    let vectorCalled = false;
+    let textCalled = false;
+    const store = makeMockStore({
+      searchHybrid: async () => {
+        hybridCalled = true;
+        return [makeResult("a", 0.9, "semantic")];
+      },
+      searchVector: async () => {
+        vectorCalled = true;
+        return [];
+      },
+      searchText: async () => {
+        textCalled = true;
+        return [];
+      },
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    await searcher.search("foo");
+    expect(hybridCalled).toBe(true);
+    expect(vectorCalled).toBe(false);
+    expect(textCalled).toBe(false);
+  });
+
+  test("passes embedded query vector and raw query string to searchHybrid", async () => {
+    let capturedVector: number[] | undefined;
+    let capturedQuery: string | undefined;
+    const store = makeMockStore({
+      searchHybrid: async (vec, q) => {
+        capturedVector = vec;
+        capturedQuery = q;
+        return [makeResult("a", 0.9, "semantic")];
+      },
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    await searcher.search("find auth");
+    expect(capturedQuery).toBe("find auth");
+    // mockEmbedding returns [0.1, 0.2, 0.3, 0.4] for any text
+    expect(capturedVector).toEqual([0.1, 0.2, 0.3, 0.4]);
+  });
+
+  test("results tagged as 'hybrid' matchType from native path", async () => {
+    const store = makeMockStore({
+      searchHybrid: async () => [makeResult("a", 0.9, "semantic")],
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    const results = await searcher.search("foo");
+    expect(results[0]?.matchType).toBe("hybrid");
+  });
+
+  test("inner limit is limit * 3", async () => {
+    let capturedOpts: SearchOptions | undefined;
+    const store = makeMockStore({
+      searchHybrid: async (_v, _q, opts) => {
+        capturedOpts = opts;
+        return [];
+      },
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    await searcher.search("foo", { limit: 10 });
+    expect(capturedOpts?.limit).toBe(30);
+  });
+
+  test("rrfK is forwarded to searchHybrid options", async () => {
+    let capturedOpts: SearchOptions | undefined;
+    const store = makeMockStore({
+      searchHybrid: async (_v, _q, opts) => {
+        capturedOpts = opts;
+        return [];
+      },
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    await searcher.search("foo", { rrfK: 30 });
+    expect(capturedOpts?.rrfK).toBe(30);
+  });
+
+  test("minScore filters results from native path", async () => {
+    const store = makeMockStore({
+      searchHybrid: async () => [makeResult("a", 0.2, "semantic")],
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    const results = await searcher.search("foo", { minScore: 0.5 });
+    expect(results).toHaveLength(0);
+  });
+
+  test("respects limit after native path results", async () => {
+    const store = makeMockStore({
+      searchHybrid: async () => [
+        makeResult("a", 0.9, "semantic"),
+        makeResult("b", 0.8, "semantic"),
+        makeResult("c", 0.7, "semantic"),
+        makeResult("d", 0.6, "semantic"),
+        makeResult("e", 0.5, "semantic"),
+      ],
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    const results = await searcher.search("foo", { limit: 3 });
+    expect(results).toHaveLength(3);
+  });
+
+  test("falls back to two-query RRF when searchHybrid throws", async () => {
+    const store = makeMockStore({
+      searchHybrid: async () => {
+        throw new Error("native hybrid unavailable");
+      },
+      searchVector: async () => [makeResult("vec_result", 0.9)],
+      searchText: async () => [makeResult("fts_result", 0.8, "lexical")],
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    const results = await searcher.search("foo");
+    const ids = results.map((r) => r.chunk.id);
+    expect(ids).toContain("vec_result");
+    expect(ids).toContain("fts_result");
   });
 });

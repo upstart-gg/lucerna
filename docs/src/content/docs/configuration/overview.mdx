@@ -72,3 +72,7 @@ interface LucernaConfig {
   rerankingFunction?: RerankingFunction | false;
 }
 ```
+
+:::tip[Reranking is optional]
+Without a `rerankingFunction`, hybrid search still applies **RRF fusion** automatically — merging vector and full-text results into a single ranked list. This is a solid baseline for most codebases. Add a [reranking provider](/configuration/reranking-providers) when you need higher precision on large codebases where many chunks look similar at the embedding level.
+:::

@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.13
+
+### Patch Changes
+
+- [#59](https://github.com/upstart-gg/lucerna/pull/59) [`ba35c15`](https://github.com/upstart-gg/lucerna/commit/ba35c156f683618caab58e1e637f43db006e48f0) Thanks [@mattallty](https://github.com/mattallty)! - Do not use shell:true in install command
+
 ## 0.1.12
 
 ### Patch Changes

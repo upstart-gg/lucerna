@@ -3,15 +3,36 @@ title: Quickstart
 description: Install and configure the Lucerna MCP server for AI coding assistants.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 Lucerna ships a built-in [Model Context Protocol](https://modelcontextprotocol.io/) server so AI coding assistants (Claude Code, Cursor, Windsurf, Zed, VS Code, and more) can search your codebase directly.
 
 ## Setup
 
 Use [`add-mcp`](https://github.com/neondatabase/add-mcp), which supports 14 clients and writes the correct config file automatically:
 
-```bash
-npx add-mcp "npx -y @upstart.gg/lucerna mcp-server" --name lucerna
-```
+<Tabs>
+  <TabItem label="npx">
+    ```bash
+    npx -y add-mcp "npx -y @upstart.gg/lucerna@latest mcp-server"
+    ```
+  </TabItem>
+  <TabItem label="bunx">
+    ```bash
+    bunx add-mcp "bunx @upstart.gg/lucerna@latest mcp-server"
+    ```
+  </TabItem>
+  <TabItem label="pnpx">
+    ```bash
+    pnpx -y add-mcp "pnpx @upstart.gg/lucerna@latest mcp-server"
+    ```
+  </TabItem>
+  <TabItem label="yarn dlx">
+    ```bash
+    yarn dlx add-mcp "yarn dlx @upstart.gg/lucerna@latest mcp-server"
+    ```
+  </TabItem>
+</Tabs>
 
 `add-mcp` will prompt you to choose which clients to configure. The MCP server uses **the working directory of the client** as the project root — no hardcoded paths needed.
 
@@ -28,7 +49,7 @@ The recommended approach is to add env vars to your MCP server config:
   "mcpServers": {
     "lucerna": {
       "command": "npx",
-      "args": ["-y", "@upstart.gg/lucerna", "mcp-server"],
+      "args": ["@upstart.gg/lucerna@latest", "mcp-server"],
       "env": {
         "LUCERNA_EMBEDDING": "voyage:voyage-4",
         "VOYAGE_API_KEY": "your-voyage-api-key"

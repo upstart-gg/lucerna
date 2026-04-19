@@ -9,7 +9,7 @@ describe("VoyageReranker — unit", () => {
   });
 
   test("throws if apiKey is missing", () => {
-    expect(() => new VoyageReranker("")).toThrow("VOYAGE_API_KEY");
+    expect(() => new VoyageReranker({ apiKey: "" })).toThrow("VOYAGE_API_KEY");
   });
 
   test("returns scores in original input order", async () => {
@@ -27,7 +27,7 @@ describe("VoyageReranker — unit", () => {
         ),
     );
 
-    const reranker = new VoyageReranker("test-key");
+    const reranker = new VoyageReranker({ apiKey: "test-key" });
     const scores = await reranker.rerank("query", ["text one", "text two"]);
 
     expect(scores).toHaveLength(2);
@@ -54,7 +54,7 @@ describe("VoyageReranker — unit", () => {
       },
     );
 
-    const reranker = new VoyageReranker("my-voyage-key");
+    const reranker = new VoyageReranker({ apiKey: "my-voyage-key" });
     await reranker.rerank("find auth", ["function auth() {}", "const x = 1"]);
 
     expect(capturedUrl).toBe("https://api.voyageai.com/v1/rerank");
@@ -68,6 +68,43 @@ describe("VoyageReranker — unit", () => {
     });
   });
 
+  test("default model rerank-2 is used when none specified", async () => {
+    let capturedBody: { model: string } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ data: [{ index: 0, relevance_score: 0.8 }] }),
+          { status: 200 },
+        );
+      },
+    );
+
+    const reranker = new VoyageReranker({ apiKey: "key" });
+    await reranker.rerank("query", ["text"]);
+    expect(capturedBody?.model).toBe("rerank-2");
+  });
+
+  test("custom model is sent in request body", async () => {
+    let capturedBody: { model: string } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ data: [{ index: 0, relevance_score: 0.7 }] }),
+          { status: 200 },
+        );
+      },
+    );
+
+    const reranker = new VoyageReranker({
+      apiKey: "key",
+      model: "rerank-lite-1",
+    });
+    await reranker.rerank("query", ["text"]);
+    expect(capturedBody?.model).toBe("rerank-lite-1");
+  });
+
   test("returns empty array without calling fetch for empty input", async () => {
     let fetchCalled = false;
     (globalThis as Record<string, unknown>).fetch = mock(async () => {
@@ -75,7 +112,7 @@ describe("VoyageReranker — unit", () => {
       return new Response("{}", { status: 200 });
     });
 
-    const reranker = new VoyageReranker("key");
+    const reranker = new VoyageReranker({ apiKey: "key" });
     const scores = await reranker.rerank("query", []);
 
     expect(scores).toHaveLength(0);
@@ -91,25 +128,8 @@ describe("VoyageReranker — unit", () => {
         }),
     );
 
-    const reranker = new VoyageReranker("key");
+    const reranker = new VoyageReranker({ apiKey: "key" });
     await expect(reranker.rerank("q", ["text"])).rejects.toThrow("401");
-  });
-
-  test("custom model is sent in request body", async () => {
-    let capturedBody: { model: string } | undefined;
-    (globalThis as Record<string, unknown>).fetch = mock(
-      async (_url: string, init: RequestInit) => {
-        capturedBody = JSON.parse(init.body as string);
-        return new Response(
-          JSON.stringify({ data: [{ index: 0, relevance_score: 0.7 }] }),
-          { status: 200 },
-        );
-      },
-    );
-
-    const reranker = new VoyageReranker("key", "rerank-lite-1");
-    await reranker.rerank("query", ["text"]);
-    expect(capturedBody?.model).toBe("rerank-lite-1");
   });
 
   test("preserves order — scores[i] corresponds to texts[i]", async () => {
@@ -126,7 +146,7 @@ describe("VoyageReranker — unit", () => {
         ),
     );
 
-    const reranker = new VoyageReranker("key");
+    const reranker = new VoyageReranker({ apiKey: "key" });
     const scores = await reranker.rerank("q", ["irrelevant", "relevant"]);
 
     expect(scores[0]).toBeCloseTo(0.05);

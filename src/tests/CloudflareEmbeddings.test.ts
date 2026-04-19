@@ -13,15 +13,15 @@ describe("CloudflareEmbeddings — unit", () => {
   });
 
   test("throws if accountId is missing", () => {
-    expect(() => new CloudflareEmbeddings("", "token")).toThrow(
-      "CLOUDFLARE_ACCOUNT_ID",
-    );
+    expect(
+      () => new CloudflareEmbeddings({ accountId: "", apiToken: "token" }),
+    ).toThrow("CLOUDFLARE_ACCOUNT_ID");
   });
 
   test("throws if apiToken is missing", () => {
-    expect(() => new CloudflareEmbeddings("account", "")).toThrow(
-      "CLOUDFLARE_API_TOKEN",
-    );
+    expect(
+      () => new CloudflareEmbeddings({ accountId: "account", apiToken: "" }),
+    ).toThrow("CLOUDFLARE_API_TOKEN");
   });
 
   test("returns vectors on success", async () => {
@@ -37,7 +37,10 @@ describe("CloudflareEmbeddings — unit", () => {
         ),
     );
 
-    const emb = new CloudflareEmbeddings("account", "token");
+    const emb = new CloudflareEmbeddings({
+      accountId: "account",
+      apiToken: "token",
+    });
     const result = await emb.generate(["hello", "world"]);
     expect(result).toEqual(mockVectors);
   });
@@ -56,7 +59,10 @@ describe("CloudflareEmbeddings — unit", () => {
       },
     );
 
-    const emb = new CloudflareEmbeddings("my-account", "my-token");
+    const emb = new CloudflareEmbeddings({
+      accountId: "my-account",
+      apiToken: "my-token",
+    });
     await emb.generate(["test input"]);
 
     expect(capturedUrl).toContain("my-account");
@@ -77,7 +83,10 @@ describe("CloudflareEmbeddings — unit", () => {
         }),
     );
 
-    const emb = new CloudflareEmbeddings("account", "token");
+    const emb = new CloudflareEmbeddings({
+      accountId: "account",
+      apiToken: "token",
+    });
     await expect(emb.generate(["test"])).rejects.toThrow("401");
   });
 
@@ -94,12 +103,18 @@ describe("CloudflareEmbeddings — unit", () => {
         ),
     );
 
-    const emb = new CloudflareEmbeddings("account", "token");
+    const emb = new CloudflareEmbeddings({
+      accountId: "account",
+      apiToken: "token",
+    });
     await expect(emb.generate(["test"])).rejects.toThrow("bad request");
   });
 
   test("dimensions is 1024", () => {
-    const emb = new CloudflareEmbeddings("account", "token");
+    const emb = new CloudflareEmbeddings({
+      accountId: "account",
+      apiToken: "token",
+    });
     expect(emb.dimensions).toBe(1024);
   });
 
@@ -118,7 +133,10 @@ describe("CloudflareEmbeddings — unit", () => {
       },
     );
 
-    const emb = new CloudflareEmbeddings("account", "token");
+    const emb = new CloudflareEmbeddings({
+      accountId: "account",
+      apiToken: "token",
+    });
     // A text longer than MAX_TEXT_CHARS (4500) must be split across multiple requests
     const longText = "x".repeat(10_000);
     const result = await emb.generate([longText]);

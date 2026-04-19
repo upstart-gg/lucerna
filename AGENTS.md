@@ -61,4 +61,5 @@ bun run dev search /path/to/project "my query"
 - Always check for existing utilities/helpers before adding new ones
 - Always check that `bun lint` and `bun typecheck` pass before committing (no warnings accepted!)
 - Make sure `bun run build` completes successfully and that the output looks correct
+- Make sure `pnpm bench` completes successfully and that benchmarks look reasonable
 - Write tests for new features and bug fixes; follow existing test patterns

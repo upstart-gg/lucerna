@@ -6,6 +6,8 @@ import {
   loadConfig,
   resolveBuiltinEmbedder,
   resolveBuiltinReranker,
+  resolveEmbedderFromEnv,
+  resolveRerankerFromEnv,
 } from "../config.js";
 import pkg from "../../package.json";
 import type {
@@ -38,9 +40,12 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, nomic",
+    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
     const indexer = await buildIndexer(projectRoot, opts);
@@ -69,9 +74,12 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, nomic",
+    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--debounce <ms>", "Debounce delay in milliseconds", "500")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
@@ -124,9 +132,12 @@ program
   .option("--no-semantic", "Disable semantic/vector search")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, nomic",
+    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .option("--limit <n>", "Max results", "10")
   .option("--format <fmt>", "Output format: raw, json, or pretty-json", "raw")
@@ -351,9 +362,12 @@ program
   .option("--no-semantic", "Disable semantic (vector) search — lexical only")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, nomic",
+    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(
     async (
@@ -487,20 +501,28 @@ async function buildIndexer(
   // Load config file (lucerna.config.ts / .js) — may be overridden by flags below.
   const cfg = await loadConfig(resolvedRoot, opts.config as string | undefined);
 
-  // Resolve embedding function. Priority: --no-semantic > --embedder flag > config file.
+  // Resolve embedding function.
+  // Priority: --no-semantic > --embedder flag > config file > LUCERNA_EMBEDDING env var.
   let embeddingFunction: EmbeddingFunction | false | undefined =
     cfg.embeddingFunction;
   if (opts.semantic === false) {
     embeddingFunction = false;
   } else if (opts.embedder) {
     embeddingFunction = await resolveBuiltinEmbedder(String(opts.embedder));
+  } else if (embeddingFunction === undefined) {
+    const fromEnv = await resolveEmbedderFromEnv();
+    if (fromEnv !== false) embeddingFunction = fromEnv;
   }
 
-  // Resolve reranking function. Priority: --reranker flag > config file.
+  // Resolve reranking function.
+  // Priority: --reranker flag > config file > LUCERNA_RERANKING env var.
   let rerankingFunction: RerankingFunction | false | undefined =
     cfg.rerankingFunction;
   if (opts.reranker) {
     rerankingFunction = await resolveBuiltinReranker(String(opts.reranker));
+  } else if (rerankingFunction === undefined) {
+    const fromEnv = await resolveRerankerFromEnv();
+    if (fromEnv !== false) rerankingFunction = fromEnv;
   }
 
   return new CodeIndexer({
@@ -589,9 +611,12 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Built-in embedder: cloudflare, local, bge-small, nomic",
+    "Embedding provider:model, e.g. voyage:voyage-code-3 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
   )
-  .option("--reranker <name>", "Built-in reranker: cloudflare, jina, voyage")
+  .option(
+    "--reranker <name>",
+    "Reranker provider:model, e.g. voyage:rerank-2 or cohere:rerank-english-v3.0. Providers: cloudflare, jina, voyage, cohere",
+  )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot = ".", opts: Record<string, unknown>) => {
     const { startMcpServer } = await import("../mcp/server.js");

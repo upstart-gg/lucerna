@@ -16,9 +16,9 @@ lucerna index /path/to/project
 | `--storage-dir <dir>` | Override storage directory (default: `<root>/.lucerna`) |
 | `--include <globs>` | Comma-separated include glob patterns (default: `**/*`) |
 | `--exclude <globs>` | Additional comma-separated exclude glob patterns |
-| `--no-semantic` | Disable semantic search (BM25 only, skips model download) |
-| `--embedder <name>` | Built-in embedder: `cloudflare`, `local`, `bge-small`, `nomic` |
-| `--reranker <name>` | Built-in reranker: `cloudflare`, `jina`, `voyage` |
+| `--no-semantic` | Disable semantic search (BM25 only) |
+| `--embedder <provider:model>` | Embedding provider and model, e.g. `voyage:voyage-code-3`. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, vertex, ollama |
+| `--reranker <provider:model>` | Reranker provider and model, e.g. `voyage:rerank-2`. Providers: voyage, cohere, jina, cloudflare |
 | `--config <path>` | Path to a `lucerna.config.ts` / `lucerna.config.js` (default: auto-detected at project root) |
 
 ## Example output

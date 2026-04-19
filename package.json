@@ -23,7 +23,7 @@
     "test": "bun test",
     "ci:test": "bun test --coverage --coverage-reporter=lcov",
     "test:dist": "bun test src/tests/cli.dist.test.ts",
-    "test:integration": "cross-env INTEGRATION_TESTS=1 bun test",
+    "test:integration": "cross-env INTEGRATION_TESTS=1 bun test --timeout 60000 src/tests/integration.test.ts src/tests/*.integration.test.ts src/tests/CloudflareEmbeddings.test.ts src/tests/CloudflareReranker.test.ts src/tests/JinaReranker.test.ts src/tests/VoyageReranker.test.ts",
     "typecheck": "tsgo --noEmit",
     "lint": "biome check --write",
     "ci:lint": "biome ci .",
@@ -35,7 +35,6 @@
     "changeset:publish": "changeset publish"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.1.0",
     "@kreuzberg/tree-sitter-language-pack": "^1.6.1",
     "@lancedb/lancedb": "^0.27.2",
     "@modelcontextprotocol/sdk": "^1.29.0",

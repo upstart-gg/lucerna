@@ -1,36 +1,36 @@
 import type { RerankingFunction } from "../types.js";
 
-const API_ENDPOINT = "https://api.jina.ai/v1/rerank";
+const API_ENDPOINT = "https://api.cohere.com/v2/rerank";
 
 /**
- * Reranking function using the Jina AI reranker API.
+ * Reranking function using the Cohere Rerank API.
  *
- * Supports up to 8K tokens per (query, document) pair — no truncation needed
- * for typical code chunks. Uses `jina-reranker-v3` (default) which has
- * strong performance on code retrieval tasks.
+ * Requires a Cohere API key via the `COHERE_API_KEY` environment variable
+ * or explicit `apiKey` option.
  *
- * Requires a Jina AI API key via the `JINA_API_KEY` environment variable
- * or explicit constructor argument.
+ * Recommended models:
+ * - `rerank-english-v3.0` — best for English-only codebases
+ * - `rerank-multilingual-v3.0` — for multilingual projects
  *
  * @example
  * ```ts
- * import { CodeIndexer, JinaReranker } from 'lucerna';
+ * import { CodeIndexer, CohereReranker } from '@upstart.gg/lucerna';
  *
  * const indexer = new CodeIndexer({
  *   projectRoot: '.',
- *   rerankingFunction: new JinaReranker(),
+ *   rerankingFunction: new CohereReranker({ model: 'rerank-english-v3.0' }),
  * });
  * ```
  */
-export class JinaReranker implements RerankingFunction {
+export class CohereReranker implements RerankingFunction {
   private readonly apiKey: string;
   private readonly model: string;
 
   constructor(options?: { model?: string; apiKey?: string }) {
-    const apiKey = options?.apiKey ?? process.env.JINA_API_KEY ?? "";
-    if (!apiKey) throw new Error("JINA_API_KEY is required");
+    const apiKey = options?.apiKey ?? process.env.COHERE_API_KEY ?? "";
+    if (!apiKey) throw new Error("COHERE_API_KEY is required");
     this.apiKey = apiKey;
-    this.model = options?.model ?? "jina-reranker-v3";
+    this.model = options?.model ?? "rerank-english-v3.0";
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {
@@ -53,7 +53,7 @@ export class JinaReranker implements RerankingFunction {
 
     if (!response.ok) {
       throw new Error(
-        `Jina Reranker request failed: ${response.status} ${response.statusText}`,
+        `Cohere Reranker request failed: ${response.status} ${response.statusText}`,
       );
     }
 
@@ -61,7 +61,6 @@ export class JinaReranker implements RerankingFunction {
       results: { index: number; relevance_score: number }[];
     };
 
-    // Re-map results by index to preserve original input order
     const scores = new Array<number>(texts.length).fill(0);
     for (const item of json.results) {
       scores[item.index] = item.relevance_score;

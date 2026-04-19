@@ -5,19 +5,51 @@ description: Install and configure the Lucerna MCP server for AI coding assistan
 
 Lucerna ships a built-in [Model Context Protocol](https://modelcontextprotocol.io/) server so AI coding assistants (Claude Code, Cursor, Windsurf, Zed, VS Code, and more) can search your codebase directly.
 
-:::tip[Works out of the box]
-The MCP server requires **no configuration**. When it starts, it indexes the project and begins watching for file changes automatically — no separate `lucerna watch` process needed, no API keys required.
-:::
-
 ## Setup
 
 Use [`add-mcp`](https://github.com/neondatabase/add-mcp), which supports 14 clients and writes the correct config file automatically:
 
 ```bash
-npx add-mcp "@upstart.gg/lucerna mcp-server" --name lucerna
+npx add-mcp "npx -y @upstart.gg/lucerna mcp-server" --name lucerna
 ```
 
-`add-mcp` will prompt you to choose which clients to configure (Claude Code, Claude Desktop, Cursor, VS Code, Zed, etc.). The MCP server will use **the working directory of the client** as the project root — no hardcoded paths needed.
+`add-mcp` will prompt you to choose which clients to configure. The MCP server uses **the working directory of the client** as the project root — no hardcoded paths needed.
+
+## Enable semantic search
+
+:::caution[Semantic search requires an embedding provider]
+Without a provider configured, Lucerna falls back to **lexical (BM25) search only** — and the MCP tools will include a warning in their output. For best results, configure an embedding provider.
+:::
+
+The recommended approach is to add env vars to your MCP server config:
+
+```json
+{
+  "mcpServers": {
+    "lucerna": {
+      "command": "npx",
+      "args": ["-y", "@upstart.gg/lucerna", "mcp-server"],
+      "env": {
+        "LUCERNA_EMBEDDING": "voyage:voyage-code-3",
+        "VOYAGE_API_KEY": "your-voyage-api-key"
+      }
+    }
+  }
+}
+```
+
+Or place a `lucerna.config.ts` at the project root — the MCP server picks it up automatically:
+
+```ts
+// lucerna.config.ts
+import { VoyageEmbeddings } from '@upstart.gg/lucerna';
+
+export default {
+  embeddingFunction: new VoyageEmbeddings({ model: 'voyage-code-3' }),
+};
+```
+
+See [Built-in Providers](/configuration/built-in-providers) for all available providers and recommended models, and [Env Vars](/configuration/env-vars) for the full variable reference.
 
 ## MCP tools
 
@@ -41,5 +73,3 @@ npx add-mcp "@upstart.gg/lucerna mcp-server" --name lucerna
 :::note
 **First-time indexing:** If the project has never been indexed, `search_codebase` returns `{ results: [], warning: "Lucerna is still indexing…" }`. Results become available once the initial index completes (typically a few seconds for small projects).
 :::
-
-To improve search quality with custom embedding or reranking providers, see [Configuration](/configuration/overview).

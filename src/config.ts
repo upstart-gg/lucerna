@@ -64,81 +64,208 @@ export async function loadConfig(
 // ---------------------------------------------------------------------------
 
 const VALID_EMBEDDERS = [
+  "openai",
+  "cohere",
+  "voyage",
+  "jina",
   "cloudflare",
-  "local",
-  "hf",
-  "bge-small",
-  "nomic",
+  "mistral",
+  "gemini",
+  "ollama",
+  "vertex",
 ] as const;
-const VALID_RERANKERS = ["cloudflare", "jina", "voyage"] as const;
+
+const VALID_RERANKERS = [
+  "cloudflare",
+  "jina",
+  "voyage",
+  "cohere",
+  "vertex",
+  "gemini",
+] as const;
 
 export type BuiltinEmbedder = (typeof VALID_EMBEDDERS)[number];
 export type BuiltinReranker = (typeof VALID_RERANKERS)[number];
 
 /**
- * Resolves a named built-in embedder to an `EmbeddingFunction` instance.
- * Credentials are read from environment variables, matching the same auto-detect
- * logic used when no embedder is specified.
+ * Parses a "provider:model" or "provider:model:dimensions" string.
+ * Both provider and model are required; dimensions is an optional positive integer.
+ */
+function parseProviderModel(
+  value: string,
+  source: string,
+): { provider: string; model: string; dimensions?: number } {
+  const firstColon = value.indexOf(":");
+  const provider = firstColon === -1 ? value : value.slice(0, firstColon);
+  const rest = firstColon === -1 ? "" : value.slice(firstColon + 1);
+  const secondColon = rest.indexOf(":");
+  const model = secondColon === -1 ? rest : rest.slice(0, secondColon);
+  const dimStr = secondColon === -1 ? undefined : rest.slice(secondColon + 1);
+
+  if (!provider || !model) {
+    throw new Error(
+      `${source} requires "provider:model" format (e.g. "voyage:voyage-code-3"), got: "${value}"`,
+    );
+  }
+
+  let dimensions: number | undefined;
+  if (dimStr !== undefined) {
+    dimensions = parseInt(dimStr, 10);
+    if (!Number.isFinite(dimensions) || dimensions <= 0) {
+      throw new Error(
+        `${source}: dimensions must be a positive integer, got: "${dimStr}"`,
+      );
+    }
+  }
+
+  return dimensions !== undefined
+    ? { provider, model, dimensions }
+    : { provider, model };
+}
+
+/**
+ * Resolves a "provider:model" flag value to an `EmbeddingFunction` instance.
  */
 export async function resolveBuiltinEmbedder(
-  name: string,
+  flagValue: string,
 ): Promise<EmbeddingFunction> {
-  switch (name as BuiltinEmbedder) {
+  const { provider, model, dimensions } = parseProviderModel(
+    flagValue,
+    "--embedder",
+  );
+  const d = dimensions !== undefined ? { dimensions } : {};
+  switch (provider as BuiltinEmbedder) {
+    case "openai": {
+      const { OpenAIEmbeddings } = await import(
+        "./embeddings/OpenAIEmbeddings.js"
+      );
+      return new OpenAIEmbeddings({ model, ...d });
+    }
+    case "cohere": {
+      const { CohereEmbeddings } = await import(
+        "./embeddings/CohereEmbeddings.js"
+      );
+      return new CohereEmbeddings({ model, ...d });
+    }
+    case "voyage": {
+      const { VoyageEmbeddings } = await import(
+        "./embeddings/VoyageEmbeddings.js"
+      );
+      return new VoyageEmbeddings({ model, ...d });
+    }
+    case "jina": {
+      const { JinaEmbeddings } = await import("./embeddings/JinaEmbeddings.js");
+      return new JinaEmbeddings({ model, ...d });
+    }
     case "cloudflare": {
       const { CloudflareEmbeddings } = await import(
         "./embeddings/CloudflareEmbeddings.js"
       );
-      return new CloudflareEmbeddings();
+      return new CloudflareEmbeddings({ model, ...d });
     }
-    case "local":
-    case "hf": {
-      const { HFEmbeddings } = await import("./embeddings/HFEmbeddings.js");
-      return new HFEmbeddings();
-    }
-    case "bge-small": {
-      const { BGESmallEmbeddings } = await import(
-        "./embeddings/BGESmallEmbeddings.js"
+    case "mistral": {
+      const { MistralEmbeddings } = await import(
+        "./embeddings/MistralEmbeddings.js"
       );
-      return new BGESmallEmbeddings();
+      return new MistralEmbeddings({ model, ...d });
     }
-    case "nomic": {
-      const { NomicCodeEmbeddings } = await import(
-        "./embeddings/NomicCodeEmbeddings.js"
+    case "gemini": {
+      const { GeminiEmbeddings } = await import(
+        "./embeddings/GeminiEmbeddings.js"
       );
-      return new NomicCodeEmbeddings();
+      return new GeminiEmbeddings({ model, ...d });
+    }
+    case "ollama": {
+      const { OllamaEmbeddings } = await import(
+        "./embeddings/OllamaEmbeddings.js"
+      );
+      return new OllamaEmbeddings({ model, ...d });
+    }
+    case "vertex": {
+      const { VertexAIEmbeddings } = await import(
+        "./embeddings/VertexAIEmbeddings.js"
+      );
+      return new VertexAIEmbeddings({ model, ...d });
     }
     default:
       throw new Error(
-        `Unknown embedder: "${name}". Valid values: ${VALID_EMBEDDERS.join(", ")}`,
+        `Unknown embedder provider: "${provider}". Valid providers: ${VALID_EMBEDDERS.join(", ")}`,
       );
   }
 }
 
 /**
- * Resolves a named built-in reranker to a `RerankingFunction` instance.
- * Credentials are read from environment variables.
+ * Resolves a "provider:model" flag value to a `RerankingFunction` instance.
  */
 export async function resolveBuiltinReranker(
-  name: string,
+  flagValue: string,
 ): Promise<RerankingFunction> {
-  switch (name as BuiltinReranker) {
+  const { provider, model } = parseProviderModel(flagValue, "--reranker");
+  switch (provider as BuiltinReranker) {
     case "cloudflare": {
       const { CloudflareReranker } = await import(
         "./embeddings/CloudflareReranker.js"
       );
-      return new CloudflareReranker();
+      return new CloudflareReranker({ model });
     }
     case "jina": {
       const { JinaReranker } = await import("./embeddings/JinaReranker.js");
-      return new JinaReranker();
+      return new JinaReranker({ model });
     }
     case "voyage": {
       const { VoyageReranker } = await import("./embeddings/VoyageReranker.js");
-      return new VoyageReranker();
+      return new VoyageReranker({ model });
+    }
+    case "cohere": {
+      const { CohereReranker } = await import("./embeddings/CohereReranker.js");
+      return new CohereReranker({ model });
+    }
+    case "vertex": {
+      const { VertexAIReranker } = await import(
+        "./embeddings/VertexAIReranker.js"
+      );
+      return new VertexAIReranker({ model });
+    }
+    case "gemini": {
+      const { GeminiReranker } = await import("./embeddings/GeminiReranker.js");
+      return new GeminiReranker({ model });
     }
     default:
       throw new Error(
-        `Unknown reranker: "${name}". Valid values: ${VALID_RERANKERS.join(", ")}`,
+        `Unknown reranker provider: "${provider}". Valid providers: ${VALID_RERANKERS.join(", ")}`,
       );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Env-var resolution (LUCERNA_EMBEDDING / LUCERNA_RERANKING)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves the `LUCERNA_EMBEDDING` environment variable to an embedding function.
+ * The value must be in "provider:model" format (e.g. "voyage:voyage-code-3").
+ * Returns `false` if the variable is not set.
+ */
+export async function resolveEmbedderFromEnv(): Promise<
+  EmbeddingFunction | false
+> {
+  const val = process.env.LUCERNA_EMBEDDING;
+  if (!val) return false;
+  const { provider, model } = parseProviderModel(val, "LUCERNA_EMBEDDING");
+  // Re-use the same resolver but inject the parsed provider:model
+  return resolveBuiltinEmbedder(`${provider}:${model}`);
+}
+
+/**
+ * Resolves the `LUCERNA_RERANKING` environment variable to a reranking function.
+ * The value must be in "provider:model" format (e.g. "cohere:rerank-english-v3.0").
+ * Returns `false` if the variable is not set.
+ */
+export async function resolveRerankerFromEnv(): Promise<
+  RerankingFunction | false
+> {
+  const val = process.env.LUCERNA_RERANKING;
+  if (!val) return false;
+  const { provider, model } = parseProviderModel(val, "LUCERNA_RERANKING");
+  return resolveBuiltinReranker(`${provider}:${model}`);
 }

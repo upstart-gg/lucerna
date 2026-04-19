@@ -10,5 +10,7 @@ benchmark-results.jsonl
 .bench-index
 .bench-index-bge
 .bench-index-coderank
+.bench-index-nomic
+.bench-jina-isolation
 .DS_Store
 .astro/

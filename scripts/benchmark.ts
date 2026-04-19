@@ -10,21 +10,16 @@
  *
  * Options (env vars):
  *   BENCH_PROJECT        path to the project to index (default: this repo)
- *   BENCH_SEMANTIC       set to "0" to skip semantic search (avoids model download)
- *   BENCH_RUNS           number of search iterations per query (default: 20)
+ *   BENCH_SEMANTIC       set to "0" to skip semantic search (avoids model download; enabled by default)
+ *   BENCH_RUNS           number of search iterations per query (default: 10)
  *   BENCH_GRAPH_DEPTH    graph traversal depth for neighbourhood bench (default: 1)
  *   BENCH_OUTPUT         path to append results JSON (default: benchmark-results.jsonl)
  */
 import { existsSync } from "node:fs";
 import { appendFile, stat } from "node:fs/promises";
 import { relative, resolve } from "node:path";
-import {
-  CodeIndexer,
-  HFEmbeddings,
-  BGESmallEmbeddings,
-  CloudflareReranker,
-} from "../src/index.js";
-import type { EmbeddingFunction } from "../src/index.js";
+import { CodeIndexer, CloudflareReranker } from "../src/index.js";
+import { resolveEmbedderFromEnv } from "../src/config.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -34,19 +29,20 @@ const PROJECT_ROOT = process.argv[2]
   ? resolve(process.argv[2])
   : resolve(import.meta.dirname, "..");
 
-const SEMANTIC_ENABLED = process.env.BENCH_SEMANTIC !== "0";
+const mainEmbeddingFn =
+  process.env.BENCH_SEMANTIC === "0" ? false : await resolveEmbedderFromEnv();
+const SEMANTIC_ENABLED = mainEmbeddingFn !== false;
 const RERANK_ENABLED =
   SEMANTIC_ENABLED &&
   !!process.env.CLOUDFLARE_ACCOUNT_ID &&
   !!process.env.CLOUDFLARE_API_TOKEN;
-const SEARCH_RUNS = parseInt(process.env.BENCH_RUNS ?? "20", 10);
+const SEARCH_RUNS = parseInt(process.env.BENCH_RUNS ?? "10", 10);
 const GRAPH_DEPTH = parseInt(process.env.BENCH_GRAPH_DEPTH ?? "1", 10);
 const OUTPUT_FILE =
   process.env.BENCH_OUTPUT ??
   resolve(import.meta.dirname, "..", "benchmark-results.jsonl");
 
 const STORAGE_DIR = resolve(import.meta.dirname, "..", ".bench-index");
-const MODELS_ENABLED = process.env.BENCH_MODELS === "1";
 
 const SEARCH_QUERIES = [
   "initialize parser and load grammar",
@@ -162,16 +158,11 @@ async function main() {
   console.log(dim(`  project : ${PROJECT_ROOT}`));
   console.log(
     dim(
-      `  semantic: ${SEMANTIC_ENABLED ? "enabled" : "disabled (set BENCH_SEMANTIC=1 to enable)"}`,
+      `  semantic: ${SEMANTIC_ENABLED ? "enabled" : "disabled (LUCERNA_EMBEDDING not set)"}`,
     ),
   );
   console.log(dim(`  runs    : ${SEARCH_RUNS} per query`));
   console.log(dim(`  graph depth: ${GRAPH_DEPTH}`));
-  console.log(
-    dim(
-      `  models  : ${MODELS_ENABLED ? "enabled" : "disabled (set BENCH_MODELS=1 to enable)"}`,
-    ),
-  );
 
   const results: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
@@ -196,7 +187,7 @@ async function main() {
   const indexer = new CodeIndexer({
     projectRoot: PROJECT_ROOT,
     storageDir: STORAGE_DIR,
-    embeddingFunction: SEMANTIC_ENABLED ? undefined : false,
+    embeddingFunction: mainEmbeddingFn,
     // Exclude the bench storage dir and test fixtures
     exclude: [
       "**/node_modules/**",
@@ -207,6 +198,8 @@ async function main() {
       "**/.bench-index/**",
       "**/.bench-index-coderank/**",
       "**/.bench-index-jina/**",
+      "**/.bench-index-nomic/**",
+      "**/.bench-index-gemma/**",
       "**/.lucerna/**",
       "**/benchmark-results.jsonl",
     ],
@@ -597,153 +590,14 @@ async function main() {
   } else {
     console.log(
       dim(
-        "\n│  Semantic + hybrid + searchWithContext skipped (BENCH_SEMANTIC=0)",
+        "\n│  Semantic + hybrid + searchWithContext skipped (set LUCERNA_EMBEDDING to enable, e.g. LUCERNA_EMBEDDING=openai:text-embedding-3-small)",
       ),
     );
   }
 
-  // ── 12. Model comparison ────────────────────────────────────────────────
+  // ── 12. Close indexer ───────────────────────────────────────────────────
 
-  // Release the main indexer (LanceDB + ONNX pipeline) before loading
-  // additional models — it is not used in this section.
   await indexer.close();
-
-  if (MODELS_ENABLED) {
-    interface ModelResult {
-      label: string;
-      dimensions: number;
-      initMs: number;
-      indexMs: number;
-      searchMean: number;
-      searchP95: number;
-    }
-
-    async function benchmarkModel(
-      label: string,
-      embeddingFn: EmbeddingFunction,
-      storageDir: string,
-    ): Promise<ModelResult> {
-      // Fresh storage dir for each model
-      if (existsSync(storageDir)) {
-        const { rm } = await import("node:fs/promises");
-        await rm(storageDir, { recursive: true, force: true });
-      }
-
-      const idx = new CodeIndexer({
-        projectRoot: PROJECT_ROOT,
-        storageDir,
-        embeddingFunction: embeddingFn,
-        exclude: [
-          "**/node_modules/**",
-          "**/.git/**",
-          "**/dist/**",
-          "**/.bench-index/**",
-          "**/.bench-index-*/**",
-          "**/benchmark-results.jsonl",
-        ],
-      });
-
-      const { ms: modelInitMs } = await time(() => idx.initialize());
-      const { ms: modelIndexMs } = await time(() => idx.indexProject());
-
-      // Discard the very first search query — it may carry residual cold-start cost
-      await idx.searchSemantic(SEARCH_QUERIES[0] ?? "", { limit: 10 });
-
-      // Benchmark warmed search latency across all queries
-      const modelTimings: number[] = [];
-      for (const query of SEARCH_QUERIES) {
-        const s = await bench(
-          () => idx.searchSemantic(query, { limit: 10 }),
-          SEARCH_RUNS,
-        );
-        modelTimings.push(s.mean);
-      }
-      modelTimings.sort((a, b) => a - b);
-      const modelSearchMean =
-        modelTimings.reduce((a, b) => a + b, 0) / modelTimings.length;
-      const modelSearchP95 = p(modelTimings, 95);
-
-      await idx.close();
-
-      // Release ONNX pipeline memory before the next model loads
-      if (
-        "dispose" in embeddingFn &&
-        typeof embeddingFn.dispose === "function"
-      ) {
-        await embeddingFn.dispose();
-      }
-
-      if (existsSync(storageDir)) {
-        const { rm } = await import("node:fs/promises");
-        await rm(storageDir, { recursive: true, force: true });
-      }
-
-      return {
-        label,
-        dimensions: embeddingFn.dimensions,
-        initMs: modelInitMs,
-        indexMs: modelIndexMs,
-        searchMean: modelSearchMean,
-        searchP95: modelSearchP95,
-      };
-    }
-
-    hr("Model comparison — all-MiniLM-L6-v2 vs bge-small-en-v1.5");
-    console.log(
-      dim("│  (models are downloaded on first run and cached locally)"),
-    );
-
-    const modelResults: ModelResult[] = [];
-
-    for (const [label, embFn, dir] of [
-      [
-        "all-MiniLM-L6-v2 (default)",
-        new HFEmbeddings(),
-        resolve(import.meta.dirname, "..", ".bench-index-minilm"),
-      ],
-      [
-        "bge-small-en-v1.5",
-        new BGESmallEmbeddings(),
-        resolve(import.meta.dirname, "..", ".bench-index-bge"),
-      ],
-    ] as [string, EmbeddingFunction, string][]) {
-      console.log(dim(`│\n│  ▶ ${label}`));
-      const r = await benchmarkModel(label, embFn, dir);
-      row("  dimensions", String(r.dimensions));
-      row("  initialize (incl. warmup)", formatMs(r.initMs));
-      row("  indexProject (embed pass)", formatMs(r.indexMs));
-      row("  semantic search mean", green(formatMs(r.searchMean)));
-      row("  semantic search p95", formatMs(r.searchP95));
-      modelResults.push(r);
-    }
-
-    // Side-by-side delta summary
-    if (modelResults.length === 2) {
-      const [base, bge] = modelResults as [ModelResult, ModelResult];
-      console.log(dim("│\n│  ── delta (bge vs MiniLM) ──"));
-      const indexDelta = ((bge.indexMs / base.indexMs - 1) * 100).toFixed(0);
-      const searchDelta = (
-        (bge.searchMean / base.searchMean - 1) *
-        100
-      ).toFixed(0);
-      row(
-        "  index time",
-        `${Number(indexDelta) > 0 ? "+" : ""}${indexDelta}%`,
-        `${formatMs(base.indexMs)} → ${formatMs(bge.indexMs)}`,
-      );
-      row(
-        "  search latency",
-        `${Number(searchDelta) > 0 ? "+" : ""}${searchDelta}%`,
-        `${formatMs(base.searchMean)} → ${formatMs(bge.searchMean)}`,
-      );
-    }
-
-    results.modelComparison = modelResults;
-  } else {
-    console.log(
-      dim("\n│  Model comparison skipped (set BENCH_MODELS=1 to enable)"),
-    );
-  }
 
   // ── 13. Summary ─────────────────────────────────────────────────────────
 
@@ -802,8 +656,6 @@ async function main() {
   );
 
   // ── Cleanup ──────────────────────────────────────────────────────────────
-
-  // (indexer was already closed before section 12)
 
   // Remove the bench storage dir so it doesn't pollute the repo
   if (existsSync(STORAGE_DIR)) {

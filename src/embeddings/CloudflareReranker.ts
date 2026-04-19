@@ -1,7 +1,7 @@
 import type { RerankingFunction } from "../types.js";
 
 const API_BASE = "https://api.cloudflare.com/client/v4/accounts";
-const MODEL = "@cf/baai/bge-reranker-base";
+const DEFAULT_MODEL = "@cf/baai/bge-reranker-base";
 
 // bge-reranker-base has a 512-token context limit. Code averages ~4 chars/token,
 // so ~2048 chars ≈ 512 tokens. We preserve head + tail rather than blindly
@@ -17,7 +17,10 @@ function truncateForReranker(text: string): string {
 }
 
 /**
- * Reranking function using Cloudflare Workers AI with the `@cf/baai/bge-reranker-base` model.
+ * Reranking function using Cloudflare Workers AI.
+ *
+ * Defaults to the `@cf/baai/bge-reranker-base` model. Pass `model` to use a
+ * different Cloudflare AI reranker model.
  *
  * Takes a query and candidate texts, returns a relevance score per text in (0,1)
  * via sigmoid-normalised cross-encoder logits. Use as a second stage after RRF fusion
@@ -39,6 +42,7 @@ function truncateForReranker(text: string): string {
  * const indexer = new CodeIndexer({
  *   projectRoot: '.',
  *   rerankingFunction: new CloudflareReranker(),
+ *   // or: new CloudflareReranker({ model: '@cf/baai/bge-reranker-large' })
  * });
  * ```
  */
@@ -46,14 +50,20 @@ export class CloudflareReranker implements RerankingFunction {
   private readonly apiToken: string;
   private readonly endpoint: string;
 
-  constructor(
-    accountId = process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
-    apiToken = process.env.CLOUDFLARE_API_TOKEN ?? "",
-  ) {
+  constructor(options?: {
+    model?: string;
+    accountId?: string;
+    apiToken?: string;
+  }) {
+    const accountId =
+      options?.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "";
+    const apiToken =
+      options?.apiToken ?? process.env.CLOUDFLARE_API_TOKEN ?? "";
     if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is required");
     if (!apiToken) throw new Error("CLOUDFLARE_API_TOKEN is required");
     this.apiToken = apiToken;
-    this.endpoint = `${API_BASE}/${accountId}/ai/run/${MODEL}`;
+    const model = options?.model ?? DEFAULT_MODEL;
+    this.endpoint = `${API_BASE}/${accountId}/ai/run/${model}`;
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {

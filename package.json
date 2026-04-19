@@ -1,6 +1,6 @@
 {
   "name": "@upstart.gg/lucerna",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "AST-aware semantic + lexical code indexer for AI agents",
   "type": "module",
   "exports": {

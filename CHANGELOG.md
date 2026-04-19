@@ -1,5 +1,13 @@
 # @upstart.gg/lucerna
 
+## 0.1.7
+
+### Patch Changes
+
+- [#42](https://github.com/upstart-gg/lucerna/pull/42) [`b8d97e3`](https://github.com/upstart-gg/lucerna/commit/b8d97e326f538e0d15f44fd2a7826dbd5c8b7336) Thanks [@mattallty](https://github.com/mattallty)! - Reduce tool output (2nd pass)
+
+- [#40](https://github.com/upstart-gg/lucerna/pull/40) [`527d651`](https://github.com/upstart-gg/lucerna/commit/527d6518b1ab568751bcad3f0fc1a7cd5a5d774f) Thanks [@mattallty](https://github.com/mattallty)! - Enhance tool output
+
 ## 0.1.6
 
 ### Patch Changes

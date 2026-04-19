@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.11
+
+### Patch Changes
+
+- [#54](https://github.com/upstart-gg/lucerna/pull/54) [`b1ccf67`](https://github.com/upstart-gg/lucerna/commit/b1ccf67c1822b2f125c8120a7789e84f296b3d3f) Thanks [@mattallty](https://github.com/mattallty)! - Improve cli output
+
 ## 0.1.10
 
 ### Patch Changes

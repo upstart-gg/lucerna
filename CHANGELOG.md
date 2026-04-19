@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.12
+
+### Patch Changes
+
+- [#56](https://github.com/upstart-gg/lucerna/pull/56) [`b217997`](https://github.com/upstart-gg/lucerna/commit/b217997de1717a5c1147237a0c6c807cd0a26026) Thanks [@mattallty](https://github.com/mattallty)! - change cli sgnatures
+
 ## 0.1.11
 
 ### Patch Changes

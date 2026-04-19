@@ -7,10 +7,10 @@ export class GeminiReranker implements RerankingFunction {
   constructor(options: { model?: string; apiKey?: string } = {}) {
     this.model = options.model ?? "gemini-2.0-flash-lite";
 
-    const apiKey = options.apiKey ?? process.env.GOOGLE_API_KEY;
+    const apiKey = options.apiKey;
     if (!apiKey) {
       throw new Error(
-        "GeminiReranker: API key is required. Pass options.apiKey or set GOOGLE_API_KEY.",
+        "GeminiReranker: apiKey is required. Set it in your lucerna.config.ts.",
       );
     }
     this.apiKey = apiKey;

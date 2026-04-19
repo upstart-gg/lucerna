@@ -39,8 +39,7 @@ export class OllamaEmbeddings implements EmbeddingFunction {
   private readonly maxBatchSize = 32;
 
   constructor(options: { model: string; host?: string; dimensions?: number }) {
-    this.host =
-      options.host ?? process.env.OLLAMA_HOST ?? "http://localhost:11434";
+    this.host = options.host ?? "http://localhost:11434";
     this.modelId = options.model;
     this.dimensions =
       options.dimensions ??

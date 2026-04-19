@@ -1,53 +1,222 @@
 ---
 title: Config File
-description: Configure Lucerna using a lucerna.config.ts file at the project root.
+description: Configure Lucerna using a lucerna.config.ts file.
 ---
 
-:::tip[Prefer env vars for most setups]
-For MCP usage, [environment variables](/configuration/env-vars) are the simpler and recommended approach. Use a config file when you need programmatic control or a [custom provider](/configuration/custom-providers).
-:::
+All Lucerna settings live in a `lucerna.config.ts` file. The MCP server and every CLI command find this file automatically by searching upward from the project root — so a config at a monorepo root is found from any subdirectory.
 
-Place a `lucerna.config.ts` at your project root. The MCP server and all CLI commands pick it up automatically.
+If no config file exists, one is created automatically the first time you run `index`, `watch`, or `mcp-server`.
 
-Supported filenames (checked in order):
+## Supported filenames
+
+Lucerna checks for these filenames in order:
 
 - `lucerna.config.ts`
 - `lucerna.config.js`
 - `lucerna.config.mjs`
 
-## Example
+## Minimal example
 
 ```ts
 // lucerna.config.ts
-import { VoyageEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
+import { defineConfig } from "@upstart.gg/lucerna";
 
-export default {
-  embeddingFunction: new VoyageEmbeddings({ model: 'voyage-4' }),
-  rerankingFunction: new VoyageReranker({ model: 'rerank-2.5' }),
-};
+export default defineConfig({
+  embedding: {
+    provider: "voyage",
+    model: "voyage-code-3",
+    apiKey: process.env.VOYAGE_API_KEY!,
+  },
+});
 ```
 
-## Pointing to a custom config path
+`defineConfig()` is an identity function that gives you TypeScript autocomplete and type-checking — no need to import types separately.
 
-```bash
-lucerna mcp-server . --config /path/to/my.config.ts
-lucerna index . --config ./configs/lucerna.dev.ts
-```
+## Find-up behavior
+
+Lucerna walks up the directory tree from the project root until it finds a config file or reaches the filesystem root. This means:
+
+- A config at `/workspace/lucerna.config.ts` is found when running from `/workspace/packages/my-app`
+- Each project can have its own config, or a monorepo can share one at the root
 
 ## Type reference
 
 ```ts
 interface LucernaConfig {
   /**
-   * Embedding provider instance, or `false` to disable semantic search (BM25 only).
-   * Omit to fall back to the LUCERNA_EMBEDDING env var, or no semantic search if unset.
+   * Embedding provider config or custom EmbeddingFunction instance.
+   * false = disable semantic search (BM25 only).
+   * undefined = semantic search disabled (no provider configured).
    */
-  embeddingFunction?: EmbeddingFunction | false;
+  embedding?: EmbeddingProviderConfig | EmbeddingFunction | false;
 
   /**
-   * Reranking provider instance, or `false` to disable reranking.
-   * Omit for no reranking (the default).
+   * Reranking provider config or custom RerankingFunction instance.
+   * false or undefined = no reranking.
    */
-  rerankingFunction?: RerankingFunction | false;
+  reranking?: RerankingProviderConfig | RerankingFunction | false;
+
+  /**
+   * Glob patterns (relative to project root) of files to index.
+   * Default: ["**\/*"] (all files — unrecognised extensions produce no chunks).
+   */
+  include?: string[];
+
+  /**
+   * Additional glob patterns to exclude on top of built-in exclusions
+   * (node_modules, .git, dist, lock files, binary files, etc.).
+   */
+  exclude?: string[];
 }
 ```
+
+## Embedding providers
+
+Pick the provider matching your credentials and pass credentials via `process.env` to keep them out of source control.
+
+### Voyage
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "voyage", model: "voyage-code-3", apiKey: process.env.VOYAGE_API_KEY! },
+});
+```
+
+### OpenAI
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "openai", model: "text-embedding-3-small", apiKey: process.env.OPENAI_API_KEY! },
+});
+```
+
+### Cohere
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "cohere", model: "embed-english-v3.0", apiKey: process.env.COHERE_API_KEY! },
+});
+```
+
+### Jina
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "jina", model: "jina-embeddings-v3", apiKey: process.env.JINA_API_KEY! },
+});
+```
+
+### Mistral
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "mistral", model: "mistral-embed", apiKey: process.env.MISTRAL_API_KEY! },
+});
+```
+
+### Google Gemini
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "gemini", model: "text-embedding-004", apiKey: process.env.GOOGLE_API_KEY! },
+});
+```
+
+### Ollama (local)
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "ollama", model: "nomic-embed-text" },
+  // Optional: host defaults to http://localhost:11434
+  // embedding: { provider: "ollama", model: "nomic-embed-text", host: "http://my-server:11434" },
+});
+```
+
+### LM Studio (local)
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "lmstudio", model: "text-embedding-nomic-embed-text-v1.5" },
+  // Optional: baseUrl defaults to http://localhost:1234
+});
+```
+
+### Cloudflare Workers AI
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: {
+    provider: "cloudflare",
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
+    apiKey: process.env.CLOUDFLARE_API_TOKEN!,
+    model: "@cf/baai/bge-large-en-v1.5", // optional
+  },
+});
+```
+
+### Google Vertex AI
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: {
+    provider: "vertex",
+    model: "text-embedding-005",
+    project: process.env.GOOGLE_CLOUD_PROJECT!,
+    accessToken: process.env.GOOGLE_ACCESS_TOKEN!, // gcloud auth print-access-token
+    location: "us-central1", // optional, default: us-central1
+  },
+});
+```
+
+## Reranking providers
+
+Add optional reranking to improve result precision:
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "voyage", model: "voyage-code-3", apiKey: process.env.VOYAGE_API_KEY! },
+  reranking: { provider: "voyage", apiKey: process.env.VOYAGE_API_KEY! },
+});
+```
+
+Supported reranking providers: `voyage`, `cohere`, `jina`, `gemini`, `cloudflare`, `vertex`.
+
+## File filtering
+
+Restrict which files get indexed:
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  include: ["src/**/*", "tests/**/*"],
+  exclude: ["**/*.test.ts", "**/fixtures/**", "**/__snapshots__/**"],
+});
+```
+
+`include` defaults to `["**/*"]`. Built-in exclusions (node_modules, .git, dist, lock files, binary files, and the `.lucerna` storage directory) are always applied regardless of `exclude`.
+
+## Custom providers
+
+For advanced use cases, pass a class instance directly instead of a provider config object:
+
+```ts
+import { defineConfig } from "@upstart.gg/lucerna";
+import { MyCustomEmbeddings } from "./my-embeddings.js";
+
+export default defineConfig({
+  embedding: new MyCustomEmbeddings({ model: "custom-v1" }),
+});
+```
+
+See [Custom Providers](/configuration/custom-providers) for how to implement the `EmbeddingFunction` and `RerankingFunction` interfaces.

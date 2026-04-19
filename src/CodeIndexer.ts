@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import fastGlob from "fast-glob";
 import { TreeSitterChunker } from "./chunker/index.js";
 
+import { IndexLock } from "./IndexLock.js";
 import { GraphTraverser } from "./graph/GraphTraverser.js";
 import { SymbolResolver } from "./graph/SymbolResolver.js";
 import type { ChunkingWithEdgesResult, RawEdge } from "./graph/types.js";
@@ -145,6 +146,17 @@ export class CodeIndexer {
   /** Timer used to batch saveFileHashes() writes in the watcher path. */
   private saveHashesTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Cross-process exclusive lock: the holder is the only process that indexes. */
+  private lock!: IndexLock;
+  private _isLeader = false;
+  /** setInterval handle used by follower processes to poll for leadership. */
+  private leaderPollInterval: ReturnType<typeof setInterval> | null = null;
+
+  /** True if this process holds the indexing lock (leader). Read-only externally. */
+  get isLeader(): boolean {
+    return this._isLeader;
+  }
+
   constructor(options: CodeIndexOptions) {
     this.options = options;
     this.projectRoot = resolve(options.projectRoot);
@@ -187,6 +199,12 @@ export class CodeIndexer {
     if (this.initialized) return;
 
     await mkdir(this.storageDir, { recursive: true });
+
+    this.lock = new IndexLock(this.storageDir);
+    this._isLeader = await this.lock.tryAcquire();
+    process.stderr.write(
+      `[lucerna] ${this._isLeader ? "Leader" : "Follower"} (PID ${process.pid})\n`,
+    );
 
     // Auto-clear stale index when the embedding model or dimensions change
     const metaPath = join(this.storageDir, "index-meta.json");
@@ -279,6 +297,19 @@ export class CodeIndexer {
    */
   async indexProject(): Promise<IndexStats> {
     this.assertInitialized();
+    if (!this._isLeader) {
+      return {
+        projectId: this.projectId,
+        projectRoot: this.projectRoot,
+        totalFiles: 0,
+        totalChunks: 0,
+        totalEdges: 0,
+        byLanguage: {},
+        byType: {},
+        byEdgeType: {},
+        lastIndexed: this.lastIndexed,
+      };
+    }
     if (this.indexingInProgress) {
       throw new Error(
         "CodeIndexer.indexProject() is already in progress. Await the previous call before calling again.",
@@ -435,6 +466,14 @@ export class CodeIndexer {
 
   async startWatching(): Promise<void> {
     this.assertInitialized();
+    if (this._isLeader) {
+      await this.startLeaderWatching();
+    } else {
+      this.startLeadershipPoll();
+    }
+  }
+
+  private async startLeaderWatching(): Promise<void> {
     if (this.watcher) return;
 
     this.watcher = new Watcher({
@@ -451,6 +490,25 @@ export class CodeIndexer {
     });
 
     await this.watcher.start();
+  }
+
+  private startLeadershipPoll(): void {
+    this.leaderPollInterval = setInterval(() => {
+      void (async () => {
+        const acquired = await this.lock.tryAcquire();
+        if (!acquired) return;
+        this._isLeader = true;
+        if (this.leaderPollInterval !== null) {
+          clearInterval(this.leaderPollInterval);
+          this.leaderPollInterval = null;
+        }
+        process.stderr.write(
+          "[lucerna] Claimed leadership. Re-indexing and starting watcher…\n",
+        );
+        await this.indexProject();
+        await this.startLeaderWatching();
+      })();
+    }, this.options.leaderPollMs ?? 10_000);
   }
 
   async stopWatching(): Promise<void> {
@@ -770,6 +828,10 @@ export class CodeIndexer {
   // ---------------------------------------------------------------------------
 
   async close(): Promise<void> {
+    if (this.leaderPollInterval !== null) {
+      clearInterval(this.leaderPollInterval);
+      this.leaderPollInterval = null;
+    }
     // Flush any pending hash saves before closing
     if (this.saveHashesTimer !== null) {
       clearTimeout(this.saveHashesTimer);
@@ -777,6 +839,7 @@ export class CodeIndexer {
       await this.saveFileHashes();
     }
     await this.stopWatching();
+    await this.lock?.release();
     if (this.store) await this.store.close();
     if (this.graphStore) await this.graphStore.close();
     if (this.chunker) await this.chunker.close();

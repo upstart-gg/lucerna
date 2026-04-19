@@ -3,15 +3,16 @@ title: lucerna watch
 description: Index a project and re-index on file changes.
 ---
 
-Index a project and automatically re-index files as they change. `.gitignore` files at any depth are respected automatically.
+Index a project and automatically re-index files as they change. `.gitignore` files at any depth are respected automatically. Defaults to the current working directory.
 
 ```bash
-lucerna watch /path/to/project
+lucerna watch
+lucerna watch --dir /path/to/project
 ```
 
 ## Options
 
-All options from [`index`](/cli/index-command) (`--storage-dir`, `--include`, `--exclude`, `--no-semantic`, `--embedder`, `--reranker`, `--config`), plus:
+All options from [`index`](/cli/index-command) (`--dir`, `--storage-dir`, `--include`, `--exclude`, `--no-semantic`), plus:
 
 | Option | Description |
 |--------|-------------|

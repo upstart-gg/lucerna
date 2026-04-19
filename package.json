@@ -35,6 +35,7 @@
     "changeset:publish": "changeset publish"
   },
   "dependencies": {
+    "@clack/prompts": "^1.2.0",
     "@kreuzberg/tree-sitter-language-pack": "^1.6.1",
     "@lancedb/lancedb": "^0.27.2",
     "@modelcontextprotocol/sdk": "^1.29.0",

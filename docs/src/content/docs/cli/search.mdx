@@ -3,20 +3,19 @@ title: lucerna search
 description: Search an existing index using hybrid semantic + BM25 search.
 ---
 
-Search an indexed project with natural language or symbol names.
+Search an indexed project with natural language or symbol names. Defaults to the current working directory.
 
 ```bash
-lucerna search /path/to/project "authentication middleware"
+lucerna search "authentication middleware"
+lucerna search "authentication middleware" --dir /path/to/project
 ```
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
+| `--dir <path>` | Project root directory (default: current working directory) |
 | `--no-semantic` | Disable semantic search (BM25 only) |
-| `--embedder <provider:model>` | Embedding provider and model, e.g. `voyage:voyage-4`. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, vertex, ollama |
-| `--reranker <provider:model>` | Reranker provider and model, e.g. `voyage:rerank-2.5`. Providers: voyage, cohere, jina, cloudflare |
-| `--config <path>` | Path to `lucerna.config.ts` / `lucerna.config.js` |
 | `--limit <n>` | Max results (default: `10`) |
 | `--format raw\|json\|pretty-json` | Output format (default: `raw`) |
 | `--language <lang>` | Filter by language: `typescript`, `javascript`, `json`, `markdown` |
@@ -46,7 +45,7 @@ src/auth/guards.ts:8-22  [function] requireAuth
 Ideal for piping:
 
 ```bash
-lucerna search /path/to/project "verifyToken" --format json | jq '.[0].id'
+lucerna search "verifyToken" --format json | jq '.[0].id'
 ```
 
 ```json

@@ -50,12 +50,15 @@ export { GraphStore } from "./store/GraphStore.js";
 export { LanceDBStore } from "./store/LanceDBStore.js";
 // Store (for custom backends)
 export type { VectorStore } from "./store/VectorStore.js";
+// Config helper
+export { defineConfig } from "./config.js";
 // Types
 export type {
   ChunkType,
   CodeChunk,
   CodeIndexOptions,
   EmbeddingFunction,
+  EmbeddingProviderConfig,
   EvalQuery,
   GraphEdge,
   GraphNeighborhood,
@@ -68,6 +71,7 @@ export type {
   RelationshipType,
   RepoMapOptions,
   RerankingFunction,
+  RerankingProviderConfig,
   SearchOptions,
   SearchResult,
   SearchWithContextOptions,

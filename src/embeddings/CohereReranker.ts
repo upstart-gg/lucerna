@@ -27,8 +27,11 @@ export class CohereReranker implements RerankingFunction {
   private readonly model: string;
 
   constructor(options?: { model?: string; apiKey?: string }) {
-    const apiKey = options?.apiKey ?? process.env.COHERE_API_KEY ?? "";
-    if (!apiKey) throw new Error("COHERE_API_KEY is required");
+    const apiKey = options?.apiKey ?? "";
+    if (!apiKey)
+      throw new Error(
+        "CohereReranker: apiKey is required. Set it in your lucerna.config.ts.",
+      );
     this.apiKey = apiKey;
     this.model = options?.model ?? "rerank-english-v3.0";
   }

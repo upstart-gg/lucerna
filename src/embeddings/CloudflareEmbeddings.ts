@@ -52,12 +52,16 @@ export class CloudflareEmbeddings implements EmbeddingFunction {
     accountId?: string;
     apiToken?: string;
   }) {
-    const accountId =
-      options?.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "";
-    const apiToken =
-      options?.apiToken ?? process.env.CLOUDFLARE_API_TOKEN ?? "";
-    if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is required");
-    if (!apiToken) throw new Error("CLOUDFLARE_API_TOKEN is required");
+    const accountId = options?.accountId ?? "";
+    const apiToken = options?.apiToken ?? "";
+    if (!accountId)
+      throw new Error(
+        "CloudflareEmbeddings: accountId is required. Set it in your lucerna.config.ts.",
+      );
+    if (!apiToken)
+      throw new Error(
+        "CloudflareEmbeddings: apiToken is required. Set it in your lucerna.config.ts.",
+      );
     this.apiToken = apiToken;
     this.modelId = options?.model ?? DEFAULT_MODEL;
     this.dimensions = options?.dimensions ?? DEFAULT_DIMENSIONS;

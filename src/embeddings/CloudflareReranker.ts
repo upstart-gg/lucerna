@@ -55,12 +55,16 @@ export class CloudflareReranker implements RerankingFunction {
     accountId?: string;
     apiToken?: string;
   }) {
-    const accountId =
-      options?.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "";
-    const apiToken =
-      options?.apiToken ?? process.env.CLOUDFLARE_API_TOKEN ?? "";
-    if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is required");
-    if (!apiToken) throw new Error("CLOUDFLARE_API_TOKEN is required");
+    const accountId = options?.accountId ?? "";
+    const apiToken = options?.apiToken ?? "";
+    if (!accountId)
+      throw new Error(
+        "CloudflareReranker: accountId is required. Set it in your lucerna.config.ts.",
+      );
+    if (!apiToken)
+      throw new Error(
+        "CloudflareReranker: apiToken is required. Set it in your lucerna.config.ts.",
+      );
     this.apiToken = apiToken;
     const model = options?.model ?? DEFAULT_MODEL;
     this.endpoint = `${API_BASE}/${accountId}/ai/run/${model}`;

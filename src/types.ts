@@ -201,9 +201,7 @@ export interface CodeIndexOptions {
   exclude?: string[];
   /**
    * The embedding function to use for semantic search.
-   *   - `undefined` (default): auto-detect — uses `CloudflareEmbeddings` when
-   *     `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` env vars are set,
-   *     otherwise falls back to the built-in @huggingface/transformers embedder
+   *   - `undefined` (default): semantic search disabled (no embedder configured)
    *   - `false`: disable semantic search entirely (lexical/BM25 only)
    *   - An `EmbeddingFunction` instance: use the provided embedder
    */
@@ -225,6 +223,12 @@ export interface CodeIndexOptions {
   watch?: boolean;
   /** Debounce delay in ms for file-watch events. Default: 500 */
   watchDebounce?: number;
+  /**
+   * How often (ms) a follower process polls to check if the indexing leader
+   * has exited and leadership can be claimed. Default: 10_000.
+   * Override in tests to speed up leader-transfer checks.
+   */
+  leaderPollMs?: number;
   /** Called after each file is indexed, removed, or errors during indexing */
   onIndexed?: (event: IndexEvent) => void;
 }
@@ -294,37 +298,98 @@ export interface SearchWithContextOptions extends SearchOptions {
 // Config file
 // ---------------------------------------------------------------------------
 
+/** Built-in embedding provider configuration — no imports needed. */
+export type EmbeddingProviderConfig =
+  | { provider: "voyage"; model: string; apiKey: string; dimensions?: number }
+  | { provider: "openai"; model: string; apiKey: string; dimensions?: number }
+  | { provider: "cohere"; model: string; apiKey: string; dimensions?: number }
+  | { provider: "jina"; model: string; apiKey: string; dimensions?: number }
+  | { provider: "mistral"; model: string; apiKey: string; dimensions?: number }
+  | { provider: "gemini"; model: string; apiKey: string; dimensions?: number }
+  | { provider: "ollama"; model: string; host?: string; dimensions?: number }
+  | {
+      provider: "lmstudio";
+      model: string;
+      baseUrl?: string;
+      dimensions?: number;
+    }
+  | {
+      provider: "cloudflare";
+      model?: string;
+      accountId: string;
+      apiKey: string;
+      dimensions?: number;
+    }
+  | {
+      provider: "vertex";
+      model: string;
+      project: string;
+      location?: string;
+      accessToken: string;
+      dimensions?: number;
+    };
+
+/** Built-in reranking provider configuration — no imports needed. */
+export type RerankingProviderConfig =
+  | { provider: "voyage"; model?: string; apiKey: string }
+  | { provider: "cohere"; model?: string; apiKey: string }
+  | { provider: "jina"; model?: string; apiKey: string }
+  | { provider: "gemini"; model?: string; apiKey: string }
+  | {
+      provider: "cloudflare";
+      model?: string;
+      accountId: string;
+      apiKey: string;
+    }
+  | {
+      provider: "vertex";
+      model?: string;
+      project: string;
+      accessToken: string;
+    };
+
 /**
  * Shape of `lucerna.config.ts` / `lucerna.config.js`.
- * Place this file at the project root to configure the embedding and reranking
- * providers used by the CLI and MCP server — no code changes required.
+ *
+ * Use `defineConfig()` for autocomplete and type-checking:
  *
  * @example
  * ```ts
  * // lucerna.config.ts
- * import type { LucernaConfig } from '@upstart.gg/lucerna';
- * import { MyEmbeddings } from './my-embeddings.ts';
+ * import { defineConfig } from '@upstart.gg/lucerna';
  *
- * export default {
- *   embeddingFunction: new MyEmbeddings(),
- * } satisfies LucernaConfig;
+ * export default defineConfig({
+ *   embedding: { provider: "voyage", model: "voyage-code-3", apiKey: "sk-..." },
+ *   include: ["src/**\/*"],
+ * });
  * ```
  */
 export interface LucernaConfig {
   /**
-   * Custom embedding function.
-   *   - An `EmbeddingFunction` instance: use this provider
+   * Embedding provider configuration or a custom `EmbeddingFunction` instance.
+   *   - Provider config object: `{ provider: "voyage", model: "...", apiKey: "..." }`
+   *   - `EmbeddingFunction` instance: advanced/custom provider
    *   - `false`: disable semantic search (lexical/BM25 only)
-   *   - `undefined`: use the CLI/MCP default (auto-detect from env vars)
+   *   - `undefined`: semantic search disabled (no provider configured)
    */
-  embeddingFunction?: EmbeddingFunction | false;
+  embedding?: EmbeddingProviderConfig | EmbeddingFunction | false;
   /**
-   * Custom reranking function.
-   *   - A `RerankingFunction` instance: apply as a second stage after RRF fusion
-   *   - `false`: explicitly disable reranking
-   *   - `undefined`: no reranking (default)
+   * Reranking provider configuration or a custom `RerankingFunction` instance.
+   *   - Provider config object: `{ provider: "voyage", apiKey: "..." }`
+   *   - `RerankingFunction` instance: advanced/custom provider
+   *   - `false` or `undefined`: no reranking (RRF fusion still applies)
    */
-  rerankingFunction?: RerankingFunction | false;
+  reranking?: RerankingProviderConfig | RerankingFunction | false;
+  /**
+   * Glob patterns (relative to project root) of files to index.
+   * Defaults to `["**\/*"]` (all files).
+   */
+  include?: string[];
+  /**
+   * Additional glob patterns to exclude on top of the built-in exclusions
+   * (node_modules, .git, dist, lock files, binary files, etc.).
+   */
+  exclude?: string[];
 }
 
 // ---------------------------------------------------------------------------

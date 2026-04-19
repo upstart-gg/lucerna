@@ -89,7 +89,7 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
   test("index --help exits 0", () => {
     const { exitCode, stdout } = run(["index", "--help"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("project-root");
+    expect(stdout).toContain("Project root");
   });
 
   test("search --help exits 0", () => {
@@ -111,6 +111,7 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
   test("index command indexes a project (lexical only)", () => {
     const { exitCode, stdout } = run([
       "index",
+      "--dir",
       projectDir,
       "--no-semantic",
       "--storage-dir",
@@ -126,6 +127,7 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
     // Relies on the index created by the previous test
     const { exitCode, stdout } = run([
       "stats",
+      "--dir",
       projectDir,
       "--storage-dir",
       storageDir,
@@ -138,6 +140,7 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
   test("stats --format json outputs valid JSON", () => {
     const { exitCode, stdout } = run([
       "stats",
+      "--dir",
       projectDir,
       "--storage-dir",
       storageDir,
@@ -153,8 +156,9 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
   test("search command returns results", () => {
     const { exitCode, stdout } = run([
       "search",
-      projectDir,
       "add",
+      "--dir",
+      projectDir,
       "--no-semantic",
       "--storage-dir",
       storageDir,
@@ -167,8 +171,9 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
   test("search --format json outputs valid JSON array", () => {
     const { exitCode, stdout } = run([
       "search",
-      projectDir,
       "add",
+      "--dir",
+      projectDir,
       "--no-semantic",
       "--storage-dir",
       storageDir,
@@ -185,11 +190,19 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
   test("clear command removes the index", () => {
     const clearStorage = join(tmpDir, "storage-to-clear");
     // First index into a fresh storage dir
-    run(["index", projectDir, "--no-semantic", "--storage-dir", clearStorage]);
+    run([
+      "index",
+      "--dir",
+      projectDir,
+      "--no-semantic",
+      "--storage-dir",
+      clearStorage,
+    ]);
 
     // Now clear it
     const { exitCode, stdout } = run([
       "clear",
+      "--dir",
       projectDir,
       "--storage-dir",
       clearStorage,

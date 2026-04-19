@@ -15,13 +15,13 @@ describe("CloudflareReranker — unit", () => {
   test("throws if accountId is missing", () => {
     expect(
       () => new CloudflareReranker({ accountId: "", apiToken: "token" }),
-    ).toThrow("CLOUDFLARE_ACCOUNT_ID");
+    ).toThrow("accountId is required");
   });
 
   test("throws if apiToken is missing", () => {
     expect(
       () => new CloudflareReranker({ accountId: "account", apiToken: "" }),
-    ).toThrow("CLOUDFLARE_API_TOKEN");
+    ).toThrow("apiToken is required");
   });
 
   test("returns scores on success in original input order", async () => {
@@ -300,7 +300,10 @@ const SKIP_INTEGRATION =
 
 describe.skipIf(SKIP_INTEGRATION)("CloudflareReranker — integration", () => {
   test("returns one score per input text", async () => {
-    const reranker = new CloudflareReranker();
+    const reranker = new CloudflareReranker({
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+      apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+    });
     const texts = ["function authenticate() {}", "const PI = 3.14"];
     const scores = await reranker.rerank("authentication", texts);
     expect(scores).toHaveLength(2);
@@ -311,7 +314,10 @@ describe.skipIf(SKIP_INTEGRATION)("CloudflareReranker — integration", () => {
   });
 
   test("more relevant text scores higher", async () => {
-    const reranker = new CloudflareReranker();
+    const reranker = new CloudflareReranker({
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+      apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+    });
     const scores = await reranker.rerank("fibonacci recursive function", [
       "const DB_HOST = 'localhost'; const DB_PORT = 5432;",
       "function fibonacci(n) { if (n <= 1) return n; return fibonacci(n - 1) + fibonacci(n - 2); }",

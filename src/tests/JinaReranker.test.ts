@@ -9,7 +9,7 @@ describe("JinaReranker — unit", () => {
   });
 
   test("throws if apiKey is missing", () => {
-    expect(() => new JinaReranker({ apiKey: "" })).toThrow("JINA_API_KEY");
+    expect(() => new JinaReranker({ apiKey: "" })).toThrow("lucerna.config.ts");
   });
 
   test("returns scores in original input order", async () => {

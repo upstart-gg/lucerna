@@ -9,7 +9,9 @@ describe("VoyageReranker — unit", () => {
   });
 
   test("throws if apiKey is missing", () => {
-    expect(() => new VoyageReranker({ apiKey: "" })).toThrow("VOYAGE_API_KEY");
+    expect(() => new VoyageReranker({ apiKey: "" })).toThrow(
+      "lucerna.config.ts",
+    );
   });
 
   test("returns scores in original input order", async () => {

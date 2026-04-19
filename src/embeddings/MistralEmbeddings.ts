@@ -37,8 +37,11 @@ export class MistralEmbeddings implements EmbeddingFunction {
     apiKey?: string;
     dimensions?: number;
   }) {
-    const apiKey = options.apiKey ?? process.env.MISTRAL_API_KEY ?? "";
-    if (!apiKey) throw new Error("MISTRAL_API_KEY is required");
+    const apiKey = options.apiKey ?? "";
+    if (!apiKey)
+      throw new Error(
+        "MistralEmbeddings: apiKey is required. Set it in your lucerna.config.ts.",
+      );
     this.apiKey = apiKey;
     this.modelId = options.model;
     this.dimensions =

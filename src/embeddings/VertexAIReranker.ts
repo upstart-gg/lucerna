@@ -16,18 +16,18 @@ export class VertexAIReranker implements RerankingFunction {
   ) {
     this.model = options.model ?? "semantic-ranker-default-004";
 
-    const project = options.project ?? process.env.GOOGLE_CLOUD_PROJECT;
+    const project = options.project;
     if (!project) {
       throw new Error(
-        "VertexAIReranker: project is required. Pass options.project or set GOOGLE_CLOUD_PROJECT.",
+        "VertexAIReranker: project is required. Set it in your lucerna.config.ts.",
       );
     }
     this.project = project;
 
-    const accessToken = options.accessToken ?? process.env.GOOGLE_ACCESS_TOKEN;
+    const accessToken = options.accessToken;
     if (!accessToken) {
       throw new Error(
-        "VertexAIReranker: access token is required. Pass options.accessToken or set GOOGLE_ACCESS_TOKEN " +
+        "VertexAIReranker: accessToken is required. Set it in your lucerna.config.ts " +
           "(obtain via: gcloud auth print-access-token).",
       );
     }

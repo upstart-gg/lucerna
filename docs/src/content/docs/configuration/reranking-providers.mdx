@@ -31,11 +31,13 @@ LM Studio does not yet expose a reranking API. Track progress at
 
 ### Voyage ⭐ recommended
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_RERANKING": "voyage:rerank-2.5",
-  "VOYAGE_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "voyage", model: "voyage-code-3", apiKey: process.env.VOYAGE_API_KEY! },
+  reranking: { provider: "voyage", model: "rerank-2.5", apiKey: process.env.VOYAGE_API_KEY! },
+});
 ```
 
 | Model | Price per 1K queries | Notes |
@@ -50,11 +52,12 @@ LM Studio does not yet expose a reranking API. Track progress at
 
 1 search = 1 query against up to 100 documents.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_RERANKING": "cohere:rerank-english-v3.0",
-  "COHERE_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  reranking: { provider: "cohere", model: "rerank-english-v3.0", apiKey: process.env.COHERE_API_KEY! },
+});
 ```
 
 | Model | Price per 1K searches | Notes |
@@ -68,11 +71,12 @@ LM Studio does not yet expose a reranking API. Track progress at
 
 First 10M tokens free per API key · Token-based billing.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_RERANKING": "jina:jina-reranker-v2-base-multilingual",
-  "JINA_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  reranking: { provider: "jina", model: "jina-reranker-v2-base-multilingual", apiKey: process.env.JINA_API_KEY! },
+});
 ```
 
 | Model | Price per 1M tokens | Notes |
@@ -92,12 +96,17 @@ gcloud services enable discoveryengine.googleapis.com
 ```
 :::
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_RERANKING": "vertex:semantic-ranker-default-004",
-  "GOOGLE_CLOUD_PROJECT": "my-gcp-project",
-  "GOOGLE_ACCESS_TOKEN": "obtain via: gcloud auth print-access-token"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  reranking: {
+    provider: "vertex",
+    model: "semantic-ranker-default-004",
+    project: process.env.GOOGLE_CLOUD_PROJECT!,
+    accessToken: process.env.GOOGLE_ACCESS_TOKEN!, // gcloud auth print-access-token
+  },
+});
 ```
 
 | Model | Price per 1K queries | Notes |
@@ -111,13 +120,14 @@ gcloud services enable discoveryengine.googleapis.com
 
 ### Gemini
 
-Prompt-based relevance scoring using a Gemini generative model. Not a cross-encoder — uses `GOOGLE_API_KEY`, no GCP project required.
+Prompt-based relevance scoring using a Gemini generative model. Not a cross-encoder — uses a Gemini API key, no GCP project required.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_RERANKING": "gemini:gemini-2.0-flash-lite",
-  "GOOGLE_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  reranking: { provider: "gemini", model: "gemini-2.0-flash-lite", apiKey: process.env.GOOGLE_API_KEY! },
+});
 ```
 
 | Model | Price per 100 docs | Notes |
@@ -130,12 +140,17 @@ Prompt-based relevance scoring using a Gemini generative model. Not a cross-enco
 
 Free tier: 10K neurons/day (shared with embeddings).
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_RERANKING": "cloudflare:@cf/baai/bge-reranker-base",
-  "CLOUDFLARE_ACCOUNT_ID": "your-account-id",
-  "CLOUDFLARE_API_TOKEN": "your-token"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  reranking: {
+    provider: "cloudflare",
+    model: "@cf/baai/bge-reranker-base",
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
+    apiKey: process.env.CLOUDFLARE_API_TOKEN!,
+  },
+});
 ```
 
 | Model | Price per 1M tokens | Notes |

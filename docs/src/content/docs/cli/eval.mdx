@@ -3,10 +3,11 @@ title: lucerna eval
 description: Measure recall@k against a JSONL query set.
 ---
 
-Evaluate search quality against a set of labelled queries. Useful for tuning embedding models and search parameters.
+Evaluate search quality against a set of labelled queries. Useful for tuning embedding models and search parameters. Defaults to the current working directory.
 
 ```bash
-lucerna eval /path/to/project queries.jsonl --k 1,5,10
+lucerna eval queries.jsonl --k 1,5,10
+lucerna eval queries.jsonl --dir /path/to/project --k 1,5,10
 ```
 
 ## Query file format
@@ -25,12 +26,10 @@ One JSON object per line:
 
 | Option | Description |
 |--------|-------------|
+| `--dir <path>` | Project root directory (default: current working directory) |
 | `--k <numbers>` | Comma-separated k values to evaluate (default: `1,5,10`) |
 | `--format raw\|json\|pretty-json` | Output format (default: `raw`) |
 | `--no-semantic` | Lexical search only |
-| `--embedder <provider:model>` | Embedding provider and model, e.g. `voyage:voyage-4`. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, vertex, ollama |
-| `--reranker <provider:model>` | Reranker provider and model, e.g. `voyage:rerank-2.5`. Providers: voyage, cohere, jina, cloudflare |
-| `--config <path>` | Path to `lucerna.config.ts` / `lucerna.config.js` |
 
 ## Example output
 

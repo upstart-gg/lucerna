@@ -15,13 +15,13 @@ describe("CloudflareEmbeddings — unit", () => {
   test("throws if accountId is missing", () => {
     expect(
       () => new CloudflareEmbeddings({ accountId: "", apiToken: "token" }),
-    ).toThrow("CLOUDFLARE_ACCOUNT_ID");
+    ).toThrow("accountId is required");
   });
 
   test("throws if apiToken is missing", () => {
     expect(
       () => new CloudflareEmbeddings({ accountId: "account", apiToken: "" }),
-    ).toThrow("CLOUDFLARE_API_TOKEN");
+    ).toThrow("apiToken is required");
   });
 
   test("returns vectors on success", async () => {
@@ -159,14 +159,20 @@ const SKIP_INTEGRATION =
 
 describe.skipIf(SKIP_INTEGRATION)("CloudflareEmbeddings — integration", () => {
   test("returns 1024-dim vectors for single text", async () => {
-    const emb = new CloudflareEmbeddings();
+    const emb = new CloudflareEmbeddings({
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+      apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+    });
     const result = await emb.generate(["function hello() { return 42; }"]);
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveLength(1024);
   });
 
   test("returns vectors for batch input", async () => {
-    const emb = new CloudflareEmbeddings();
+    const emb = new CloudflareEmbeddings({
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+      apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+    });
     const texts = ["foo", "bar", "baz"];
     const result = await emb.generate(texts);
     expect(result).toHaveLength(3);

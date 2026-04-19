@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.14
+
+### Patch Changes
+
+- [#61](https://github.com/upstart-gg/lucerna/pull/61) [`84e8ef8`](https://github.com/upstart-gg/lucerna/commit/84e8ef84b8d58624edf3fa4d46a037b97e6ca94a) Thanks [@mattallty](https://github.com/mattallty)! - add @upstart.gg/lucerna as dev dep
+
 ## 0.1.13
 
 ### Patch Changes

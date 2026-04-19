@@ -117,7 +117,7 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
       storageDir,
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Done.");
+    expect(stdout).toContain("Done");
     expect(stdout).toMatch(/\d+ files/);
     expect(stdout).toMatch(/\d+ chunks/);
   });

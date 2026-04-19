@@ -199,3 +199,26 @@ No API key required. Requires a running Ollama server. `OLLAMA_HOST` is optional
 |-------|-----------|-------|-------|
 | `nomic-embed-text` | 768 | Free | Popular, fast |
 | `mxbai-embed-large` | 1024 | Free | Higher quality, GPU recommended |
+
+---
+
+### LM Studio (local GPU)
+
+No API key required. Requires LM Studio running with the local server enabled (Settings → Local Server → Start Server). `LMSTUDIO_BASE_URL` is optional (default: `http://localhost:1234`).
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_EMBEDDING": "lmstudio:nomic-embed-text"
+}
+```
+
+| Model | Dimensions | Price | Notes |
+|-------|-----------|-------|-------|
+| `nomic-embed-text` | 768 | Free | Popular, fast |
+| `mxbai-embed-large` | 1024 | Free | Higher quality, GPU recommended |
+| `bge-m3` | 1024 | Free | Multilingual |
+
+For models not in the table, pass dimensions explicitly:
+```json
+{ "LUCERNA_EMBEDDING": "lmstudio:my-custom-model:768" }
+```

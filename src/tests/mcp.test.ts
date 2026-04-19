@@ -176,7 +176,7 @@ describe("search_codebase delegation", () => {
     expect(calls).toEqual(["search:auth"]);
   });
 
-  test("returns results array in payload", async () => {
+  test("returns flattened results with loc field", async () => {
     const fakeResult = {
       chunk: {
         id: "c1",
@@ -188,10 +188,10 @@ describe("search_codebase delegation", () => {
         content: "function foo() {}",
         contextContent: "import x;\n\nfunction foo() {}",
         startLine: 1,
-        endLine: 1,
+        endLine: 3,
         metadata: {},
       },
-      score: 0.9,
+      score: 0.9452,
       matchType: "lexical" as const,
     } satisfies import("../types.js").SearchResult;
     harness = await makeHarness(
@@ -202,16 +202,22 @@ describe("search_codebase delegation", () => {
       arguments: { query: "foo", includeGraphContext: false },
     });
     const payload = parseToolPayload(result);
-    const results = payload.results as Array<{
-      chunk: Record<string, unknown>;
-    }>;
+    const results = payload.results as Array<Record<string, unknown>>;
     expect(results).toHaveLength(1);
-    expect(results[0]?.chunk.id).toBe("c1");
-    // Internal fields must be stripped
-    expect(results[0]?.chunk.contextContent).toBeUndefined();
-    expect(results[0]?.chunk.projectId).toBeUndefined();
-    // Source content is present by default
-    expect(results[0]?.chunk.content).toBe("function foo() {}");
+    const r = results[0] ?? ({} as Record<string, unknown>);
+    // Flat structure — no chunk nesting
+    expect(r.id).toBe("c1");
+    expect(r.loc).toBe("src/a.ts:1-3");
+    expect(r.content).toBe("function foo() {}");
+    expect(r.score).toBe(0.95); // rounded to 2dp
+    // Internal / verbose fields absent
+    expect(r.chunk).toBeUndefined();
+    expect(r.language).toBeUndefined();
+    expect(r.matchType).toBeUndefined();
+    expect(r.metadata).toBeUndefined(); // empty metadata omitted
+    expect(r.filePath).toBeUndefined();
+    expect(r.startLine).toBeUndefined();
+    expect(r.endLine).toBeUndefined();
   });
 
   test("strips content when includeContent is false", async () => {
@@ -244,12 +250,12 @@ describe("search_codebase delegation", () => {
       },
     });
     const payload = parseToolPayload(result);
-    const results = payload.results as Array<{
-      chunk: Record<string, unknown>;
-    }>;
+    const results = payload.results as Array<Record<string, unknown>>;
     expect(results).toHaveLength(1);
-    expect(results[0]?.chunk.content).toBeUndefined();
-    expect(results[0]?.chunk.id).toBe("c2");
+    const r2 = results[0] ?? ({} as Record<string, unknown>);
+    expect(r2.content).toBeUndefined();
+    expect(r2.id).toBe("c2");
+    expect(r2.loc).toBe("src/b.ts:5-5");
   });
 
   test("returns pagination fields in payload", async () => {

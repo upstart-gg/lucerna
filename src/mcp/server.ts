@@ -183,15 +183,26 @@ export function createMcpServer(
 
       const results = paged.map((r) => {
         const {
-          contextContent: _ctx,
-          projectId: _pid,
-          ...chunkWithContent
+          id,
+          filePath,
+          startLine,
+          endLine,
+          type: chunkType,
+          name,
+          content,
+          metadata,
         } = r.chunk;
-        if (!includeContent) {
-          const { content: _content, ...chunkMeta } = chunkWithContent;
-          return { ...r, chunk: chunkMeta };
-        }
-        return { ...r, chunk: chunkWithContent };
+        const score = Math.round(r.score * 100) / 100;
+        const loc = `${filePath}:${startLine}-${endLine}`;
+        const base = {
+          id,
+          loc,
+          type: chunkType,
+          ...(name !== undefined ? { name } : {}),
+          ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+          score,
+        };
+        return includeContent ? { ...base, content } : base;
       });
 
       const payload: {

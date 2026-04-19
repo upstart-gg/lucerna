@@ -1,45 +1,22 @@
 ---
 title: Configuration
-description: Configure embedding and reranking providers via lucerna.config.ts or env vars.
+description: Configure embedding and reranking providers via env vars or lucerna.config.ts.
 ---
 
 Lucerna requires an embedding provider to enable semantic (vector) search. Without one, only lexical (BM25) search is available.
 
-The two main ways to configure providers are:
+There are two ways to configure providers:
 
-1. **Environment variables** — set `LUCERNA_EMBEDDING=provider:model` (picked up by the MCP server and CLI automatically)
-2. **Config file** — place a `lucerna.config.ts` at the project root
+1. **[Environment variables](/configuration/env-vars)** *(recommended)* — set `LUCERNA_EMBEDDING=provider:model` in your MCP server config. No files to add to your project, works across all AI clients.
+2. **[Config file](/configuration/config-file)** — place a `lucerna.config.ts` at the project root. Useful when you need programmatic control or a [custom provider](/configuration/custom-providers).
 
-## Config file
-
-Supported filenames (checked in order):
-
-- `lucerna.config.ts`
-- `lucerna.config.js`
-- `lucerna.config.mjs`
-
-```ts
-// lucerna.config.ts
-import { VoyageEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
-
-export default {
-  embeddingFunction: new VoyageEmbeddings({ model: 'voyage-4' }),
-  rerankingFunction: new VoyageReranker({ model: 'rerank-2.5' }),
-};
-```
-
-The MCP server and all CLI commands pick up `lucerna.config.ts` automatically from the project root.
-
-## Passing providers via CLI flags
-
-Use `--embedder` and `--reranker` flags for a one-off run (both require `provider:model` format):
-
-```bash
-lucerna mcp-server . --embedder voyage:voyage-code-3 --reranker voyage:rerank-2
-lucerna index . --config /path/to/lucerna.config.ts
-```
+:::tip[Prefer env vars for MCP]
+Setting `LUCERNA_EMBEDDING` and the provider API key directly in your MCP server config keeps configuration out of your repo and works identically across all AI coding clients.
+:::
 
 ## Priority order
+
+When multiple configuration sources are present, the highest-priority source wins:
 
 | Priority | Source |
 |----------|--------|
@@ -47,31 +24,6 @@ lucerna index . --config /path/to/lucerna.config.ts
 | 2 | `--embedder` / `--reranker` CLI flags |
 | 3 | `lucerna.config.ts` / `.js` |
 | 4 (lowest) | `LUCERNA_EMBEDDING` / `LUCERNA_RERANKING` env vars |
-
-## Pointing to a custom config path
-
-```bash
-lucerna mcp-server . --config /path/to/my.config.ts
-lucerna index . --config ./configs/lucerna.dev.ts
-```
-
-## Type reference
-
-```ts
-interface LucernaConfig {
-  /**
-   * Embedding provider instance, or `false` to disable semantic search (BM25 only).
-   * Omit to fall back to the LUCERNA_EMBEDDING env var, or no semantic search if unset.
-   */
-  embeddingFunction?: EmbeddingFunction | false;
-
-  /**
-   * Reranking provider instance, or `false` to disable reranking.
-   * Omit for no reranking (the default).
-   */
-  rerankingFunction?: RerankingFunction | false;
-}
-```
 
 :::tip[Reranking is optional]
 Without a `rerankingFunction`, hybrid search still applies **RRF fusion** automatically — merging vector and full-text results into a single ranked list. This is a solid baseline for most codebases. Add a [reranking provider](/configuration/reranking-providers) when you need higher precision on large codebases where many chunks look similar at the embedding level.

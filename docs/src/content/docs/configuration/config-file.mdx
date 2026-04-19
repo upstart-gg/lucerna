@@ -1,0 +1,53 @@
+---
+title: Config File
+description: Configure Lucerna using a lucerna.config.ts file at the project root.
+---
+
+:::tip[Prefer env vars for most setups]
+For MCP usage, [environment variables](/configuration/env-vars) are the simpler and recommended approach. Use a config file when you need programmatic control or a [custom provider](/configuration/custom-providers).
+:::
+
+Place a `lucerna.config.ts` at your project root. The MCP server and all CLI commands pick it up automatically.
+
+Supported filenames (checked in order):
+
+- `lucerna.config.ts`
+- `lucerna.config.js`
+- `lucerna.config.mjs`
+
+## Example
+
+```ts
+// lucerna.config.ts
+import { VoyageEmbeddings, VoyageReranker } from '@upstart.gg/lucerna';
+
+export default {
+  embeddingFunction: new VoyageEmbeddings({ model: 'voyage-4' }),
+  rerankingFunction: new VoyageReranker({ model: 'rerank-2.5' }),
+};
+```
+
+## Pointing to a custom config path
+
+```bash
+lucerna mcp-server . --config /path/to/my.config.ts
+lucerna index . --config ./configs/lucerna.dev.ts
+```
+
+## Type reference
+
+```ts
+interface LucernaConfig {
+  /**
+   * Embedding provider instance, or `false` to disable semantic search (BM25 only).
+   * Omit to fall back to the LUCERNA_EMBEDDING env var, or no semantic search if unset.
+   */
+  embeddingFunction?: EmbeddingFunction | false;
+
+  /**
+   * Reranking provider instance, or `false` to disable reranking.
+   * Omit for no reranking (the default).
+   */
+  rerankingFunction?: RerankingFunction | false;
+}
+```

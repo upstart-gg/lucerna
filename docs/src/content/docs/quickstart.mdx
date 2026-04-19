@@ -9,6 +9,8 @@ Lucerna ships a built-in [Model Context Protocol](https://modelcontextprotocol.i
 
 ## Setup
 
+### 1. Add Lucerna to your AI coding assistant
+
 Use [`add-mcp`](https://github.com/neondatabase/add-mcp), which supports 14 clients and writes the correct config file automatically:
 
 <Tabs>
@@ -36,7 +38,18 @@ Use [`add-mcp`](https://github.com/neondatabase/add-mcp), which supports 14 clie
 
 `add-mcp` will prompt you to choose which clients to configure. The MCP server uses **the working directory of the client** as the project root — no hardcoded paths needed.
 
-## Enable semantic search
+### 2. Ignore the index directory
+
+Lucerna stores its index (vector database, file hashes) in a `.lucerna` directory at your project root. Add it to your `.gitignore`:
+
+```
+# .gitignore
+.lucerna/
+```
+
+Or, if you work across many projects, add it once to your global gitignore (`~/.gitignore_global`) instead.
+
+### 3. Enable semantic search *(optional)*
 
 :::caution[Semantic search requires an embedding provider]
 Without a provider configured, Lucerna falls back to **lexical (BM25) search only** — and the MCP tools will include a warning in their output. For best results, configure an embedding provider.
@@ -72,25 +85,4 @@ export default {
 
 See [Embedding Providers](/configuration/embedding-providers) for all available providers and recommended models, [Reranking Providers](/configuration/reranking-providers) for optional cross-encoder reranking, and [Env Vars](/configuration/env-vars) for the full variable reference.
 
-## MCP tools
-
-| Tool | Description |
-|------|-------------|
-| `search_codebase` | Hybrid semantic + BM25 search with optional graph context expansion. Returns `{ results, warning? }`. |
-| `get_neighbors` | Get the knowledge-graph neighborhood for a chunk ID from search results. |
-
-## `search_codebase` parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `query` | string | — | Search query |
-| `includeGraphContext` | boolean | `true` | Expand results with related symbols from the knowledge graph |
-| `graphDepth` | number | `1` | Hops to follow when expanding graph context (0–3) |
-| `limit` | number | `10` | Maximum results to return |
-| `language` | string | — | Restrict to a language (e.g. `"typescript"`) |
-| `type` | string | — | Restrict to a chunk type (`"function"`, `"class"`, etc.) |
-| `filePath` | string | — | Filter by file path (supports glob patterns) |
-
-:::note
-**First-time indexing:** If the project has never been indexed, `search_codebase` returns `{ results: [], warning: "Lucerna is still indexing…" }`. Results become available once the initial index completes (typically a few seconds for small projects).
-:::
+See [MCP Tools](/mcp-tools) for the full tool reference.

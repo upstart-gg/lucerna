@@ -76,7 +76,9 @@ program
       const stats = await indexer.indexProject();
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       if (filesIndexed === 0) {
-        console.log(`Up to date. ${stats.totalFiles} files, ${stats.totalChunks} chunks. (${elapsed}s)`);
+        console.log(
+          `Up to date. ${stats.totalFiles} files, ${stats.totalChunks} chunks. (${elapsed}s)`,
+        );
       } else {
         console.log(
           `Done in ${elapsed}s. ${stats.totalFiles} files total, ${filesIndexed} updated, ${stats.totalChunks} chunks.`,

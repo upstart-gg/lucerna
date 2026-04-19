@@ -8,6 +8,7 @@ import {
   resolveEmbeddingConfig,
   resolveRerankingConfig,
 } from "../config.js";
+import { runInstall } from "./install.js";
 import pkg from "../../package.json";
 import type {
   CodeChunk,
@@ -617,6 +618,17 @@ function printChunks(chunks: CodeChunk[], labels?: string[]): void {
   }
   console.log(`${chunks.length} result(s)`);
 }
+
+// ---------------------------------------------------------------------------
+// install command
+// ---------------------------------------------------------------------------
+
+program
+  .command("install")
+  .description(
+    "Interactive setup: register the MCP server and configure an embedding provider",
+  )
+  .action(runInstall);
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err instanceof Error ? err.message : String(err));

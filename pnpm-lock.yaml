@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@clack/prompts':
+        specifier: ^1.2.0
+        version: 1.2.0
       '@kreuzberg/tree-sitter-language-pack':
         specifier: ^1.6.1
         version: 1.6.1

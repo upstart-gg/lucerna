@@ -338,7 +338,9 @@ export async function startMcpServer(
   const initPromise = indexer
     .initialize()
     .then(async () => {
-      log(`Initialized. Starting initial index…`);
+      log(
+        `Initialized. ${indexer.isLeader ? "Leader — starting initial index…" : "Follower — awaiting leadership, search is available."}`,
+      );
       const stats = await indexer.indexProject();
       ready = true;
       log(

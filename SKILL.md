@@ -17,12 +17,31 @@ Hybrid semantic + lexical (BM25) search over the indexed codebase. The primary t
 | `query` | string | required | Search query |
 | `includeGraphContext` | boolean | `true` | Expand results with related symbols from the knowledge graph |
 | `graphDepth` | integer 0–3 | `1` | Hops to follow when expanding graph context |
-| `limit` | integer 1–100 | `10` | Max results to return |
+| `limit` | integer 1–100 | `10` | Max results per page |
+| `offset` | integer ≥ 0 | `0` | Results to skip — use for pagination when `hasMore` is `true` |
+| `includeContent` | boolean | `true` | Include chunk source code. Set `false` for metadata-only (filePath, name, type, lines) — much smaller response |
 | `language` | string | *(all)* | Filter by language: `typescript`, `python`, `rust`, `go`, etc. |
 | `type` | string | *(all)* | Filter by chunk type: `function` · `class` · `method` · `interface` · `type` · `variable` · `import` · `section` · `file` |
 | `filePath` | string | *(all)* | Filter by file path (supports glob patterns) |
 
-Results include a `warning` field when indexing is still in progress or semantic search is unavailable — retry in a few seconds if you see it.
+### Response shape
+
+```json
+{
+  "results": [...],
+  "total": 15,
+  "hasMore": true,
+  "offset": 10
+}
+```
+
+| Field | Description |
+|---|---|
+| `results` | Array of `{ chunk, score, matchType }` — `chunk` has `id`, `filePath`, `name`, `type`, `language`, `content` (unless `includeContent: false`), `startLine`, `endLine`, `metadata` |
+| `total` | Number of results fetched before pagination (at most `offset + limit + 1`) |
+| `hasMore` | `true` if more results exist beyond the current page |
+| `offset` | Only present when non-zero — the offset used for this page |
+| `warning` | Present when indexing is still in progress or semantic search is unavailable — retry in a few seconds |
 
 ---
 
@@ -59,3 +78,5 @@ Traverses the knowledge graph for a specific chunk. Use it to explore callers, c
 - If results look incomplete, check for a `warning` field in the response — indexing may still be running.
 - Prefer one well-formed query over multiple narrow ones. The hybrid ranker handles broad queries well.
 - `graphDepth: 2` is rarely needed. Start at `1`; only go deeper if the direct neighborhood is insufficient.
+- **Pagination:** when `hasMore` is `true`, call again with `offset` incremented by `limit` to fetch the next page. Stop when `hasMore` is `false` or `results` is empty.
+- **Token-efficient survey:** use `includeContent: false` to locate relevant files first, then read the ones you need with a file-reading tool. Use the default `includeContent: true` when you need to understand the code in a single call.

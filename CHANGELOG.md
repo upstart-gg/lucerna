@@ -1,5 +1,13 @@
 # @upstart.gg/lucerna
 
+## 0.1.9
+
+### Patch Changes
+
+- [#47](https://github.com/upstart-gg/lucerna/pull/47) [`ea9adb3`](https://github.com/upstart-gg/lucerna/commit/ea9adb3cb9207931e8b36214be28da2764641cd7) Thanks [@mattallty](https://github.com/mattallty)! - add LM Studio embedding provider
+
+- [#45](https://github.com/upstart-gg/lucerna/pull/45) [`e30dd8f`](https://github.com/upstart-gg/lucerna/commit/e30dd8f99d6fdba30bb9c76a6e246ae8fd3fe356) Thanks [@mattallty](https://github.com/mattallty)! - Implement hybrid search with RRF fusion
+
 ## 0.1.8
 
 ### Patch Changes

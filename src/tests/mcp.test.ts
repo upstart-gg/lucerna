@@ -186,7 +186,7 @@ describe("search_codebase delegation", () => {
         type: "function",
         name: "foo",
         content: "function foo() {}",
-        contextContent: "",
+        contextContent: "import x;\n\nfunction foo() {}",
         startLine: 1,
         endLine: 1,
         metadata: {},
@@ -202,9 +202,133 @@ describe("search_codebase delegation", () => {
       arguments: { query: "foo", includeGraphContext: false },
     });
     const payload = parseToolPayload(result);
-    const results = payload.results as Array<{ chunk: { id: string } }>;
+    const results = payload.results as Array<{
+      chunk: Record<string, unknown>;
+    }>;
     expect(results).toHaveLength(1);
     expect(results[0]?.chunk.id).toBe("c1");
+    // Internal fields must be stripped
+    expect(results[0]?.chunk.contextContent).toBeUndefined();
+    expect(results[0]?.chunk.projectId).toBeUndefined();
+    // Source content is present by default
+    expect(results[0]?.chunk.content).toBe("function foo() {}");
+  });
+
+  test("strips content when includeContent is false", async () => {
+    const fakeResult = {
+      chunk: {
+        id: "c2",
+        projectId: "p",
+        filePath: "src/b.ts",
+        language: "typescript",
+        type: "function",
+        name: "bar",
+        content: "function bar() {}",
+        contextContent: "",
+        startLine: 5,
+        endLine: 5,
+        metadata: {},
+      },
+      score: 0.8,
+      matchType: "lexical" as const,
+    } satisfies import("../types.js").SearchResult;
+    harness = await makeHarness(
+      makeIndexer({ search: async (_q: string) => [fakeResult] }),
+    );
+    const result = await harness.client.callTool({
+      name: "search_codebase",
+      arguments: {
+        query: "bar",
+        includeGraphContext: false,
+        includeContent: false,
+      },
+    });
+    const payload = parseToolPayload(result);
+    const results = payload.results as Array<{
+      chunk: Record<string, unknown>;
+    }>;
+    expect(results).toHaveLength(1);
+    expect(results[0]?.chunk.content).toBeUndefined();
+    expect(results[0]?.chunk.id).toBe("c2");
+  });
+
+  test("returns pagination fields in payload", async () => {
+    // Return 11 results to trigger hasMore
+    const makeResult = (i: number) =>
+      ({
+        chunk: {
+          id: `c${i}`,
+          projectId: "p",
+          filePath: `src/${i}.ts`,
+          language: "typescript",
+          type: "function" as const,
+          content: "",
+          contextContent: "",
+          startLine: 1,
+          endLine: 1,
+          metadata: {},
+        },
+        score: 1 - i * 0.01,
+        matchType: "lexical" as const,
+      }) satisfies import("../types.js").SearchResult;
+
+    harness = await makeHarness(
+      makeIndexer({
+        search: async (_q: string) =>
+          Array.from({ length: 11 }, (_, i) => makeResult(i)),
+      }),
+    );
+    const result = await harness.client.callTool({
+      name: "search_codebase",
+      arguments: { query: "x", includeGraphContext: false, limit: 10 },
+    });
+    const payload = parseToolPayload(result);
+    expect(payload.hasMore).toBe(true);
+    expect(payload.total).toBe(11);
+    expect(payload.offset).toBeUndefined(); // not included on first page
+    const results = payload.results as unknown[];
+    expect(results).toHaveLength(10);
+  });
+
+  test("includes offset in payload when paginating", async () => {
+    const makeResult = (i: number) =>
+      ({
+        chunk: {
+          id: `c${i}`,
+          projectId: "p",
+          filePath: `src/${i}.ts`,
+          language: "typescript",
+          type: "function" as const,
+          content: "",
+          contextContent: "",
+          startLine: 1,
+          endLine: 1,
+          metadata: {},
+        },
+        score: 1 - i * 0.01,
+        matchType: "lexical" as const,
+      }) satisfies import("../types.js").SearchResult;
+
+    harness = await makeHarness(
+      makeIndexer({
+        search: async (_q: string) =>
+          Array.from({ length: 6 }, (_, i) => makeResult(i)),
+      }),
+    );
+    const result = await harness.client.callTool({
+      name: "search_codebase",
+      arguments: {
+        query: "x",
+        includeGraphContext: false,
+        limit: 5,
+        offset: 5,
+      },
+    });
+    const payload = parseToolPayload(result);
+    expect(payload.offset).toBe(5);
+    expect(payload.hasMore).toBe(false);
+    const results = payload.results as unknown[];
+    expect(results).toHaveLength(1);
   });
 });
 

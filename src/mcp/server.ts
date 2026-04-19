@@ -61,7 +61,10 @@ export function createMcpServer(
       description:
         "Search the codebase using hybrid semantic + lexical (BM25) search. " +
         "Optionally expands results with graph context (callers, callees, imports). " +
-        "Returns an empty array with a warning message while the project is being indexed for the first time.",
+        "Response includes `results`, `total` (results fetched before pagination), and `hasMore` (boolean). " +
+        "Use `offset` to page through results when `hasMore` is true. " +
+        "Set `includeContent: false` for a lightweight metadata-only response when you only need file locations. " +
+        "Returns an empty results array with a warning message while the project is being indexed for the first time.",
       inputSchema: {
         query: z
           .string()
@@ -94,7 +97,26 @@ export function createMcpServer(
           .max(100)
           .optional()
           .default(10)
-          .describe("Maximum number of results to return (default: 10)"),
+          .describe(
+            "Maximum number of results to return per page (default: 10)",
+          ),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .default(0)
+          .describe(
+            "Number of results to skip for pagination (default: 0). Use with `hasMore: true` to fetch the next page.",
+          ),
+        includeContent: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe(
+            "Include chunk source code in results (default: true). " +
+              "Set false for a lightweight metadata-only response when you only need file locations, names, and line numbers.",
+          ),
         language: z
           .string()
           .optional()
@@ -126,6 +148,8 @@ export function createMcpServer(
       includeGraphContext,
       graphDepth,
       limit,
+      offset,
+      includeContent,
       language,
       type,
       filePath,
@@ -136,24 +160,52 @@ export function createMcpServer(
           ? SEMANTIC_DISABLED_WARNING
           : undefined;
 
+      // Fetch one extra result to detect whether more pages exist.
+      const fetchLimit = offset + limit + 1;
+
       const baseOpts: SearchOptions = {
-        limit,
+        limit: fetchLimit,
         ...(language !== undefined ? { language } : {}),
         ...(type !== undefined ? { types: [type] } : {}),
         ...(filePath !== undefined ? { filePath } : {}),
       };
 
-      const results = await (includeGraphContext
+      const raw = await (includeGraphContext
         ? indexer.searchWithContext(query, {
             ...baseOpts,
             graphDepth: graphDepth ?? 1,
           } satisfies SearchWithContextOptions)
         : indexer.search(query, baseOpts));
 
+      const hasMore = raw.length > offset + limit;
+      const total = raw.length;
+      const paged = raw.slice(offset, offset + limit);
+
+      const results = paged.map((r) => {
+        const {
+          contextContent: _ctx,
+          projectId: _pid,
+          ...chunkWithContent
+        } = r.chunk;
+        if (!includeContent) {
+          const { content: _content, ...chunkMeta } = chunkWithContent;
+          return { ...r, chunk: chunkMeta };
+        }
+        return { ...r, chunk: chunkWithContent };
+      });
+
       const payload: {
         results: typeof results;
+        total: number;
+        offset?: number;
+        hasMore: boolean;
         warning?: string;
-      } = { results };
+      } = {
+        results,
+        total,
+        ...(offset > 0 ? { offset } : {}),
+        hasMore,
+      };
       if (warning !== undefined) {
         payload.warning = warning;
       }
@@ -162,7 +214,7 @@ export function createMcpServer(
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(payload, null, 2),
+            text: JSON.stringify(payload),
           },
         ],
       };
@@ -204,7 +256,7 @@ export function createMcpServer(
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(neighborhood, null, 2),
+            text: JSON.stringify(neighborhood),
           },
         ],
       };

@@ -48,14 +48,42 @@ program
   )
   .option("--config <path>", "Path to lucerna.config.ts / lucerna.config.js")
   .action(async (projectRoot: string, opts: Record<string, unknown>) => {
-    const indexer = await buildIndexer(projectRoot, opts);
+    const resolvedRoot = resolve(projectRoot);
+    let filesIndexed = 0;
+    const startTime = Date.now();
+
+    const indexer = await buildIndexer(projectRoot, {
+      ...opts,
+      onIndexed: (event: IndexEvent) => {
+        if (event.filePath === resolvedRoot) return; // project-level summary event
+        if (event.type === "indexed") {
+          filesIndexed++;
+          console.log(
+            `  indexed  ${event.filePath} (${event.chunksAffected ?? 0} chunks)`,
+          );
+        } else if (event.type === "removed") {
+          console.log(`  removed  ${event.filePath}`);
+        } else if (event.type === "error") {
+          console.error(
+            `  error    ${event.filePath}: ${event.error?.message}`,
+          );
+        }
+      },
+    });
     try {
       await indexer.initialize();
-      console.log(`Indexing ${resolve(projectRoot)}...`);
+      console.log(`Indexing ${resolvedRoot}...`);
       const stats = await indexer.indexProject();
-      console.log(
-        `Done. ${stats.totalFiles} files, ${stats.totalChunks} chunks indexed.`,
-      );
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      if (filesIndexed === 0) {
+        console.log(
+          `Up to date. ${stats.totalFiles} files, ${stats.totalChunks} chunks. (${elapsed}s)`,
+        );
+      } else {
+        console.log(
+          `Done in ${elapsed}s. ${stats.totalFiles} files total, ${filesIndexed} updated, ${stats.totalChunks} chunks.`,
+        );
+      }
     } finally {
       await indexer.close();
     }

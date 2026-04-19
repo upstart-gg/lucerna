@@ -31,8 +31,12 @@ export default defineConfig({
           items: [
             { label: "Overview", slug: "configuration/overview" },
             {
-              label: "Built-in Providers",
-              slug: "configuration/built-in-providers",
+              label: "Embedding Providers",
+              slug: "configuration/embedding-providers",
+            },
+            {
+              label: "Reranking Providers",
+              slug: "configuration/reranking-providers",
             },
             { label: "Env Vars", slug: "configuration/env-vars" },
             {

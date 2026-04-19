@@ -337,4 +337,93 @@ describe("LanceDBStore", () => {
     const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
     expect(await raw.count()).toBe(0);
   });
+
+  // -------------------------------------------------------------------------
+  // searchHybrid()
+  // -------------------------------------------------------------------------
+
+  describe("searchHybrid()", () => {
+    test("returns empty array when store is empty", async () => {
+      const results = await store.searchHybrid(
+        makeVector(DIMS),
+        "authentication",
+        { limit: 10 },
+      );
+      expect(results).toEqual([]);
+    });
+
+    test("returns results with matchType=hybrid and numeric score", async () => {
+      const chunks = [
+        makeChunk("id1", "src/a.ts", "function authenticate(token: string) {}"),
+        makeChunk("id2", "src/b.ts", "const PI = 3.14159"),
+      ];
+      await store.upsert(chunks, [
+        makeVector(DIMS, 0.9),
+        makeVector(DIMS, 0.1),
+      ]);
+
+      const results = await store.searchHybrid(
+        makeVector(DIMS, 0.9),
+        "authenticate",
+        { limit: 10 },
+      );
+      expect(results.length).toBeGreaterThan(0);
+      for (const r of results) {
+        expect(r.matchType).toBe("hybrid");
+        expect(typeof r.score).toBe("number");
+        expect(r.score).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    test("respects the limit option", async () => {
+      const chunks = Array.from({ length: 5 }, (_, i) =>
+        makeChunk(`id${i}`, `src/${i}.ts`, `function fn${i}() {}`),
+      );
+      await store.upsert(
+        chunks,
+        chunks.map(() => makeVector(DIMS)),
+      );
+
+      const results = await store.searchHybrid(makeVector(DIMS), "fn", {
+        limit: 2,
+      });
+      expect(results.length).toBeLessThanOrEqual(2);
+    });
+
+    test("filePath filter narrows results", async () => {
+      const chunks = [
+        makeChunk("id1", "src/a.ts", "function alpha() {}"),
+        makeChunk("id2", "src/b.ts", "function beta() {}"),
+      ];
+      await store.upsert(chunks, [
+        makeVector(DIMS, 0.8),
+        makeVector(DIMS, 0.2),
+      ]);
+
+      const results = await store.searchHybrid(makeVector(DIMS), "function", {
+        limit: 10,
+        filePath: "src/a.ts",
+      });
+      for (const r of results) {
+        expect(r.chunk.filePath).toBe("src/a.ts");
+      }
+    });
+
+    test("result chunks have correct ids and file paths", async () => {
+      const chunks = [
+        makeChunk(
+          "chunk-abc",
+          "src/auth.ts",
+          "function login(user: string) {}",
+        ),
+      ];
+      await store.upsert(chunks, [makeVector(DIMS)]);
+
+      const results = await store.searchHybrid(makeVector(DIMS), "login", {
+        limit: 5,
+      });
+      const ids = results.map((r) => r.chunk.id);
+      expect(ids).toContain("chunk-abc");
+    });
+  });
 });

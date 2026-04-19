@@ -1,0 +1,138 @@
+---
+title: Reranking Providers
+description: Optional cross-encoder reranking providers to improve search precision on top of built-in RRF fusion.
+---
+
+:::tip
+A reranking provider is optional. Add one when search precision matters more than latency.
+:::
+
+Lucerna uses two stages of ranking during hybrid search:
+
+**Stage 1 — RRF fusion (always on, no config needed)**
+
+After running vector search and full-text search in parallel, LanceDB's built-in Reciprocal Rank Fusion algorithm merges the two ranked lists into one. It's fast, free, and requires no API key. For many codebases this is sufficient.
+
+**Stage 2 — Cross-encoder reranking (optional)**
+
+A trained ML model re-scores each candidate result against the full query text. Unlike embeddings (which compress meaning into a fixed vector), a cross-encoder sees both the query and the document together and produces a precise relevance score. This meaningfully improves precision — especially on large codebases where many chunks look similar at embedding level — at the cost of additional API calls and ~200–500 ms of extra latency per search.
+
+:::note[Ollama reranking]
+Ollama does not yet expose a reranking API. Local reranking support will be added once
+[ollama/ollama#3368](https://github.com/ollama/ollama/issues/3368) is resolved.
+:::
+
+---
+
+### Voyage ⭐ recommended
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "voyage:rerank-2.5",
+  "VOYAGE_API_KEY": "your-key"
+}
+```
+
+| Model | Price per 1K queries | Notes |
+|-------|---------------------|-------|
+| `rerank-2.5` | — | Latest generation — **top pick** |
+| `rerank-2` | $0.05 | Previous generation, 16K ctx per pair |
+| `rerank-2-lite` | $0.02 | Lower latency |
+
+---
+
+### Cohere
+
+1 search = 1 query against up to 100 documents.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "cohere:rerank-english-v3.0",
+  "COHERE_API_KEY": "your-key"
+}
+```
+
+| Model | Price per 1K searches | Notes |
+|-------|----------------------|-------|
+| `rerank-english-v3.0` | $2.00 | Strong English reranker |
+| `rerank-multilingual-v3.0` | $2.00 | Multilingual |
+
+---
+
+### Jina
+
+First 10M tokens free per API key · Token-based billing.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "jina:jina-reranker-v2-base-multilingual",
+  "JINA_API_KEY": "your-key"
+}
+```
+
+| Model | Price per 1M tokens | Notes |
+|-------|---------------------|-------|
+| `jina-reranker-v2-base-multilingual` | ~$0.02 | Fast, multilingual, good for code |
+
+---
+
+### GCP Vertex AI Ranking
+
+Proper cross-encoder using Google's dedicated Ranking API. No data store or app needed — just a GCP project with the Discovery Engine API enabled.
+
+:::note[One-time setup]
+Enable the Discovery Engine API in your GCP project before first use:
+```bash
+gcloud services enable discoveryengine.googleapis.com
+```
+:::
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "vertex:semantic-ranker-default-004",
+  "GOOGLE_CLOUD_PROJECT": "my-gcp-project",
+  "GOOGLE_ACCESS_TOKEN": "obtain via: gcloud auth print-access-token"
+}
+```
+
+| Model | Price per 1K queries | Notes |
+|-------|---------------------|-------|
+| `semantic-ranker-default-004` | $1.00 | Recommended, 1024 token ctx per doc |
+| `semantic-ranker-fast-004` | $1.00 | Lower latency |
+
+1 query = up to 100 documents; every additional 100 docs counts as +1 query.
+
+---
+
+### Gemini
+
+Prompt-based relevance scoring using a Gemini generative model. Not a cross-encoder — uses `GOOGLE_API_KEY`, no GCP project required.
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "gemini:gemini-2.0-flash-lite",
+  "GOOGLE_API_KEY": "your-key"
+}
+```
+
+| Model | Price per 100 docs | Notes |
+|-------|-------------------|-------|
+| `gemini-2.0-flash-lite` | ~$0.0002 | Cheapest; good enough for most use cases |
+
+---
+
+### Cloudflare Workers AI
+
+Free tier: 10K neurons/day (shared with embeddings).
+
+```json title=".mcp.json → env"
+{
+  "LUCERNA_RERANKING": "cloudflare:@cf/baai/bge-reranker-base",
+  "CLOUDFLARE_ACCOUNT_ID": "your-account-id",
+  "CLOUDFLARE_API_TOKEN": "your-token"
+}
+```
+
+| Model | Price per 1M tokens | Notes |
+|-------|---------------------|-------|
+| `@cf/baai/bge-reranker-base` | ~$0.003 (free tier applies) | No extra key if already using Cloudflare |

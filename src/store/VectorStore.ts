@@ -23,6 +23,17 @@ export interface VectorStore {
   /** Full-text / BM25 search. */
   searchText(query: string, options: SearchOptions): Promise<SearchResult[]>;
 
+  /**
+   * Native hybrid (vector + FTS) search fused via RRF in a single query.
+   * Optional — stores that don't implement this fall back to the two-query
+   * RRF path in Searcher.
+   */
+  searchHybrid?(
+    queryVector: number[],
+    query: string,
+    options: SearchOptions,
+  ): Promise<SearchResult[]>;
+
   /** Return all distinct filePaths stored. */
   listFiles(): Promise<string[]>;
 

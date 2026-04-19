@@ -130,8 +130,10 @@ async function ensureGitignore(dir: string): Promise<void> {
 }
 
 function runAddMcp(): boolean {
+  // On Windows, npx is a .cmd file and requires the .cmd suffix when shell is not used.
+  const npx = process.platform === "win32" ? "npx.cmd" : "npx";
   const result = spawnSync(
-    "npx",
+    npx,
     [
       "-y",
       "add-mcp",
@@ -140,7 +142,7 @@ function runAddMcp(): boolean {
       "lucerna",
       "--yes",
     ],
-    { stdio: "inherit", shell: true },
+    { stdio: "inherit" },
   );
   return result.status === 0;
 }

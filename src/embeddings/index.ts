@@ -7,6 +7,7 @@ export { GeminiReranker } from "./GeminiReranker.js";
 export { JinaEmbeddings } from "./JinaEmbeddings.js";
 export { JinaReranker } from "./JinaReranker.js";
 export { MistralEmbeddings } from "./MistralEmbeddings.js";
+export { LMStudioEmbeddings } from "./LMStudioEmbeddings.js";
 export { OllamaEmbeddings } from "./OllamaEmbeddings.js";
 export { OpenAIEmbeddings } from "./OpenAIEmbeddings.js";
 export { VertexAIEmbeddings } from "./VertexAIEmbeddings.js";

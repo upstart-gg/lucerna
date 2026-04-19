@@ -40,7 +40,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama, lmstudio",
   )
   .option(
     "--reranker <name>",
@@ -74,7 +74,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama, lmstudio",
   )
   .option(
     "--reranker <name>",
@@ -132,7 +132,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama, lmstudio",
   )
   .option(
     "--reranker <name>",
@@ -362,7 +362,7 @@ program
   .option("--no-semantic", "Disable semantic (vector) search — lexical only")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama, lmstudio",
   )
   .option(
     "--reranker <name>",
@@ -611,7 +611,7 @@ program
   .option("--no-semantic", "Disable semantic/vector search (lexical only)")
   .option(
     "--embedder <name>",
-    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama",
+    "Embedding provider:model, e.g. voyage:voyage-4 or openai:text-embedding-3-small. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, ollama, lmstudio",
   )
   .option(
     "--reranker <name>",

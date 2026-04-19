@@ -72,6 +72,7 @@ const VALID_EMBEDDERS = [
   "mistral",
   "gemini",
   "ollama",
+  "lmstudio",
   "vertex",
 ] as const;
 
@@ -180,6 +181,12 @@ export async function resolveBuiltinEmbedder(
         "./embeddings/OllamaEmbeddings.js"
       );
       return new OllamaEmbeddings({ model, ...d });
+    }
+    case "lmstudio": {
+      const { LMStudioEmbeddings } = await import(
+        "./embeddings/LMStudioEmbeddings.js"
+      );
+      return new LMStudioEmbeddings({ model, ...d });
     }
     case "vertex": {
       const { VertexAIEmbeddings } = await import(

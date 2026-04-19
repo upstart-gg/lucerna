@@ -35,6 +35,7 @@ export { GeminiReranker } from "./embeddings/GeminiReranker.js";
 export { JinaEmbeddings } from "./embeddings/JinaEmbeddings.js";
 export { JinaReranker } from "./embeddings/JinaReranker.js";
 export { MistralEmbeddings } from "./embeddings/MistralEmbeddings.js";
+export { LMStudioEmbeddings } from "./embeddings/LMStudioEmbeddings.js";
 export { OllamaEmbeddings } from "./embeddings/OllamaEmbeddings.js";
 export { OpenAIEmbeddings } from "./embeddings/OpenAIEmbeddings.js";
 export { VertexAIEmbeddings } from "./embeddings/VertexAIEmbeddings.js";

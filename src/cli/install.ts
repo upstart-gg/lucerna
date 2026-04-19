@@ -5,6 +5,42 @@ import { spawnSync } from "node:child_process";
 import * as clack from "@clack/prompts";
 
 // ---------------------------------------------------------------------------
+// Package manager detection
+// ---------------------------------------------------------------------------
+
+type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
+
+function detectPackageManager(): PackageManager {
+  const agent = process.env.npm_config_user_agent ?? "";
+  if (agent.startsWith("pnpm")) return "pnpm";
+  if (agent.startsWith("yarn")) return "yarn";
+  if (agent.startsWith("bun")) return "bun";
+  return "npm";
+}
+
+function installDevDep(pkg: string, cwd: string): boolean {
+  const pm = detectPackageManager();
+  const isWin = process.platform === "win32";
+
+  const argv: [string, string[]] = (() => {
+    const suffix = isWin ? ".cmd" : "";
+    switch (pm) {
+      case "pnpm":
+        return [`pnpm${suffix}`, ["add", "--save-dev", pkg]];
+      case "yarn":
+        return [`yarn${suffix}`, ["add", "--dev", pkg]];
+      case "bun":
+        return [`bun${suffix}`, ["add", "--dev", pkg]];
+      default:
+        return [`npm${suffix}`, ["install", "--save-dev", pkg]];
+    }
+  })();
+
+  const result = spawnSync(argv[0], argv[1], { stdio: "inherit", cwd });
+  return result.status === 0;
+}
+
+// ---------------------------------------------------------------------------
 // Provider metadata
 // ---------------------------------------------------------------------------
 
@@ -213,6 +249,18 @@ export async function runInstall(): Promise<void> {
   const configPath = join(cwd, "lucerna.config.ts");
 
   if (providerKey !== "skip") {
+    // Install @upstart.gg/lucerna as a dev dep so the config's `defineConfig`
+    // import resolves for TypeScript — but only if a package.json exists.
+    if (existsSync(join(cwd, "package.json"))) {
+      const s = clack.spinner();
+      s.start(`Installing @upstart.gg/lucerna as a dev dependency…`);
+      const ok = installDevDep("@upstart.gg/lucerna@latest", cwd);
+      s.stop(
+        ok
+          ? "Installed @upstart.gg/lucerna."
+          : "Install failed — run it manually.",
+      );
+    }
     if (existsSync(configPath)) {
       const overwrite = await clack.confirm({
         message: "lucerna.config.ts already exists. Overwrite?",

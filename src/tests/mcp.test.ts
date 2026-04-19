@@ -111,7 +111,7 @@ describe("search_codebase warning", () => {
     });
     const payload = parseToolPayload(result);
     expect(payload.warning).toBeString();
-    expect(payload.warning).toInclude("indexing");
+    expect(payload.warning).toInclude("initializing");
   });
 
   test("omits warning when indexing is complete", async () => {

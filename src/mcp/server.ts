@@ -43,7 +43,7 @@ const SEMANTIC_DISABLED_WARNING =
 
 export function createMcpServer(
   indexer: CodeIndexer,
-  getIndexingComplete: () => boolean,
+  getReady: () => boolean,
   semanticEnabled = true,
 ): McpServer {
   const server = new McpServer({
@@ -154,8 +154,8 @@ export function createMcpServer(
       type,
       filePath,
     }) => {
-      const warning = !getIndexingComplete()
-        ? "Lucerna is still indexing this project for the first time. Results may be incomplete — please retry in a few seconds."
+      const warning = !getReady()
+        ? "Lucerna is still initializing. Results may be incomplete — please retry in a few seconds."
         : !semanticEnabled
           ? SEMANTIC_DISABLED_WARNING
           : undefined;
@@ -337,17 +337,29 @@ export async function startMcpServer(
     },
   });
 
-  await indexer.initialize();
   log(`Project root: ${resolvedRoot}`);
 
-  // Track whether the initial index has completed so we can warn callers that
-  // results may be empty during first-time indexing.
-  let indexingComplete = false;
+  // `ready` becomes true once both initialize() and indexProject() complete.
+  let ready = false;
 
-  const indexingPromise = indexer
-    .indexProject()
-    .then(async (stats) => {
-      indexingComplete = true;
+  const server = createMcpServer(indexer, () => ready, semanticEnabled);
+
+  // -------------------------------------------------------------------------
+  // Connect via stdio immediately so the client stops seeing "connecting"
+  // -------------------------------------------------------------------------
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  log("MCP server connected (stdio). Initializing in background…");
+
+  // Run initialize() + indexProject() in the background so the transport is
+  // already up before the slow work (DB open, grammar loading, embedder warm-up).
+  const initPromise = indexer
+    .initialize()
+    .then(async () => {
+      log(`Initialized. Starting initial index…`);
+      const stats = await indexer.indexProject();
+      ready = true;
       log(
         `Initial index complete: ${stats.totalFiles} files, ${stats.totalChunks} chunks.`,
       );
@@ -355,25 +367,11 @@ export async function startMcpServer(
       log("Watching for file changes.");
     })
     .catch((err: Error) => {
-      log(`Indexing error: ${err.message}`);
+      log(`Initialization error: ${err.message}`);
     });
 
   // Keep a reference so the promise isn't GC'd before it resolves.
-  void indexingPromise;
-
-  const server = createMcpServer(
-    indexer,
-    () => indexingComplete,
-    semanticEnabled,
-  );
-
-  // -------------------------------------------------------------------------
-  // Connect via stdio and keep running
-  // -------------------------------------------------------------------------
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  log("MCP server ready (stdio).");
+  void initPromise;
 
   // Keep the process alive until the transport closes.
   await new Promise<void>((resolvePromise) => {

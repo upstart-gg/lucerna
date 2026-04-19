@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.10
+
+### Patch Changes
+
+- [#51](https://github.com/upstart-gg/lucerna/pull/51) [`870b294`](https://github.com/upstart-gg/lucerna/commit/870b29463057fdd57db056b508491ff418ba4611) Thanks [@mattallty](https://github.com/mattallty)! - change MCP server initialization logic
+
 ## 0.1.9
 
 ### Patch Changes

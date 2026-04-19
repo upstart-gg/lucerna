@@ -5,18 +5,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { CodeIndexer } from "../CodeIndexer.js";
 import {
+  createDefaultConfig,
   loadConfig,
-  resolveBuiltinEmbedder,
-  resolveBuiltinReranker,
-  resolveEmbedderFromEnv,
-  resolveRerankerFromEnv,
+  resolveEmbeddingConfig,
+  resolveRerankingConfig,
 } from "../config.js";
-import type {
-  EmbeddingFunction,
-  RerankingFunction,
-  SearchOptions,
-  SearchWithContextOptions,
-} from "../types.js";
+import type { SearchOptions, SearchWithContextOptions } from "../types.js";
 import pkg from "../../package.json";
 
 // ---------------------------------------------------------------------------
@@ -38,8 +32,8 @@ function log(msg: string): void {
  */
 const SEMANTIC_DISABLED_WARNING =
   "⚠️ Semantic search is disabled — no embedding provider configured. " +
-  "Set LUCERNA_EMBEDDING=provider:model (e.g. LUCERNA_EMBEDDING=voyage:voyage-code-3) " +
-  "and the provider's API key to enable vector search. Results are lexical (BM25) only.";
+  'Add an `embedding` field to your lucerna.config.ts (e.g. `{ provider: "voyage", model: "voyage-code-3", apiKey: "..." }`) ' +
+  "to enable vector search. Results are lexical (BM25) only.";
 
 export function createMcpServer(
   indexer: CodeIndexer,
@@ -286,37 +280,22 @@ export async function startMcpServer(
   opts: {
     storageDir?: string;
     semantic?: boolean;
-    embedder?: string;
-    reranker?: string;
-    config?: string;
   } = {},
 ): Promise<void> {
   const resolvedRoot = resolve(projectRoot);
 
-  // Load lucerna.config.ts / .js, then apply flag overrides on top.
-  const cfg = await loadConfig(resolvedRoot, opts.config);
+  const { config: cfg, configDir } = await loadConfig(resolvedRoot);
 
-  // Priority: --no-semantic > --embedder flag > config file > LUCERNA_EMBEDDING env var.
-  let embeddingFunction: EmbeddingFunction | false | undefined =
-    cfg.embeddingFunction;
-  if (opts.semantic === false) {
-    embeddingFunction = false;
-  } else if (opts.embedder) {
-    embeddingFunction = await resolveBuiltinEmbedder(opts.embedder);
-  } else if (embeddingFunction === undefined) {
-    const fromEnv = await resolveEmbedderFromEnv();
-    if (fromEnv !== false) embeddingFunction = fromEnv;
+  if (configDir === null) {
+    await createDefaultConfig(process.cwd());
   }
 
-  // Priority: --reranker flag > config file > LUCERNA_RERANKING env var.
-  let rerankingFunction: RerankingFunction | false | undefined =
-    cfg.rerankingFunction;
-  if (opts.reranker) {
-    rerankingFunction = await resolveBuiltinReranker(opts.reranker);
-  } else if (rerankingFunction === undefined) {
-    const fromEnv = await resolveRerankerFromEnv();
-    if (fromEnv !== false) rerankingFunction = fromEnv;
-  }
+  // Embedding: --no-semantic > config file
+  let embeddingFunction = await resolveEmbeddingConfig(cfg.embedding);
+  if (opts.semantic === false) embeddingFunction = false;
+
+  // Reranking: config file only
+  const rerankingFunction = await resolveRerankingConfig(cfg.reranking);
 
   const semanticEnabled =
     embeddingFunction !== false && embeddingFunction !== undefined;
@@ -324,6 +303,8 @@ export async function startMcpServer(
   const indexer = new CodeIndexer({
     projectRoot: resolvedRoot,
     ...(opts.storageDir !== undefined ? { storageDir: opts.storageDir } : {}),
+    ...(cfg.include !== undefined ? { include: cfg.include } : {}),
+    ...(cfg.exclude !== undefined ? { exclude: cfg.exclude } : {}),
     ...(embeddingFunction !== undefined ? { embeddingFunction } : {}),
     ...(rerankingFunction !== undefined ? { rerankingFunction } : {}),
     onIndexed: (event) => {

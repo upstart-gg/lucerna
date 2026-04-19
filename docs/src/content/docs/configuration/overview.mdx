@@ -1,30 +1,53 @@
 ---
 title: Configuration
-description: Configure embedding and reranking providers via env vars or lucerna.config.ts.
+description: Configure Lucerna using lucerna.config.ts — the single source of truth for all settings.
 ---
 
-Lucerna requires an embedding provider to enable semantic (vector) search. Without one, only lexical (BM25) search is available.
+Lucerna is configured entirely through a `lucerna.config.ts` file. All settings — including embedding provider credentials — live there. No environment variables are read.
 
-There are two ways to configure providers:
+The config file is created automatically the first time you run `index`, `watch`, or `mcp-server` if none is found.
 
-1. **[Environment variables](/configuration/env-vars)** *(recommended)* — set `LUCERNA_EMBEDDING=provider:model` in your MCP server config. No files to add to your project, works across all AI clients.
-2. **[Config file](/configuration/config-file)** — place a `lucerna.config.ts` at the project root. Useful when you need programmatic control or a [custom provider](/configuration/custom-providers).
+## How it works
 
-:::tip[Prefer env vars for MCP]
-Setting `LUCERNA_EMBEDDING` and the provider API key directly in your MCP server config keeps configuration out of your repo and works identically across all AI coding clients.
-:::
+1. On startup, Lucerna walks up the directory tree from the project root looking for `lucerna.config.ts` (or `.js` / `.mjs`).
+2. If found, the file is loaded and its settings applied.
+3. If not found, a template is created in the current directory.
 
-## Priority order
+This means a config at a monorepo root is automatically picked up by any subdirectory — no per-package config needed.
 
-When multiple configuration sources are present, the highest-priority source wins:
+## Minimal setup
 
-| Priority | Source |
-|----------|--------|
-| 1 (highest) | `--no-semantic` flag (disables embeddings entirely) |
-| 2 | `--embedder` / `--reranker` CLI flags |
-| 3 | `lucerna.config.ts` / `.js` |
-| 4 (lowest) | `LUCERNA_EMBEDDING` / `LUCERNA_RERANKING` env vars |
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+
+export default defineConfig({});
+```
+
+This is a valid config — Lucerna works out of the box with lexical (BM25) search. Add an `embedding` provider to also enable semantic (vector) search, which is strongly recommended for best results:
+
+```ts
+export default defineConfig({
+  embedding: {
+    provider: "voyage",
+    model: "voyage-code-3",
+    apiKey: process.env.VOYAGE_API_KEY!,
+  },
+});
+```
+
+`defineConfig()` is an identity function providing TypeScript autocomplete and type-checking.
+
+## What you can configure
+
+| Setting | Description |
+|---------|-------------|
+| `embedding` | Embedding provider for semantic (vector) search — optional but strongly recommended. See [Embedding Providers](/configuration/embedding-providers). |
+| `reranking` | Optional cross-encoder reranking. See [Reranking Providers](/configuration/reranking-providers). |
+| `include` | Glob patterns for files to index (default: `["**/*"]`). |
+| `exclude` | Additional glob patterns to exclude beyond the built-in list. |
+
 
 :::tip[Reranking is optional]
-Without a `rerankingFunction`, hybrid search still applies **RRF fusion** automatically — merging vector and full-text results into a single ranked list. This is a solid baseline for most codebases. Add a [reranking provider](/configuration/reranking-providers) when you need higher precision on large codebases where many chunks look similar at the embedding level.
+Without a reranking provider, hybrid search still applies **RRF fusion** automatically — merging vector and full-text results into a single ranked list. This is a solid baseline for most codebases. Add a [reranking provider](/configuration/reranking-providers) when you need higher precision on large codebases where many chunks look similar at the embedding level.
 :::

@@ -55,34 +55,23 @@ Or, if you work across many projects, add it once to your global gitignore (`~/.
 Without a provider configured, Lucerna falls back to **lexical (BM25) search only** — and the MCP tools will include a warning in their output. For best results, configure an embedding provider.
 :::
 
-The recommended approach is to add env vars to your MCP server config:
-
-```json
-{
-  "mcpServers": {
-    "lucerna": {
-      "command": "npx",
-      "args": ["@upstart.gg/lucerna@latest", "mcp-server"],
-      "env": {
-        "LUCERNA_EMBEDDING": "voyage:voyage-4",
-        "VOYAGE_API_KEY": "your-voyage-api-key"
-      }
-    }
-  }
-}
-```
-
-Or place a `lucerna.config.ts` at the project root — the MCP server picks it up automatically:
+Place a `lucerna.config.ts` at your project root (or any parent directory — Lucerna searches upward automatically). If none exists, it will be created automatically on first run.
 
 ```ts
 // lucerna.config.ts
-import { VoyageEmbeddings } from '@upstart.gg/lucerna';
+import { defineConfig } from "@upstart.gg/lucerna";
 
-export default {
-  embeddingFunction: new VoyageEmbeddings({ model: 'voyage-4' }),
-};
+export default defineConfig({
+  embedding: {
+    provider: "voyage",
+    model: "voyage-code-3",
+    apiKey: process.env.VOYAGE_API_KEY!,
+  },
+});
 ```
 
-See [Embedding Providers](/configuration/embedding-providers) for all available providers and recommended models, [Reranking Providers](/configuration/reranking-providers) for optional cross-encoder reranking, and [Env Vars](/configuration/env-vars) for the full variable reference.
+Set `VOYAGE_API_KEY` in your shell (or wherever your AI client picks up environment variables), and Lucerna will use it for semantic search.
+
+For other providers (OpenAI, Cohere, Ollama, local models, and more), see [Config File](/configuration/config-file).
 
 See [MCP Tools](/mcp-tools) for the full tool reference.

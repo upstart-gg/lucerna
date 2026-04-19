@@ -23,20 +23,19 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
   }) {
     this.modelId = options.model;
 
-    const project = options.project ?? process.env.GOOGLE_CLOUD_PROJECT;
+    const project = options.project;
     if (!project) {
       throw new Error(
-        "VertexAIEmbeddings: project is required. Pass options.project or set GOOGLE_CLOUD_PROJECT.",
+        "VertexAIEmbeddings: project is required. Set it in your lucerna.config.ts.",
       );
     }
     this.project = project;
-    this.location =
-      options.location ?? process.env.GOOGLE_CLOUD_LOCATION ?? "us-central1";
+    this.location = options.location ?? "us-central1";
 
-    const accessToken = options.accessToken ?? process.env.GOOGLE_ACCESS_TOKEN;
+    const accessToken = options.accessToken;
     if (!accessToken) {
       throw new Error(
-        "VertexAIEmbeddings: access token is required. Pass options.accessToken or set GOOGLE_ACCESS_TOKEN " +
+        "VertexAIEmbeddings: accessToken is required. Set it in your lucerna.config.ts " +
           "(obtain via: gcloud auth print-access-token).",
       );
     }

@@ -27,8 +27,11 @@ export class VoyageReranker implements RerankingFunction {
   private readonly model: string;
 
   constructor(options?: { model?: string; apiKey?: string }) {
-    const apiKey = options?.apiKey ?? process.env.VOYAGE_API_KEY ?? "";
-    if (!apiKey) throw new Error("VOYAGE_API_KEY is required");
+    const apiKey = options?.apiKey ?? "";
+    if (!apiKey)
+      throw new Error(
+        "VoyageReranker: apiKey is required. Set it in your lucerna.config.ts.",
+      );
     this.apiKey = apiKey;
     this.model = options?.model ?? "rerank-2.5";
   }

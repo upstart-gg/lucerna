@@ -3,63 +3,33 @@ title: Embedding Providers
 description: Embedding providers for semantic (vector) search — recommended models and pricing.
 ---
 
-Lucerna supports multiple embedding providers for semantic (vector) search. The recommended way to configure them is via your `.mcp.json` file — see [Env Vars](/configuration/env-vars) for the full variable reference, or [Custom Providers](/configuration/custom-providers) for the `lucerna.config.ts` approach.
+Configure an embedding provider in `lucerna.config.ts` to enable semantic (vector) search. Without one, only lexical (BM25) search is available.
 
 :::note[Pricing]
 Prices shown are approximate as of April 2026 and subject to change. Always verify at the provider's pricing page before budgeting.
 :::
 
----
-
-Each snippet below shows the `env` block to add to your `.mcp.json`:
-
-```json title=".mcp.json"
-{
-  "mcpServers": {
-    "lucerna": {
-      "command": "npx",
-      "args": ["@upstart.gg/lucerna@latest", "mcp-server"],
-      "env": {
-        "LUCERNA_EMBEDDING": "voyage:voyage-4",
-        "VOYAGE_API_KEY": "your-key"
-      }
-    }
-  }
-}
-```
-
-:::tip[Using unlisted models]
-For models not in the tables below, pass dimensions as a third segment:
-
-```json
-{ "LUCERNA_EMBEDDING": "ollama:my-custom-model:768" }
-```
-
-OpenAI's `text-embedding-3` models also support server-side Matryoshka truncation — passing a smaller dimension produces shorter vectors directly from the API (better quality than post-hoc truncation):
-
-```json
-{ "LUCERNA_EMBEDDING": "openai:text-embedding-3-large:256" }
-```
-:::
+Each example below shows the `lucerna.config.ts` snippet for that provider. Pass credentials via `process.env` to keep them out of source control.
 
 ---
 
 ### Voyage ⭐ recommended for code
 
-Best-in-class for code retrieval. `voyage-4` is the latest generation model recommended for code search.
+Best-in-class for code retrieval. `voyage-code-3` is the recommended model for code search.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "voyage:voyage-4",
-  "VOYAGE_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "voyage", model: "voyage-code-3", apiKey: process.env.VOYAGE_API_KEY! },
+});
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
 |-------|-----------|---------------------|-------|
-| `voyage-4` | 1024 | — | Latest generation — **top pick** |
+| `voyage-4` | 1024 | — | Latest generation |
 | `voyage-4-lite` | 512 | — | Faster, lower cost |
-| `voyage-code-3` | 1024 | $0.18 | Legacy, code-optimized, 32K ctx |
+| `voyage-code-3` | 1024 | $0.18 | Code-optimized, 32K ctx — **top pick** |
 | `voyage-3` | 1024 | $0.06 | General text |
 | `voyage-3-lite` | 512 | $0.02 | Faster, lower cost |
 
@@ -67,11 +37,18 @@ Best-in-class for code retrieval. `voyage-4` is the latest generation model reco
 
 ### OpenAI
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "openai:text-embedding-3-small",
-  "OPENAI_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "openai", model: "text-embedding-3-small", apiKey: process.env.OPENAI_API_KEY! },
+});
+```
+
+OpenAI's `text-embedding-3` models support server-side Matryoshka truncation — passing a smaller `dimensions` value produces shorter vectors directly from the API (better quality than post-hoc truncation):
+
+```ts
+embedding: { provider: "openai", model: "text-embedding-3-large", apiKey: process.env.OPENAI_API_KEY!, dimensions: 256 },
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
@@ -84,11 +61,12 @@ Best-in-class for code retrieval. `voyage-4` is the latest generation model reco
 
 ### Cohere
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "cohere:embed-english-v3.0",
-  "COHERE_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "cohere", model: "embed-english-v3.0", apiKey: process.env.COHERE_API_KEY! },
+});
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
@@ -102,11 +80,12 @@ Best-in-class for code retrieval. `voyage-4` is the latest generation model reco
 
 First 10M tokens free per API key.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "jina:jina-embeddings-v3",
-  "JINA_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "jina", model: "jina-embeddings-v3", apiKey: process.env.JINA_API_KEY! },
+});
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
@@ -117,11 +96,12 @@ First 10M tokens free per API key.
 
 ### Mistral
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "mistral:codestral-embed",
-  "MISTRAL_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "mistral", model: "codestral-embed", apiKey: process.env.MISTRAL_API_KEY! },
+});
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
@@ -133,11 +113,12 @@ First 10M tokens free per API key.
 
 ### Google Gemini
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "gemini:gemini-embedding-001",
-  "GOOGLE_API_KEY": "your-key"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "gemini", model: "gemini-embedding-001", apiKey: process.env.GOOGLE_API_KEY! },
+});
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
@@ -149,14 +130,20 @@ First 10M tokens free per API key.
 
 ### GCP Vertex AI
 
-Requires a GCP project and an access token. `GOOGLE_CLOUD_LOCATION` is optional (default: `us-central1`).
+Requires a GCP project and an access token. `location` defaults to `us-central1`.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "vertex:text-embedding-005",
-  "GOOGLE_CLOUD_PROJECT": "my-gcp-project",
-  "GOOGLE_ACCESS_TOKEN": "obtain via: gcloud auth print-access-token"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: {
+    provider: "vertex",
+    model: "text-embedding-005",
+    project: process.env.GOOGLE_CLOUD_PROJECT!,
+    accessToken: process.env.GOOGLE_ACCESS_TOKEN!, // gcloud auth print-access-token
+    location: "us-central1", // optional
+  },
+});
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
@@ -171,12 +158,17 @@ Requires a GCP project and an access token. `GOOGLE_CLOUD_LOCATION` is optional 
 
 Free tier: 10K neurons/day (~9M tokens/day for bge-m3).
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "cloudflare:@cf/baai/bge-m3",
-  "CLOUDFLARE_ACCOUNT_ID": "your-account-id",
-  "CLOUDFLARE_API_TOKEN": "your-token"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: {
+    provider: "cloudflare",
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
+    apiKey: process.env.CLOUDFLARE_API_TOKEN!,
+    model: "@cf/baai/bge-m3", // optional, this is the default
+  },
+});
 ```
 
 | Model | Price per 1M tokens | Notes |
@@ -185,14 +177,17 @@ Free tier: 10K neurons/day (~9M tokens/day for bge-m3).
 
 ---
 
-### Ollama (local GPU)
+### Ollama (local)
 
-No API key required. Requires a running Ollama server. `OLLAMA_HOST` is optional (default: `http://localhost:11434`).
+No API key required. Requires a running Ollama server. `host` defaults to `http://localhost:11434`.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "ollama:nomic-embed-text"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "ollama", model: "nomic-embed-text" },
+  // embedding: { provider: "ollama", model: "nomic-embed-text", host: "http://my-server:11434" },
+});
 ```
 
 | Model | Dimensions | Price | Notes |
@@ -200,16 +195,25 @@ No API key required. Requires a running Ollama server. `OLLAMA_HOST` is optional
 | `nomic-embed-text` | 768 | Free | Popular, fast |
 | `mxbai-embed-large` | 1024 | Free | Higher quality, GPU recommended |
 
+For custom models not in the table, add a `dimensions` field:
+
+```ts
+embedding: { provider: "ollama", model: "my-custom-model", dimensions: 768 },
+```
+
 ---
 
-### LM Studio (local GPU)
+### LM Studio (local)
 
-No API key required. Requires LM Studio running with the local server enabled (Settings → Local Server → Start Server). `LMSTUDIO_BASE_URL` is optional (default: `http://localhost:1234`).
+No API key required. Requires LM Studio running with the local server enabled (Settings → Local Server → Start Server). `baseUrl` defaults to `http://localhost:1234`.
 
-```json title=".mcp.json → env"
-{
-  "LUCERNA_EMBEDDING": "lmstudio:nomic-embed-text"
-}
+```ts
+// lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
+export default defineConfig({
+  embedding: { provider: "lmstudio", model: "nomic-embed-text" },
+  // embedding: { provider: "lmstudio", model: "nomic-embed-text", baseUrl: "http://my-server:1234" },
+});
 ```
 
 | Model | Dimensions | Price | Notes |
@@ -217,8 +221,3 @@ No API key required. Requires LM Studio running with the local server enabled (S
 | `nomic-embed-text` | 768 | Free | Popular, fast |
 | `mxbai-embed-large` | 1024 | Free | Higher quality, GPU recommended |
 | `bge-m3` | 1024 | Free | Multilingual |
-
-For models not in the table, pass dimensions explicitly:
-```json
-{ "LUCERNA_EMBEDDING": "lmstudio:my-custom-model:768" }
-```

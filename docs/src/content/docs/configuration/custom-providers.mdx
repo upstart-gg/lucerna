@@ -45,7 +45,7 @@ export class MyReranker implements RerankingFunction {
 
 ## Using a local file
 
-The simplest approach: put your provider in any `.ts` or `.js` file and import it directly from `lucerna.config.ts`. No build step or publishing required — Lucerna's config loader handles TypeScript transpilation automatically.
+Put your provider in any `.ts` or `.js` file and import it directly from `lucerna.config.ts`. No build step or publishing required — Lucerna's config loader handles TypeScript transpilation automatically.
 
 ```
 your-project/
@@ -59,20 +59,21 @@ your-project/
 
 ```ts
 // lucerna.config.ts
+import { defineConfig } from "@upstart.gg/lucerna";
 import { MyEmbeddings } from './lucerna-providers/my-embeddings.ts';
 import { MyReranker } from './lucerna-providers/my-reranker.ts';
 
-export default {
-  embeddingFunction: new MyEmbeddings({ apiKey: process.env.MY_API_KEY }),
-  rerankingFunction: new MyReranker(),
-};
+export default defineConfig({
+  embedding: new MyEmbeddings({ apiKey: process.env.MY_API_KEY }),
+  reranking: new MyReranker(),
+});
 ```
 
 Then run as usual — no flags needed:
 
 ```bash
-lucerna mcp-server /path/to/project
-lucerna index /path/to/project
+lucerna index
+lucerna mcp-server
 ```
 
 ## Publishing as an npm package
@@ -98,11 +99,12 @@ npm install my-lucerna-embeddings
 Then use it in `lucerna.config.ts`:
 
 ```ts
+import { defineConfig } from "@upstart.gg/lucerna";
 import { MyEmbeddings } from 'my-lucerna-embeddings';
 
-export default {
-  embeddingFunction: new MyEmbeddings(),
-};
+export default defineConfig({
+  embedding: new MyEmbeddings(),
+});
 ```
 
 ## Interface reference

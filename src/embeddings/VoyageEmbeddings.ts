@@ -40,8 +40,11 @@ export class VoyageEmbeddings implements EmbeddingFunction {
     apiKey?: string;
     dimensions?: number;
   }) {
-    const apiKey = options.apiKey ?? process.env.VOYAGE_API_KEY ?? "";
-    if (!apiKey) throw new Error("VOYAGE_API_KEY is required");
+    const apiKey = options.apiKey ?? "";
+    if (!apiKey)
+      throw new Error(
+        "VoyageEmbeddings: apiKey is required. Set it in your lucerna.config.ts.",
+      );
     this.apiKey = apiKey;
     this.modelId = options.model;
     this.dimensions =

@@ -3,23 +3,24 @@ title: lucerna index
 description: One-shot indexing of a project directory.
 ---
 
-Index an entire project directory in one pass.
+Index an entire project directory in one pass. Defaults to the current working directory.
 
 ```bash
-lucerna index /path/to/project
+lucerna index
+lucerna index --dir /path/to/project
 ```
+
+If no `lucerna.config.ts` is found, one is created automatically in the current directory.
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
+| `--dir <path>` | Project root directory (default: current working directory) |
 | `--storage-dir <dir>` | Override storage directory (default: `<root>/.lucerna`) |
-| `--include <globs>` | Comma-separated include glob patterns (default: `**/*`) |
-| `--exclude <globs>` | Additional comma-separated exclude glob patterns |
+| `--include <globs>` | Comma-separated include glob patterns (overrides config file) |
+| `--exclude <globs>` | Additional comma-separated exclude glob patterns (overrides config file) |
 | `--no-semantic` | Disable semantic search (BM25 only) |
-| `--embedder <provider:model>` | Embedding provider and model, e.g. `voyage:voyage-4`. Providers: openai, cohere, voyage, jina, cloudflare, mistral, gemini, vertex, ollama |
-| `--reranker <provider:model>` | Reranker provider and model, e.g. `voyage:rerank-2.5`. Providers: voyage, cohere, jina, cloudflare |
-| `--config <path>` | Path to a `lucerna.config.ts` / `lucerna.config.js` (default: auto-detected at project root) |
 
 ## Example output
 
@@ -29,5 +30,5 @@ Done. 142 files, 3817 chunks indexed.
 ```
 
 :::tip
-Place a `lucerna.config.ts` at the project root to configure embeddings and reranking without passing flags every time. See [Configuration](/configuration/overview).
+Place a `lucerna.config.ts` at the project root (or any parent directory) to configure embeddings and reranking without passing flags every time. See [Configuration](/configuration/config-file).
 :::

@@ -44,10 +44,7 @@ export class LMStudioEmbeddings implements EmbeddingFunction {
     baseUrl?: string;
     dimensions?: number;
   }) {
-    this.baseUrl =
-      options.baseUrl ??
-      process.env.LMSTUDIO_BASE_URL ??
-      "http://localhost:1234";
+    this.baseUrl = options.baseUrl ?? "http://localhost:1234";
     this.modelId = options.model;
     this.dimensions =
       options.dimensions ??

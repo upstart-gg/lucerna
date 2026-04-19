@@ -7,18 +7,22 @@ Traverse the knowledge graph starting from a chunk ID. Get the chunk ID from `se
 
 ```bash
 # Get a chunk ID
-lucerna search /path/to/project "verifyToken" --format json | jq '.[0].id'
+lucerna search "verifyToken" --format json | jq '.[0].id'
 
 # Then traverse the graph
-lucerna graph /path/to/project <chunk-id> --relation callers
-lucerna graph /path/to/project <chunk-id> --relation implementors
-lucerna graph /path/to/project <chunk-id> --relation neighborhood --depth 2
+lucerna graph <chunk-id> --relation callers
+lucerna graph <chunk-id> --relation implementors
+lucerna graph <chunk-id> --relation neighborhood --depth 2
+
+# Or specify a project directory
+lucerna graph <chunk-id> --dir /path/to/project
 ```
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
+| `--dir <path>` | Project root directory (default: current working directory) |
 | `--relation <type>` | `callers`, `callees`, `implementors`, `super-types`, `usages`, `neighborhood` (default) |
 | `--depth <n>` | BFS depth for neighborhood (default: `1`) |
 | `--format raw\|json\|pretty-json` | Output format (default: `raw`) |

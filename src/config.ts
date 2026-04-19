@@ -1,9 +1,12 @@
-import { join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import type {
   EmbeddingFunction,
+  EmbeddingProviderConfig,
   LucernaConfig,
   RerankingFunction,
+  RerankingProviderConfig,
 } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -17,38 +20,43 @@ const CONFIG_FILENAMES = [
 ];
 
 /**
- * Loads `lucerna.config.ts` / `lucerna.config.js` from the project root (or
- * an explicit path). Uses jiti for on-the-fly TypeScript transpilation.
- *
- * Returns an empty object when no config file is found.
+ * Loads `lucerna.config.ts` / `lucerna.config.js` by walking up the directory
+ * tree from `projectRoot`. Returns the first config found, or an empty object
+ * if none exists anywhere in the tree.
  */
 export async function loadConfig(
   projectRoot: string,
-  configPath?: string,
-): Promise<LucernaConfig> {
+): Promise<{ config: LucernaConfig; configDir: string | null }> {
   const { createJiti } = await import("jiti");
   const jiti = createJiti(import.meta.url);
 
-  const candidates = configPath
-    ? [resolve(configPath)]
-    : CONFIG_FILENAMES.map((f) => join(projectRoot, f));
+  const candidates: Array<{ path: string; dir: string }> = (() => {
+    const results: Array<{ path: string; dir: string }> = [];
+    let dir = projectRoot;
+    while (true) {
+      for (const filename of CONFIG_FILENAMES) {
+        results.push({ path: join(dir, filename), dir });
+      }
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return results;
+  })();
 
-  for (const candidate of candidates) {
+  for (const { path: candidate, dir } of candidates) {
     if (!existsSync(candidate)) continue;
     try {
       const mod = (await jiti.import(candidate)) as
         | { default?: unknown }
         | undefined;
       if (mod?.default && typeof mod.default === "object") {
-        return mod.default as LucernaConfig;
+        return { config: mod.default as LucernaConfig, configDir: dir };
       }
       throw new Error(
         `Config file ${candidate} must export a default object (LucernaConfig).`,
       );
     } catch (err) {
-      // Re-throw errors from config files that exist but failed to load.
-      // MODULE_NOT_FOUND just means the file wasn't found despite existsSync
-      // finding it (race condition / symlink edge case) — skip silently.
       const code = (err as NodeJS.ErrnoException).code;
       if (code !== "MODULE_NOT_FOUND" && code !== "ERR_MODULE_NOT_FOUND") {
         throw err;
@@ -56,223 +64,271 @@ export async function loadConfig(
     }
   }
 
-  return {};
+  return { config: {}, configDir: null };
 }
 
 // ---------------------------------------------------------------------------
-// Built-in provider resolvers (for --embedder / --reranker CLI flags)
+// Auto-create default config
 // ---------------------------------------------------------------------------
 
-const VALID_EMBEDDERS = [
-  "openai",
-  "cohere",
-  "voyage",
-  "jina",
-  "cloudflare",
-  "mistral",
-  "gemini",
-  "ollama",
-  "lmstudio",
-  "vertex",
-] as const;
+const DEFAULT_CONFIG_TEMPLATE = `import { defineConfig } from "@upstart.gg/lucerna";
 
-const VALID_RERANKERS = [
-  "cloudflare",
-  "jina",
-  "voyage",
-  "cohere",
-  "vertex",
-  "gemini",
-] as const;
+export default defineConfig({
+  // Configure a semantic search provider (required for semantic/vector search):
+  // embedding: { provider: "voyage", model: "voyage-code-3", apiKey: "sk-..." },
+  // embedding: { provider: "openai", model: "text-embedding-3-small", apiKey: "sk-..." },
+  // embedding: { provider: "ollama", model: "nomic-embed-text" },
 
-export type BuiltinEmbedder = (typeof VALID_EMBEDDERS)[number];
-export type BuiltinReranker = (typeof VALID_RERANKERS)[number];
+  // Configure a reranker (optional, improves result ranking):
+  // reranking: { provider: "voyage", apiKey: "sk-..." },
+
+  // Restrict which files are indexed (default: all files):
+  // include: ["src/**/*"],
+
+  // Add extra exclusion patterns (node_modules, .git etc. are always excluded):
+  // exclude: ["**/*.test.ts", "**/fixtures/**"],
+});
+`;
 
 /**
- * Parses a "provider:model" or "provider:model:dimensions" string.
- * Both provider and model are required; dimensions is an optional positive integer.
+ * Creates a `lucerna.config.ts` template in the given directory.
+ * Logs a message to stderr so it doesn't interfere with MCP stdio.
  */
-function parseProviderModel(
-  value: string,
-  source: string,
-): { provider: string; model: string; dimensions?: number } {
-  const firstColon = value.indexOf(":");
-  const provider = firstColon === -1 ? value : value.slice(0, firstColon);
-  const rest = firstColon === -1 ? "" : value.slice(firstColon + 1);
-  const secondColon = rest.indexOf(":");
-  const model = secondColon === -1 ? rest : rest.slice(0, secondColon);
-  const dimStr = secondColon === -1 ? undefined : rest.slice(secondColon + 1);
-
-  if (!provider || !model) {
-    throw new Error(
-      `${source} requires "provider:model" format (e.g. "voyage:voyage-code-3"), got: "${value}"`,
-    );
-  }
-
-  let dimensions: number | undefined;
-  if (dimStr !== undefined) {
-    dimensions = parseInt(dimStr, 10);
-    if (!Number.isFinite(dimensions) || dimensions <= 0) {
-      throw new Error(
-        `${source}: dimensions must be a positive integer, got: "${dimStr}"`,
-      );
-    }
-  }
-
-  return dimensions !== undefined
-    ? { provider, model, dimensions }
-    : { provider, model };
-}
-
-/**
- * Resolves a "provider:model" flag value to an `EmbeddingFunction` instance.
- */
-export async function resolveBuiltinEmbedder(
-  flagValue: string,
-): Promise<EmbeddingFunction> {
-  const { provider, model, dimensions } = parseProviderModel(
-    flagValue,
-    "--embedder",
+export async function createDefaultConfig(dir: string): Promise<void> {
+  const path = join(dir, "lucerna.config.ts");
+  await writeFile(path, DEFAULT_CONFIG_TEMPLATE, "utf-8");
+  process.stderr.write(
+    `[lucerna] Created ${path} — edit it to configure your embedding provider.\n`,
   );
-  const d = dimensions !== undefined ? { dimensions } : {};
-  switch (provider as BuiltinEmbedder) {
+}
+
+// ---------------------------------------------------------------------------
+// Provider config resolvers
+// ---------------------------------------------------------------------------
+
+function isEmbeddingProviderConfig(
+  val: EmbeddingProviderConfig | EmbeddingFunction,
+): val is EmbeddingProviderConfig {
+  return (
+    "provider" in val &&
+    typeof (val as EmbeddingProviderConfig).provider === "string"
+  );
+}
+
+function isRerankingProviderConfig(
+  val: RerankingProviderConfig | RerankingFunction,
+): val is RerankingProviderConfig {
+  return (
+    "provider" in val &&
+    typeof (val as RerankingProviderConfig).provider === "string"
+  );
+}
+
+/**
+ * Resolves `LucernaConfig.embedding` to an `EmbeddingFunction` instance.
+ * Handles provider config objects, existing instances, `false`, and `undefined`.
+ */
+export async function resolveEmbeddingConfig(
+  cfg: EmbeddingProviderConfig | EmbeddingFunction | false | undefined,
+): Promise<EmbeddingFunction | false | undefined> {
+  if (cfg === undefined || cfg === false) return cfg;
+  if (!isEmbeddingProviderConfig(cfg)) return cfg as EmbeddingFunction;
+
+  const d = cfg.dimensions !== undefined ? { dimensions: cfg.dimensions } : {};
+
+  switch (cfg.provider) {
+    case "voyage": {
+      const { VoyageEmbeddings } = await import(
+        "./embeddings/VoyageEmbeddings.js"
+      );
+      return new VoyageEmbeddings({
+        model: cfg.model,
+        apiKey: cfg.apiKey,
+        ...d,
+      });
+    }
     case "openai": {
       const { OpenAIEmbeddings } = await import(
         "./embeddings/OpenAIEmbeddings.js"
       );
-      return new OpenAIEmbeddings({ model, ...d });
+      return new OpenAIEmbeddings({
+        model: cfg.model,
+        apiKey: cfg.apiKey,
+        ...d,
+      });
     }
     case "cohere": {
       const { CohereEmbeddings } = await import(
         "./embeddings/CohereEmbeddings.js"
       );
-      return new CohereEmbeddings({ model, ...d });
-    }
-    case "voyage": {
-      const { VoyageEmbeddings } = await import(
-        "./embeddings/VoyageEmbeddings.js"
-      );
-      return new VoyageEmbeddings({ model, ...d });
+      return new CohereEmbeddings({
+        model: cfg.model,
+        apiKey: cfg.apiKey,
+        ...d,
+      });
     }
     case "jina": {
       const { JinaEmbeddings } = await import("./embeddings/JinaEmbeddings.js");
-      return new JinaEmbeddings({ model, ...d });
-    }
-    case "cloudflare": {
-      const { CloudflareEmbeddings } = await import(
-        "./embeddings/CloudflareEmbeddings.js"
-      );
-      return new CloudflareEmbeddings({ model, ...d });
+      return new JinaEmbeddings({ model: cfg.model, apiKey: cfg.apiKey, ...d });
     }
     case "mistral": {
       const { MistralEmbeddings } = await import(
         "./embeddings/MistralEmbeddings.js"
       );
-      return new MistralEmbeddings({ model, ...d });
+      return new MistralEmbeddings({
+        model: cfg.model,
+        apiKey: cfg.apiKey,
+        ...d,
+      });
     }
     case "gemini": {
       const { GeminiEmbeddings } = await import(
         "./embeddings/GeminiEmbeddings.js"
       );
-      return new GeminiEmbeddings({ model, ...d });
+      return new GeminiEmbeddings({
+        model: cfg.model,
+        apiKey: cfg.apiKey,
+        ...d,
+      });
     }
     case "ollama": {
       const { OllamaEmbeddings } = await import(
         "./embeddings/OllamaEmbeddings.js"
       );
-      return new OllamaEmbeddings({ model, ...d });
+      return new OllamaEmbeddings({
+        model: cfg.model,
+        ...(cfg.host !== undefined ? { host: cfg.host } : {}),
+        ...d,
+      });
     }
     case "lmstudio": {
       const { LMStudioEmbeddings } = await import(
         "./embeddings/LMStudioEmbeddings.js"
       );
-      return new LMStudioEmbeddings({ model, ...d });
+      return new LMStudioEmbeddings({
+        model: cfg.model,
+        ...(cfg.baseUrl !== undefined ? { baseUrl: cfg.baseUrl } : {}),
+        ...d,
+      });
+    }
+    case "cloudflare": {
+      const { CloudflareEmbeddings } = await import(
+        "./embeddings/CloudflareEmbeddings.js"
+      );
+      return new CloudflareEmbeddings({
+        accountId: cfg.accountId,
+        apiToken: cfg.apiKey,
+        ...(cfg.model !== undefined ? { model: cfg.model } : {}),
+        ...d,
+      });
     }
     case "vertex": {
       const { VertexAIEmbeddings } = await import(
         "./embeddings/VertexAIEmbeddings.js"
       );
-      return new VertexAIEmbeddings({ model, ...d });
+      return new VertexAIEmbeddings({
+        model: cfg.model,
+        project: cfg.project,
+        accessToken: cfg.accessToken,
+        ...(cfg.location !== undefined ? { location: cfg.location } : {}),
+        ...d,
+      });
     }
-    default:
+    default: {
+      const exhaustive: never = cfg;
       throw new Error(
-        `Unknown embedder provider: "${provider}". Valid providers: ${VALID_EMBEDDERS.join(", ")}`,
+        `Unknown embedding provider: "${(exhaustive as EmbeddingProviderConfig).provider}"`,
       );
+    }
   }
 }
 
 /**
- * Resolves a "provider:model" flag value to a `RerankingFunction` instance.
+ * Resolves `LucernaConfig.reranking` to a `RerankingFunction` instance.
+ * Handles provider config objects, existing instances, `false`, and `undefined`.
  */
-export async function resolveBuiltinReranker(
-  flagValue: string,
-): Promise<RerankingFunction> {
-  const { provider, model } = parseProviderModel(flagValue, "--reranker");
-  switch (provider as BuiltinReranker) {
+export async function resolveRerankingConfig(
+  cfg: RerankingProviderConfig | RerankingFunction | false | undefined,
+): Promise<RerankingFunction | false | undefined> {
+  if (cfg === undefined || cfg === false) return cfg;
+  if (!isRerankingProviderConfig(cfg)) return cfg as RerankingFunction;
+
+  switch (cfg.provider) {
+    case "voyage": {
+      const { VoyageReranker } = await import("./embeddings/VoyageReranker.js");
+      return new VoyageReranker({
+        apiKey: cfg.apiKey,
+        ...(cfg.model !== undefined ? { model: cfg.model } : {}),
+      });
+    }
+    case "cohere": {
+      const { CohereReranker } = await import("./embeddings/CohereReranker.js");
+      return new CohereReranker({
+        apiKey: cfg.apiKey,
+        ...(cfg.model !== undefined ? { model: cfg.model } : {}),
+      });
+    }
+    case "jina": {
+      const { JinaReranker } = await import("./embeddings/JinaReranker.js");
+      return new JinaReranker({
+        apiKey: cfg.apiKey,
+        ...(cfg.model !== undefined ? { model: cfg.model } : {}),
+      });
+    }
+    case "gemini": {
+      const { GeminiReranker } = await import("./embeddings/GeminiReranker.js");
+      return new GeminiReranker({
+        apiKey: cfg.apiKey,
+        ...(cfg.model !== undefined ? { model: cfg.model } : {}),
+      });
+    }
     case "cloudflare": {
       const { CloudflareReranker } = await import(
         "./embeddings/CloudflareReranker.js"
       );
-      return new CloudflareReranker({ model });
-    }
-    case "jina": {
-      const { JinaReranker } = await import("./embeddings/JinaReranker.js");
-      return new JinaReranker({ model });
-    }
-    case "voyage": {
-      const { VoyageReranker } = await import("./embeddings/VoyageReranker.js");
-      return new VoyageReranker({ model });
-    }
-    case "cohere": {
-      const { CohereReranker } = await import("./embeddings/CohereReranker.js");
-      return new CohereReranker({ model });
+      return new CloudflareReranker({
+        accountId: cfg.accountId,
+        apiToken: cfg.apiKey,
+        ...(cfg.model !== undefined ? { model: cfg.model } : {}),
+      });
     }
     case "vertex": {
       const { VertexAIReranker } = await import(
         "./embeddings/VertexAIReranker.js"
       );
-      return new VertexAIReranker({ model });
+      return new VertexAIReranker({
+        project: cfg.project,
+        accessToken: cfg.accessToken,
+        ...(cfg.model !== undefined ? { model: cfg.model } : {}),
+      });
     }
-    case "gemini": {
-      const { GeminiReranker } = await import("./embeddings/GeminiReranker.js");
-      return new GeminiReranker({ model });
-    }
-    default:
+    default: {
+      const exhaustive: never = cfg;
       throw new Error(
-        `Unknown reranker provider: "${provider}". Valid providers: ${VALID_RERANKERS.join(", ")}`,
+        `Unknown reranking provider: "${(exhaustive as RerankingProviderConfig).provider}"`,
       );
+    }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Env-var resolution (LUCERNA_EMBEDDING / LUCERNA_RERANKING)
+// defineConfig helper
 // ---------------------------------------------------------------------------
 
 /**
- * Resolves the `LUCERNA_EMBEDDING` environment variable to an embedding function.
- * The value must be in "provider:model" format (e.g. "voyage:voyage-code-3").
- * Returns `false` if the variable is not set.
+ * Helper for `lucerna.config.ts` — provides TypeScript autocomplete and
+ * type-checking with no need to import the `LucernaConfig` type separately.
+ *
+ * @example
+ * ```ts
+ * // lucerna.config.ts
+ * import { defineConfig } from "@upstart.gg/lucerna";
+ *
+ * export default defineConfig({
+ *   embedding: { provider: "voyage", model: "voyage-code-3", apiKey: "sk-..." },
+ * });
+ * ```
  */
-export async function resolveEmbedderFromEnv(): Promise<
-  EmbeddingFunction | false
-> {
-  const val = process.env.LUCERNA_EMBEDDING;
-  if (!val) return false;
-  const { provider, model } = parseProviderModel(val, "LUCERNA_EMBEDDING");
-  // Re-use the same resolver but inject the parsed provider:model
-  return resolveBuiltinEmbedder(`${provider}:${model}`);
-}
-
-/**
- * Resolves the `LUCERNA_RERANKING` environment variable to a reranking function.
- * The value must be in "provider:model" format (e.g. "cohere:rerank-english-v3.0").
- * Returns `false` if the variable is not set.
- */
-export async function resolveRerankerFromEnv(): Promise<
-  RerankingFunction | false
-> {
-  const val = process.env.LUCERNA_RERANKING;
-  if (!val) return false;
-  const { provider, model } = parseProviderModel(val, "LUCERNA_RERANKING");
-  return resolveBuiltinReranker(`${provider}:${model}`);
+export function defineConfig(config: LucernaConfig): LucernaConfig {
+  return config;
 }

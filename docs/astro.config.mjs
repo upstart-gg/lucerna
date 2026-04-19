@@ -31,7 +31,6 @@ export default defineConfig({
           collapsed: false,
           items: [
             { label: "Overview", slug: "configuration/overview" },
-            { label: "Env Vars", slug: "configuration/env-vars" },
             { label: "Config File", slug: "configuration/config-file" },
             {
               label: "Embedding Providers",

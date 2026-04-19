@@ -3,16 +3,18 @@ title: lucerna stats
 description: Show index statistics for a project.
 ---
 
-Display statistics about an indexed project.
+Display statistics about an indexed project. Defaults to the current working directory.
 
 ```bash
-lucerna stats /path/to/project
+lucerna stats
+lucerna stats --dir /path/to/project
 ```
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
+| `--dir <path>` | Project root directory (default: current working directory) |
 | `--format raw\|json\|pretty-json` | Output format (default: `raw`) |
 
 ## Raw output

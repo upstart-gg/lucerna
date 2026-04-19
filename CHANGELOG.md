@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.6
+
+### Patch Changes
+
+- [#38](https://github.com/upstart-gg/lucerna/pull/38) [`87e4287`](https://github.com/upstart-gg/lucerna/commit/87e4287bdfb443463edc68554143e6e455a4a084) Thanks [@mattallty](https://github.com/mattallty)! - Rework to use providers + Ollama for local models
+
 ## 0.1.5
 
 ### Patch Changes

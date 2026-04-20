@@ -3,6 +3,7 @@ import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import * as clack from "@clack/prompts";
+import { createDefaultConfig } from "../config.js";
 
 // ---------------------------------------------------------------------------
 // Package manager detection
@@ -38,116 +39,6 @@ function installDevDep(pkg: string, cwd: string): boolean {
 
   const result = spawnSync(argv[0], argv[1], { stdio: "inherit", cwd });
   return result.status === 0;
-}
-
-// ---------------------------------------------------------------------------
-// Provider metadata
-// ---------------------------------------------------------------------------
-
-type Provider =
-  | "voyage"
-  | "openai"
-  | "cohere"
-  | "jina"
-  | "mistral"
-  | "gemini"
-  | "ollama"
-  | "lmstudio"
-  | "skip";
-
-interface ProviderMeta {
-  label: string;
-  envVar?: string;
-  model: string;
-  extraFields?: string;
-  hint?: string;
-}
-
-const PROVIDERS: Record<Provider, ProviderMeta> = {
-  voyage: {
-    label: "Voyage AI (recommended for code)",
-    envVar: "VOYAGE_API_KEY",
-    model: "voyage-code-3",
-    hint: "Get a key at https://dash.voyageai.com",
-  },
-  openai: {
-    label: "OpenAI",
-    envVar: "OPENAI_API_KEY",
-    model: "text-embedding-3-small",
-  },
-  cohere: {
-    label: "Cohere",
-    envVar: "COHERE_API_KEY",
-    model: "embed-english-v3.0",
-  },
-  jina: {
-    label: "Jina AI",
-    envVar: "JINA_API_KEY",
-    model: "jina-embeddings-v3",
-  },
-  mistral: {
-    label: "Mistral AI",
-    envVar: "MISTRAL_API_KEY",
-    model: "mistral-embed",
-  },
-  gemini: {
-    label: "Google Gemini",
-    envVar: "GOOGLE_API_KEY",
-    model: "text-embedding-004",
-  },
-  ollama: {
-    label: "Ollama (local, no API key needed)",
-    model: "nomic-embed-text",
-  },
-  lmstudio: {
-    label: "LM Studio (local, no API key needed)",
-    model: "text-embedding-nomic-embed-text-v1.5",
-  },
-  skip: {
-    label: "Skip — BM25 lexical search only",
-    model: "",
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Config file generation
-// ---------------------------------------------------------------------------
-
-function buildConfigContent(provider: Provider): string {
-  if (provider === "skip") {
-    return `import { defineConfig } from "@upstart.gg/lucerna";
-
-export default defineConfig({});
-`;
-  }
-
-  const meta = PROVIDERS[provider];
-
-  if (provider === "ollama") {
-    return `import { defineConfig } from "@upstart.gg/lucerna";
-
-export default defineConfig({
-  embedding: { provider: "ollama", model: "${meta.model}" },
-});
-`;
-  }
-
-  if (provider === "lmstudio") {
-    return `import { defineConfig } from "@upstart.gg/lucerna";
-
-export default defineConfig({
-  embedding: { provider: "lmstudio", model: "${meta.model}" },
-});
-`;
-  }
-
-  const envVar = meta.envVar ?? "API_KEY";
-  return `import { defineConfig } from "@upstart.gg/lucerna";
-
-export default defineConfig({
-  embedding: { provider: "${provider}", model: "${meta.model}", apiKey: process.env.${envVar}! },
-});
-`;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,60 +91,16 @@ export async function runInstall(): Promise<void> {
     s1.stop("add-mcp reported an error — you may need to register manually.");
   }
 
-  // --- Step 2: Embedding provider ---
-  const providerKey = await clack.select<Provider>({
-    message: "Enable semantic (vector) search?",
-    options: (Object.entries(PROVIDERS) as [Provider, ProviderMeta][]).map(
-      ([value, meta]) => ({
-        value,
-        label: meta.label,
-      }),
-    ),
-    initialValue: "voyage" as Provider,
-  });
-
-  if (clack.isCancel(providerKey)) {
-    clack.cancel("Setup cancelled.");
-    process.exit(0);
-  }
-
-  // --- Step 3: API key ---
-  let apiKey: string | undefined;
-  const meta = PROVIDERS[providerKey];
-
-  if (
-    providerKey !== "skip" &&
-    providerKey !== "ollama" &&
-    providerKey !== "lmstudio"
-  ) {
-    if (meta.hint) {
-      clack.note(meta.hint, `${meta.label} API key`);
-    }
-
-    const key = await clack.password({
-      message: `Enter your ${meta.label} API key:`,
-      validate: (v) =>
-        !v || v.trim().length === 0 ? "API key cannot be empty." : undefined,
-    });
-
-    if (clack.isCancel(key)) {
-      clack.cancel("Setup cancelled.");
-      process.exit(0);
-    }
-
-    apiKey = key as string;
-  }
-
-  // --- Step 4: Write config file ---
+  // --- Step 2: Config file ---
   const cwd = process.cwd();
   const configPath = join(cwd, "lucerna.config.ts");
 
-  if (providerKey !== "skip") {
-    // Install @upstart.gg/lucerna as a dev dep so the config's `defineConfig`
-    // import resolves for TypeScript — but only if a package.json exists.
+  if (existsSync(configPath)) {
+    clack.note("lucerna.config.ts already exists — skipped.", "Config");
+  } else {
     if (existsSync(join(cwd, "package.json"))) {
       const s = clack.spinner();
-      s.start(`Installing @upstart.gg/lucerna as a dev dependency…`);
+      s.start("Installing @upstart.gg/lucerna as a dev dependency…");
       const ok = installDevDep("@upstart.gg/lucerna@latest", cwd);
       s.stop(
         ok
@@ -261,32 +108,14 @@ export async function runInstall(): Promise<void> {
           : "Install failed — run it manually.",
       );
     }
-    if (existsSync(configPath)) {
-      const overwrite = await clack.confirm({
-        message: "lucerna.config.ts already exists. Overwrite?",
-        initialValue: false,
-      });
-      if (clack.isCancel(overwrite) || !overwrite) {
-        clack.note("Skipped — existing config file unchanged.", "Config");
-      } else {
-        await writeFile(configPath, buildConfigContent(providerKey), "utf-8");
-        clack.note(`Written: ${configPath}`, "Config");
-      }
-    } else {
-      await writeFile(configPath, buildConfigContent(providerKey), "utf-8");
-      clack.note(`Written: ${configPath}`, "Config");
-    }
-  }
-
-  // Remind user to set the env var
-  if (apiKey && meta.envVar) {
+    await createDefaultConfig(cwd);
     clack.note(
-      `Add this to your shell profile so your AI client can read it:\n\nexport ${meta.envVar}=${apiKey}`,
-      "Environment variable",
+      "Created lucerna.config.ts — edit it to configure your embedding provider.",
+      "Config",
     );
   }
 
-  // --- Step 5: .gitignore ---
+  // --- Step 3: .gitignore ---
   await ensureGitignore(cwd);
 
   clack.outro(

@@ -23,11 +23,17 @@ function installDevDep(pkg: string, cwd: string): boolean {
   const pm = detectPackageManager();
   const isWin = process.platform === "win32";
 
+  const isPnpmWorkspaceRoot =
+    pm === "pnpm" && existsSync(join(cwd, "pnpm-workspace.yaml"));
+
   const argv: [string, string[]] = (() => {
     const suffix = isWin ? ".cmd" : "";
     switch (pm) {
       case "pnpm":
-        return [`pnpm${suffix}`, ["add", "--save-dev", pkg]];
+        return [
+          `pnpm${suffix}`,
+          ["add", "--save-dev", ...(isPnpmWorkspaceRoot ? ["-w"] : []), pkg],
+        ];
       case "yarn":
         return [`yarn${suffix}`, ["add", "--dev", pkg]];
       case "bun":

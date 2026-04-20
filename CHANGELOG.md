@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.19
+
+### Patch Changes
+
+- [#71](https://github.com/upstart-gg/lucerna/pull/71) [`ff1221d`](https://github.com/upstart-gg/lucerna/commit/ff1221d8b409a547464f3a238dc6e479f20d84ed) Thanks [@mattallty](https://github.com/mattallty)! - Work around providers limits
+
 ## 0.1.18
 
 ### Patch Changes

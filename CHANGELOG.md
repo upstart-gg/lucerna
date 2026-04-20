@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.20
+
+### Patch Changes
+
+- [#73](https://github.com/upstart-gg/lucerna/pull/73) [`a2dbe44`](https://github.com/upstart-gg/lucerna/commit/a2dbe44d50ec0243e0c71535012b23dfb32649be) Thanks [@mattallty](https://github.com/mattallty)! - Simplify vertex limits checks
+
 ## 0.1.19
 
 ### Patch Changes

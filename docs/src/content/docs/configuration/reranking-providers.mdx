@@ -96,6 +96,8 @@ gcloud services enable discoveryengine.googleapis.com
 ```
 :::
 
+Authentication uses **Application Default Credentials (ADC)** — same as for the embedding provider. Run `gcloud auth application-default login` once for local dev, or set `GOOGLE_APPLICATION_CREDENTIALS` for CI/CD.
+
 ```ts
 // lucerna.config.ts
 import { defineConfig } from "@upstart.gg/lucerna";
@@ -104,7 +106,7 @@ export default defineConfig({
     provider: "vertex",
     model: "semantic-ranker-default-004",
     project: process.env.GOOGLE_CLOUD_PROJECT!,
-    accessToken: process.env.GOOGLE_ACCESS_TOKEN!, // gcloud auth print-access-token
+    // keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS, // explicit service account key (optional)
   },
 });
 ```

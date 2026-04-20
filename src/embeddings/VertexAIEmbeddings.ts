@@ -1,5 +1,6 @@
 import type { EmbeddingFunction } from "../types.js";
 import { charBudgetBatches, prepareTexts, reassembleVectors } from "./utils.js";
+import { type VertexAuthOptions, getVertexAccessToken } from "./vertexAuth.js";
 
 const MODEL_DIMENSIONS: Record<string, number> = {
   "text-embedding-005": 768,
@@ -19,13 +20,13 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
 
   private readonly project: string;
   private readonly location: string;
-  private readonly accessToken: string;
+  private readonly authOptions: VertexAuthOptions;
 
   constructor(options: {
     model: string;
     project?: string;
     location?: string;
-    accessToken?: string;
+    keyFile?: string;
     dimensions?: number;
   }) {
     this.modelId = options.model;
@@ -38,15 +39,8 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
     }
     this.project = project;
     this.location = options.location ?? "us-central1";
-
-    const accessToken = options.accessToken;
-    if (!accessToken) {
-      throw new Error(
-        "VertexAIEmbeddings: accessToken is required. Set it in your lucerna.config.ts " +
-          "(obtain via: gcloud auth print-access-token).",
-      );
-    }
-    this.accessToken = accessToken;
+    this.authOptions =
+      options.keyFile !== undefined ? { keyFile: options.keyFile } : {};
 
     const knownDim = MODEL_DIMENSIONS[options.model];
     if (options.dimensions !== undefined) {
@@ -62,6 +56,7 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
 
   async generate(texts: string[]): Promise<number[][]> {
     const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.project}/locations/${this.location}/publishers/google/models/${this.modelId}:predict`;
+    const accessToken = await getVertexAccessToken(this.authOptions);
 
     const { pieces, ranges } = prepareTexts(texts, MAX_PER_TEXT_CHARS);
     const pieceVectors: number[][] = [];
@@ -75,7 +70,7 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${this.accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           instances: batch.map((content) => ({

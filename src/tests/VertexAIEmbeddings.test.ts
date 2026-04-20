@@ -1,36 +1,42 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { _clearVertexAuthCache } from "../embeddings/vertexAuth.js";
 import { VertexAIEmbeddings } from "../embeddings/VertexAIEmbeddings.js";
 
 const REAL_FETCH = globalThis.fetch;
 
+// Mock google-auth-library so tests don't need real GCP credentials
+mock.module("google-auth-library", () => ({
+  GoogleAuth: class {
+    getClient = mock(async () => ({
+      getAccessToken: mock(async () => ({ token: "test-access-token" })),
+    }));
+  },
+}));
+
 const VALID_OPTS = {
   model: "text-embedding-005",
   project: "my-project",
-  accessToken: "my-token",
 };
 
-function makeFetch(vectors: number[][][] | null = null, status = 200) {
-  let callCount = 0;
-  return mock(async (_url: string, init: RequestInit) => {
-    const body = JSON.parse(init.body as string) as {
-      instances: { content: string }[];
-    };
-    const batchSize = body.instances.length;
-    const data =
-      vectors?.[callCount++] ??
-      Array.from({ length: batchSize }, (_, i) => [i + 1, 0]);
-    return new Response(
-      JSON.stringify({
-        predictions: data.map((v) => ({ embeddings: { values: v } })),
-      }),
-      { status, statusText: status === 200 ? "OK" : "Bad Request" },
-    );
-  });
+function makeVertexResponse(batchSize: number) {
+  return new Response(
+    JSON.stringify({
+      predictions: Array.from({ length: batchSize }, (_, i) => ({
+        embeddings: { values: [i + 1, 0] },
+      })),
+    }),
+    { status: 200 },
+  );
 }
 
 describe("VertexAIEmbeddings — unit", () => {
+  beforeEach(() => {
+    _clearVertexAuthCache();
+  });
+
   afterEach(() => {
     (globalThis as Record<string, unknown>).fetch = REAL_FETCH;
+    _clearVertexAuthCache();
   });
 
   test("throws if project is missing", () => {
@@ -38,19 +44,8 @@ describe("VertexAIEmbeddings — unit", () => {
       () =>
         new VertexAIEmbeddings({
           model: "text-embedding-005",
-          accessToken: "token",
         }),
     ).toThrow("project is required");
-  });
-
-  test("throws if accessToken is missing", () => {
-    expect(
-      () =>
-        new VertexAIEmbeddings({
-          model: "text-embedding-005",
-          project: "proj",
-        }),
-    ).toThrow("accessToken is required");
   });
 
   test("throws for unknown model without explicit dimensions", () => {
@@ -59,7 +54,6 @@ describe("VertexAIEmbeddings — unit", () => {
         new VertexAIEmbeddings({
           model: "unknown-model",
           project: "proj",
-          accessToken: "tok",
         }),
     ).toThrow("unknown model");
   });
@@ -70,40 +64,36 @@ describe("VertexAIEmbeddings — unit", () => {
   });
 
   test("returns vectors for a small batch in a single request", async () => {
-    (globalThis as Record<string, unknown>).fetch = makeFetch([
-      [
-        [0.1, 0.2],
-        [0.3, 0.4],
-      ],
-    ]);
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(init.body as string) as {
+          instances: unknown[];
+        };
+        return makeVertexResponse(body.instances.length);
+      },
+    );
     const emb = new VertexAIEmbeddings(VALID_OPTS);
     const result = await emb.generate(["hello", "world"]);
-    expect(result).toEqual([
-      [0.1, 0.2],
-      [0.3, 0.4],
-    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual([1, 0]);
+    expect(result[1]).toEqual([2, 0]);
   });
 
-  test("sends correct URL and auth header", async () => {
+  test("sends correct URL and Bearer auth header", async () => {
     let capturedUrl: string | undefined;
     let capturedHeaders: Record<string, string> | undefined;
     (globalThis as Record<string, unknown>).fetch = mock(
       async (url: string, init: RequestInit) => {
         capturedUrl = url;
         capturedHeaders = init.headers as Record<string, string>;
-        return new Response(
-          JSON.stringify({
-            predictions: [{ embeddings: { values: [0.1] } }],
-          }),
-          { status: 200 },
-        );
+        return makeVertexResponse(1);
       },
     );
     const emb = new VertexAIEmbeddings(VALID_OPTS);
     await emb.generate(["test"]);
     expect(capturedUrl).toContain("my-project");
     expect(capturedUrl).toContain("text-embedding-005");
-    expect(capturedHeaders?.Authorization).toBe("Bearer my-token");
+    expect(capturedHeaders?.Authorization).toBe("Bearer test-access-token");
   });
 
   test("splits oversized text into pieces and returns one averaged vector", async () => {

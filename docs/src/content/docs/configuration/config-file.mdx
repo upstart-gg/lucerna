@@ -165,6 +165,8 @@ export default defineConfig({
 
 ### Google Vertex AI
 
+Uses **Application Default Credentials (ADC)** for automatic token refresh. Run `gcloud auth application-default login` once locally. For CI/CD, set `GOOGLE_APPLICATION_CREDENTIALS` to a service account key file path (or pass it via `keyFile`).
+
 ```ts
 import { defineConfig } from "@upstart.gg/lucerna";
 export default defineConfig({
@@ -172,8 +174,8 @@ export default defineConfig({
     provider: "vertex",
     model: "text-embedding-005",
     project: process.env.GOOGLE_CLOUD_PROJECT!,
-    accessToken: process.env.GOOGLE_ACCESS_TOKEN!, // gcloud auth print-access-token
     location: "us-central1", // optional, default: us-central1
+    // keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS, // explicit service account key (optional)
   },
 });
 ```

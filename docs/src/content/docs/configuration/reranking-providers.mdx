@@ -128,13 +128,14 @@ Prompt-based relevance scoring using a Gemini generative model. Not a cross-enco
 // lucerna.config.ts
 import { defineConfig } from "@upstart.gg/lucerna";
 export default defineConfig({
-  reranking: { provider: "gemini", model: "gemini-2.0-flash-lite", apiKey: process.env.GOOGLE_API_KEY! },
+  reranking: { provider: "gemini", model: "gemini-2.5-flash-lite", apiKey: process.env.GOOGLE_API_KEY! },
 });
 ```
 
 | Model | Price per 100 docs | Notes |
 |-------|-------------------|-------|
-| `gemini-2.0-flash-lite` | ~$0.0002 | Cheapest; good enough for most use cases |
+| `gemini-2.5-flash-lite` | ~$0.0002 | Default; good balance of quality and cost |
+| `gemini-2.0-flash-lite` | ~$0.0002 | Previous default |
 
 ---
 

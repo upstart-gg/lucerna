@@ -1,7 +1,15 @@
 import type { RerankingFunction } from "../types.js";
+import { truncateWithEllipsis } from "./utils.js";
 import { type VertexAuthOptions, getVertexAccessToken } from "./vertexAuth.js";
 
 const BATCH_SIZE = 200;
+
+// semantic-ranker-default-004: 1,024 tokens per record (title + content combined).
+// Using 2 chars/token → 2,048 chars. Truncate proactively to preserve head+tail signal
+// rather than letting the server silently drop the tail.
+const MAX_DOC_CHARS = 2_000;
+// Query shares the 1,024-token budget with each document.
+const MAX_QUERY_CHARS = 500;
 
 export class VertexAIReranker implements RerankingFunction {
   private readonly model: string;
@@ -31,12 +39,13 @@ export class VertexAIReranker implements RerankingFunction {
   async rerank(query: string, texts: string[]): Promise<number[]> {
     const scores = new Array<number>(texts.length).fill(0);
     const accessToken = await getVertexAccessToken(this.authOptions);
+    const safeQuery = truncateWithEllipsis(query, MAX_QUERY_CHARS);
 
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
       const batch = texts.slice(i, i + BATCH_SIZE);
       const records = batch.map((content, j) => ({
         id: String(i + j),
-        content,
+        content: truncateWithEllipsis(content, MAX_DOC_CHARS),
       }));
 
       const url =
@@ -49,7 +58,7 @@ export class VertexAIReranker implements RerankingFunction {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ model: this.model, query, records }),
+        body: JSON.stringify({ model: this.model, query: safeQuery, records }),
       });
 
       if (!res.ok) {

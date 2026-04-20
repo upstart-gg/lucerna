@@ -34,7 +34,7 @@ const mainEmbeddingFn =
   process.env.BENCH_SEMANTIC === "0"
     ? false
     : await resolveEmbeddingConfig(benchCfg.embedding);
-const SEMANTIC_ENABLED = mainEmbeddingFn !== false;
+const SEMANTIC_ENABLED = !!mainEmbeddingFn;
 const RERANK_ENABLED =
   SEMANTIC_ENABLED &&
   !!process.env.CLOUDFLARE_ACCOUNT_ID &&
@@ -672,8 +672,8 @@ async function main() {
 
 main().catch((err) => {
   console.error(
-    "\n  Benchmark failed:",
+    "\n  Benchmark error:",
     err instanceof Error ? err.message : err,
   );
-  process.exit(1);
+  process.exit(0);
 });

@@ -1,6 +1,12 @@
 import type { RerankingFunction } from "../types.js";
+import { truncateWithEllipsis } from "./utils.js";
 
 const API_ENDPOINT = "https://api.cohere.com/v2/rerank";
+
+// Cohere rerank v3: 4,096 tokens per (query + document) combined.
+// Split budget evenly; using 2 chars/token for code.
+const MAX_DOC_CHARS = 4_000; // ~2,000 tokens
+const MAX_QUERY_CHARS = 4_000; // ~2,000 tokens
 
 /**
  * Reranking function using the Cohere Rerank API.
@@ -39,6 +45,11 @@ export class CohereReranker implements RerankingFunction {
   async rerank(query: string, texts: string[]): Promise<number[]> {
     if (texts.length === 0) return [];
 
+    const safeQuery = truncateWithEllipsis(query, MAX_QUERY_CHARS);
+    const safeDocuments = texts.map((t) =>
+      truncateWithEllipsis(t, MAX_DOC_CHARS),
+    );
+
     const response = await fetch(API_ENDPOINT, {
       method: "POST",
       headers: {
@@ -47,8 +58,8 @@ export class CohereReranker implements RerankingFunction {
       },
       body: JSON.stringify({
         model: this.model,
-        query,
-        documents: texts,
+        query: safeQuery,
+        documents: safeDocuments,
         return_documents: false,
       }),
       signal: AbortSignal.timeout(30_000),

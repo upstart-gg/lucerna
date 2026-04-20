@@ -1,10 +1,17 @@
 import type { EmbeddingFunction } from "../types.js";
+import { charBudgetBatches, prepareTexts, reassembleVectors } from "./utils.js";
 
 const MODEL_DIMENSIONS: Record<string, number> = {
   "text-embedding-005": 768,
   "text-embedding-004": 768,
   "text-multilingual-embedding-002": 768,
 };
+
+// VertexAI limits: 2,048 tokens per text, 20,000 tokens total per batch, 250 texts max.
+// Using ~3 chars/token (conservative for code); 10% safety margin on batch total.
+const MAX_PER_TEXT_CHARS = 6_000; // 2,048 tokens × 3 chars/token
+const MAX_BATCH_CHARS = 54_000; // 18,000 tokens × 3 chars/token
+const MAX_BATCH_ITEMS = 250;
 
 export class VertexAIEmbeddings implements EmbeddingFunction {
   readonly dimensions: number;
@@ -54,12 +61,16 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
   }
 
   async generate(texts: string[]): Promise<number[][]> {
-    const BATCH = 250;
-    const results: number[][] = [];
     const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.project}/locations/${this.location}/publishers/google/models/${this.modelId}:predict`;
 
-    for (let i = 0; i < texts.length; i += BATCH) {
-      const batch = texts.slice(i, i + BATCH);
+    const { pieces, ranges } = prepareTexts(texts, MAX_PER_TEXT_CHARS);
+    const pieceVectors: number[][] = [];
+
+    for (const batch of charBudgetBatches(
+      pieces,
+      MAX_BATCH_CHARS,
+      MAX_BATCH_ITEMS,
+    )) {
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -72,6 +83,7 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
             task_type: "RETRIEVAL_DOCUMENT",
           })),
         }),
+        signal: AbortSignal.timeout(60_000),
       });
       if (!res.ok) {
         throw new Error(
@@ -82,9 +94,10 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
         predictions: { embeddings: { values: number[] } }[];
       };
       for (const prediction of json.predictions) {
-        results.push(prediction.embeddings.values);
+        pieceVectors.push(prediction.embeddings.values);
       }
     }
-    return results;
+
+    return reassembleVectors(pieceVectors, ranges);
   }
 }

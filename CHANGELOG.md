@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.22
+
+### Patch Changes
+
+- [#77](https://github.com/upstart-gg/lucerna/pull/77) [`0db8bb1`](https://github.com/upstart-gg/lucerna/commit/0db8bb14a030ec62a04774e53a02ca60949b522c) Thanks [@mattallty](https://github.com/mattallty)! - add ignored patterns
+
 ## 0.1.21
 
 ### Patch Changes

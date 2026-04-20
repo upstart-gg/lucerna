@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { glob, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import fastGlob from "fast-glob";
 import { TreeSitterChunker } from "./chunker/index.js";
@@ -268,7 +268,7 @@ export class CodeIndexer {
     this.graphTraverser = new GraphTraverser(this.graphStore, this.store);
 
     // Merge .gitignore patterns (all depths) into exclude list so both
-    // fastGlob (indexing) and Watcher (watch mode) respect gitignore.
+    // glob (indexing) and Watcher (watch mode) respect gitignore.
     const gitignoreExcludes = await loadAllGitignorePatterns(this.projectRoot);
     this.exclude.push(...gitignoreExcludes);
 
@@ -317,39 +317,18 @@ export class CodeIndexer {
     }
     this.indexingInProgress = true;
 
-    try {
-      const files = await fastGlob(this.include, {
-        cwd: this.projectRoot,
-        ignore: this.exclude,
-        absolute: true,
-        onlyFiles: true,
-        followSymbolicLinks: false,
-      });
+    // Accumulates raw edges from all batches for a single graph-resolution pass
+    const allRawEdges: RawEdge[] = [];
+    let totalChunks = 0;
+    let anyChanges = false;
 
-      // Phase 1: hash all files concurrently, collect only those that changed
-      const hashResults = await Promise.all(
-        files.map(async (absPath) => {
-          const relPath = relative(this.projectRoot, absPath);
-          const hash = await hashFile(absPath);
-          return {
-            absPath,
-            relPath,
-            hash,
-            changed: this.fileHashes.get(relPath) !== hash,
-          };
-        }),
-      );
-      const toIndex = hashResults.filter((r) => r.changed);
-
-      if (toIndex.length === 0) {
-        this.lastIndexed = new Date();
-        return this.getStats();
-      }
-
-      // Phase 2: chunk all changed files concurrently
+    // Process a batch of changed files: chunk → embed → store → emit per file
+    const processBatch = async (
+      batch: Array<{ absPath: string; relPath: string; hash: string }>,
+    ): Promise<void> => {
       const fileResults = (
         await Promise.all(
-          toIndex.map(async ({ absPath, relPath, hash }) => {
+          batch.map(async ({ absPath, relPath, hash }) => {
             const result = await this.chunker.chunkFileWithEdges(
               absPath,
               this.projectId,
@@ -361,22 +340,19 @@ export class CodeIndexer {
         )
       ).filter((r): r is NonNullable<typeof r> => r !== null);
 
-      // Phase 3: embed all chunks in a single batch (one model pass)
-      const allChunks = fileResults.flatMap((f) => f.chunks);
-      let allVectors: number[][];
-      if (this.embeddingFn !== false && allChunks.length > 0) {
-        allVectors = await this.embeddingFn.generate(
-          allChunks.map((c) => c.contextContent),
+      const batchChunks = fileResults.flatMap((f) => f.chunks);
+      let batchVectors: number[][];
+      if (this.embeddingFn !== false && batchChunks.length > 0) {
+        batchVectors = await this.embeddingFn.generate(
+          batchChunks.map((c) => c.contextContent),
         );
       } else {
-        allVectors = allChunks.map(() => []);
+        batchVectors = batchChunks.map(() => []);
       }
 
-      // Phase 4: upsert chunks per-file and delete stale edges
-      let totalChunks = 0;
       let vectorOffset = 0;
-      for (const { relPath, hash, chunks } of fileResults) {
-        const vectors = allVectors.slice(
+      for (const { relPath, hash, chunks, rawEdges } of fileResults) {
+        const vectors = batchVectors.slice(
           vectorOffset,
           vectorOffset + chunks.length,
         );
@@ -386,23 +362,51 @@ export class CodeIndexer {
         await this.store.upsert(chunks, vectors);
         await this.graphStore.deleteEdgesByFile(relPath);
 
-        // Keep the in-memory cache in sync for each indexed file
         this.cachedChunksByFile.set(relPath, chunks);
-
         this.fileHashes.set(relPath, hash);
         totalChunks += chunks.length;
+        allRawEdges.push(...rawEdges);
         this.emit({
           type: "indexed",
           filePath: relPath,
           chunksAffected: chunks.length,
         });
       }
+    };
 
-      // Phase 5: resolve and store graph edges.
-      // loadAllChunks() uses the in-memory cache (which was just updated in
-      // Phase 4 for changed files). On the very first run the cache is primed
-      // from the DB here, covering unchanged files from previous sessions.
-      const allRawEdges = fileResults.flatMap((f) => f.rawEdges);
+    try {
+      const BATCH_SIZE = 50;
+      let batch: Array<{ absPath: string; relPath: string; hash: string }> = [];
+
+      // Stream files via native glob — hash each on arrival, skip unchanged
+      for await (const relPath of glob(this.include, {
+        cwd: this.projectRoot,
+        exclude: this.exclude,
+      })) {
+        const absPath = join(this.projectRoot, relPath);
+        const fileStat = await stat(absPath).catch(() => null);
+        if (!fileStat?.isFile()) continue;
+        const hash = await hashFile(absPath);
+        if (this.fileHashes.get(relPath) === hash) continue;
+
+        anyChanges = true;
+        batch.push({ absPath, relPath, hash });
+        if (batch.length >= BATCH_SIZE) {
+          await processBatch(batch);
+          batch = [];
+        }
+      }
+
+      if (batch.length > 0) await processBatch(batch);
+
+      if (!anyChanges) {
+        this.lastIndexed = new Date();
+        return this.getStats();
+      }
+
+      // Graph resolution — single pass after all batches.
+      // loadAllChunks() uses the in-memory cache updated above; on the first
+      // run it is primed from the DB to cover unchanged files from prior sessions.
       if (allRawEdges.length > 0) {
         const allIndexedChunks = await this.loadAllChunks();
         const resolvedEdges = await this.symbolResolver.resolveAll(

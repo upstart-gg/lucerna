@@ -1,0 +1,57 @@
+---
+title: Searching
+description: Search methods and options for the programmatic API.
+---
+
+## Search methods
+
+```ts
+// Hybrid search (default: semantic + BM25 via RRF)
+const results = await indexer.search(query, options?);
+
+// Semantic only
+const results = await indexer.searchSemantic(query, options?);
+
+// Lexical / BM25 only
+const results = await indexer.searchLexical(query, options?);
+
+// Hybrid + graph-context expansion
+const results = await indexer.searchWithContext(query, options?);
+```
+
+## `SearchOptions`
+
+```ts
+{
+  limit?: number,                          // default: 10
+  language?: Language | Language[],        // filter by language
+  types?: ChunkType[],                     // filter by chunk type
+  filePath?: string,                       // path filter (glob patterns supported)
+  hybrid?: boolean,                        // default: true when embeddings available
+  minScore?: number,                       // minimum score threshold (0–1)
+  rerank?: boolean,                        // apply reranking after RRF; default: true when rerankingFunction set
+  rrfK?: number,                           // RRF rank constant k; default: 45 (tuned for code retrieval)
+}
+```
+
+## `SearchWithContextOptions`
+
+Extends `SearchOptions`:
+
+```ts
+{
+  graphDepth?: number,                     // BFS hops to expand — default: 1
+  graphRelationTypes?: RelationshipType[], // edge types to follow — default: all
+  contextScoreDiscount?: number,           // score multiplier for neighbour chunks — default: 0.7
+}
+```
+
+## `SearchResult`
+
+```ts
+{
+  chunk: CodeChunk,
+  score: number,                           // higher = more relevant
+  matchType: 'semantic' | 'lexical' | 'hybrid',
+}
+```

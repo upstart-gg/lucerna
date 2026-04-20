@@ -115,8 +115,8 @@ describe("VertexAIEmbeddings — unit", () => {
     );
 
     const emb = new VertexAIEmbeddings(VALID_OPTS);
-    // 13,000-char text exceeds MAX_PER_TEXT_CHARS (4000); splits into 4 pieces
-    const longText = "x".repeat(13_000);
+    // 5,000-char text exceeds MAX_PER_TEXT_CHARS (2000); splits into 3 pieces
+    const longText = "x".repeat(5_000);
     const result = await emb.generate([longText]);
 
     // All pieces sent (> 1 piece for 1 input text)
@@ -145,9 +145,9 @@ describe("VertexAIEmbeddings — unit", () => {
     );
 
     const emb = new VertexAIEmbeddings(VALID_OPTS);
-    // 10 texts each 4000 chars = 40,000 chars total → must split into multiple batches
-    // MAX_BATCH_CHARS = 36,000 so 9 texts fit per batch (36,000 chars), 1 in second
-    const texts = Array.from({ length: 10 }, () => "a".repeat(4_000));
+    // 10 texts each 2000 chars = 20,000 chars total → must split into multiple batches
+    // MAX_BATCH_CHARS = 18,000 so 9 texts fit per batch (18,000 chars), 1 in second
+    const texts = Array.from({ length: 10 }, () => "a".repeat(2_000));
     const result = await emb.generate(texts);
 
     expect(result).toHaveLength(10);

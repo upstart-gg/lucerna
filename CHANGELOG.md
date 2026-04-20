@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.16
+
+### Patch Changes
+
+- [#65](https://github.com/upstart-gg/lucerna/pull/65) [`cf6a242`](https://github.com/upstart-gg/lucerna/commit/cf6a242b61ff4b0da5e34b39ff171abb56c370f2) Thanks [@mattallty](https://github.com/mattallty)! - detect pnpm workspace
+
 ## 0.1.15
 
 ### Patch Changes

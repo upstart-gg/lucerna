@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.15
+
+### Patch Changes
+
+- [#63](https://github.com/upstart-gg/lucerna/pull/63) [`b53aaeb`](https://github.com/upstart-gg/lucerna/commit/b53aaebc8293e68e717f3ab5a0fd18ac8f104ff0) Thanks [@mattallty](https://github.com/mattallty)! - Fix install script
+
 ## 0.1.14
 
 ### Patch Changes

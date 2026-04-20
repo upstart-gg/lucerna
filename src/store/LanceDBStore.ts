@@ -457,13 +457,14 @@ export class LanceDBStore implements VectorStore {
   private async ensureVectorIndex(): Promise<void> {
     if (this.vectorIndexed || !this.table) return;
     const count = await this.table.countRows();
-    // IVF_PQ is only beneficial at scale; use flat index for small tables.
-    // LanceDB warns about empty clusters when count < ~65k, so we gate at 10k
-    // to avoid noisy warnings on small/benchmark datasets.
-    if (count >= 10_000) {
+    // IVF_PQ requires ~256 rows per partition and well-formed PQ codebooks.
+    // LanceDB itself recommends ≥65,536 rows; below that a flat scan is fast
+    // enough and avoids noisy KMeans empty-cluster warnings.
+    if (count >= 65_536) {
+      const numPartitions = Math.max(1, Math.floor(count / 256));
       try {
         await this.table.createIndex("vector", {
-          config: lancedb.Index.ivfPq({ numPartitions: 32 }),
+          config: lancedb.Index.ivfPq({ numPartitions }),
         });
       } catch {
         // Already exists or not enough data

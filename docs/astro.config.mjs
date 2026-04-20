@@ -79,9 +79,15 @@ export default defineConfig({
             { label: "Indexing", slug: "programmatic-usage/indexing" },
             { label: "Searching", slug: "programmatic-usage/searching" },
             { label: "Watching", slug: "programmatic-usage/watching" },
-            { label: "Graph Traversal", slug: "programmatic-usage/graph-traversal" },
+            {
+              label: "Graph Traversal",
+              slug: "programmatic-usage/graph-traversal",
+            },
             { label: "Inspection", slug: "programmatic-usage/inspection" },
-            { label: "Configuration", slug: "programmatic-usage/configuration" },
+            {
+              label: "Configuration",
+              slug: "programmatic-usage/configuration",
+            },
           ],
         },
       ],

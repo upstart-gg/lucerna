@@ -6,7 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist", "!!docs/.astro"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!docs/.astro",
+      "!!.lucerna",
+      "!!lucerna.config.ts"
+    ]
   },
   "formatter": {
     "enabled": true,

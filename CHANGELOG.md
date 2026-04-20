@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.17
+
+### Patch Changes
+
+- [#67](https://github.com/upstart-gg/lucerna/pull/67) [`5517263`](https://github.com/upstart-gg/lucerna/commit/55172639bf9b723fefd9890b1337ddca081f8598) Thanks [@mattallty](https://github.com/mattallty)! - Fix batching limits
+
 ## 0.1.16
 
 ### Patch Changes

@@ -1,17 +1,18 @@
 import type { RerankingFunction } from "../types.js";
+import { type VertexAuthOptions, getVertexAccessToken } from "./vertexAuth.js";
 
 const BATCH_SIZE = 200;
 
 export class VertexAIReranker implements RerankingFunction {
   private readonly model: string;
   private readonly project: string;
-  private readonly accessToken: string;
+  private readonly authOptions: VertexAuthOptions;
 
   constructor(
     options: {
       model?: string;
       project?: string;
-      accessToken?: string;
+      keyFile?: string;
     } = {},
   ) {
     this.model = options.model ?? "semantic-ranker-default-004";
@@ -23,19 +24,13 @@ export class VertexAIReranker implements RerankingFunction {
       );
     }
     this.project = project;
-
-    const accessToken = options.accessToken;
-    if (!accessToken) {
-      throw new Error(
-        "VertexAIReranker: accessToken is required. Set it in your lucerna.config.ts " +
-          "(obtain via: gcloud auth print-access-token).",
-      );
-    }
-    this.accessToken = accessToken;
+    this.authOptions =
+      options.keyFile !== undefined ? { keyFile: options.keyFile } : {};
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {
     const scores = new Array<number>(texts.length).fill(0);
+    const accessToken = await getVertexAccessToken(this.authOptions);
 
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
       const batch = texts.slice(i, i + BATCH_SIZE);
@@ -52,7 +47,7 @@ export class VertexAIReranker implements RerankingFunction {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${this.accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ model: this.model, query, records }),
       });

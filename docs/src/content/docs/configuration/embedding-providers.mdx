@@ -130,7 +130,14 @@ export default defineConfig({
 
 ### GCP Vertex AI
 
-Requires a GCP project and an access token. `location` defaults to `us-central1`.
+Requires a GCP project. Authentication uses **Application Default Credentials (ADC)** — tokens are refreshed automatically with no expiry concerns. `location` defaults to `us-central1`.
+
+**Local development** — run once, then Lucerna handles token refresh automatically:
+```bash
+gcloud auth application-default login
+```
+
+**CI/CD** — set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the path of a service account JSON key file. Lucerna picks it up automatically via ADC, or you can pass it explicitly with `keyFile`.
 
 ```ts
 // lucerna.config.ts
@@ -140,8 +147,8 @@ export default defineConfig({
     provider: "vertex",
     model: "text-embedding-005",
     project: process.env.GOOGLE_CLOUD_PROJECT!,
-    accessToken: process.env.GOOGLE_ACCESS_TOKEN!, // gcloud auth print-access-token
     location: "us-central1", // optional
+    // keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS, // explicit service account key (optional)
   },
 });
 ```

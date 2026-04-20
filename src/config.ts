@@ -229,7 +229,7 @@ export async function resolveEmbeddingConfig(
       return new VertexAIEmbeddings({
         model: cfg.model,
         project: cfg.project,
-        accessToken: cfg.accessToken,
+        ...(cfg.keyFile !== undefined ? { keyFile: cfg.keyFile } : {}),
         ...(cfg.location !== undefined ? { location: cfg.location } : {}),
         ...d,
       });
@@ -298,7 +298,7 @@ export async function resolveRerankingConfig(
       );
       return new VertexAIReranker({
         project: cfg.project,
-        accessToken: cfg.accessToken,
+        ...(cfg.keyFile !== undefined ? { keyFile: cfg.keyFile } : {}),
         ...(cfg.model !== undefined ? { model: cfg.model } : {}),
       });
     }

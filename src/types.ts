@@ -325,7 +325,8 @@ export type EmbeddingProviderConfig =
       model: string;
       project: string;
       location?: string;
-      accessToken: string;
+      /** Path to a service account JSON key file. Uses ADC if omitted. */
+      keyFile?: string;
       dimensions?: number;
     };
 
@@ -345,7 +346,8 @@ export type RerankingProviderConfig =
       provider: "vertex";
       model?: string;
       project: string;
-      accessToken: string;
+      /** Path to a service account JSON key file. Uses ADC if omitted. */
+      keyFile?: string;
     };
 
 /**

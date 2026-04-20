@@ -37,7 +37,7 @@ Run the interactive installer from your project directory:
 The installer will:
 
 1. **Detect and configure your AI clients** — registers the Lucerna MCP server with every AI coding assistant found on your machine (Claude Code, Cursor, Windsurf, Zed, VS Code, and [more](https://github.com/neondatabase/add-mcp))
-2. **Set up semantic search** *(optional)* — prompts you to choose an embedding provider and API key; writes a `lucerna.config.ts` at your project root
+2. **Scaffold `lucerna.config.ts`** — creates a config file at your project root if one doesn't exist yet (edit it afterwards to configure an embedding provider for semantic search)
 3. **Update `.gitignore`** — appends `.lucerna/` so the index directory is never committed
 
 Restart your AI client after running the installer to load the MCP server.

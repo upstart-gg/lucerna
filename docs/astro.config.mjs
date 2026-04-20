@@ -71,6 +71,25 @@ export default defineConfig({
             { label: "eval", slug: "cli/eval" },
           ],
         },
+        {
+          label: "Programmatic Usage",
+          collapsed: true,
+          items: [
+            { label: "Quickstart", slug: "programmatic-usage/quickstart" },
+            { label: "Indexing", slug: "programmatic-usage/indexing" },
+            { label: "Searching", slug: "programmatic-usage/searching" },
+            { label: "Watching", slug: "programmatic-usage/watching" },
+            {
+              label: "Graph Traversal",
+              slug: "programmatic-usage/graph-traversal",
+            },
+            { label: "Inspection", slug: "programmatic-usage/inspection" },
+            {
+              label: "Configuration",
+              slug: "programmatic-usage/configuration",
+            },
+          ],
+        },
       ],
     }),
     mermaid(),

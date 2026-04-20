@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.21
+
+### Patch Changes
+
+- [#75](https://github.com/upstart-gg/lucerna/pull/75) [`73b3789`](https://github.com/upstart-gg/lucerna/commit/73b3789f671c7b7708dc856353b19c54ffd378a5) Thanks [@mattallty](https://github.com/mattallty)! - refactor: improve indexing logic
+
 ## 0.1.20
 
 ### Patch Changes

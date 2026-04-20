@@ -38,14 +38,17 @@ import { Watcher } from "./watcher/Watcher.js";
 const DEFAULT_INCLUDE = ["**/*"];
 
 const DEFAULT_EXCLUDE = [
+  // Hidden files and directories — dotfiles are never domain code
+  "**/.*",
+  "**/.*/**",
+  // Common non-hidden build output / dependency dirs
   "**/node_modules/**",
-  "**/.git/**",
   "**/dist/**",
   "**/build/**",
   "**/out/**",
-  "**/.next/**",
-  "**/.nuxt/**",
-  "**/.lucerna/**",
+  // Build output & test coverage (non-dotdir)
+  "**/coverage/**",
+  "**/__pycache__/**",
   // Lock files — never useful to search, can be very large
   "**/pnpm-lock.yaml",
   "**/yarn.lock",
@@ -62,7 +65,6 @@ const DEFAULT_EXCLUDE = [
   "**/AGENTS.md",
   "**/GEMINI.md",
   "**/COPILOT.md",
-  "**/.cursorrules",
   // Workspace / tooling boilerplate
   "**/pnpm-workspace.yaml",
   "**/pnpm-workspace.yml",
@@ -87,7 +89,95 @@ const DEFAULT_EXCLUDE = [
   "**/*.gz",
   "**/*.7z",
   "**/*.pdf",
-  "**/*.DS_Store",
+  // Lucerna own config
+  "**/lucerna.config.js",
+  "**/lucerna.config.mjs",
+  "**/lucerna.config.cjs",
+  "**/lucerna.config.ts",
+  // TypeScript / JS toolchain config
+  "**/tsconfig.json",
+  "**/tsconfig.*.json",
+  "**/jsconfig.json",
+  // Bundlers / build tools config
+  "**/vite.config.{js,ts,mjs,cjs}",
+  "**/vitest.config.{js,ts,mjs,cjs}",
+  "**/webpack.config.{js,ts,mjs,cjs}",
+  "**/rollup.config.{js,ts,mjs,cjs}",
+  "**/esbuild.config.{js,ts,mjs,cjs}",
+  "**/tsup.config.{js,ts,mjs,cjs}",
+  "**/tsdown.config.{js,ts,mjs,cjs}",
+  // Test runner config
+  "**/jest.config.{js,ts,mjs,cjs,json}",
+  "**/playwright.config.{js,ts,mjs,cjs}",
+  "**/cypress.config.{js,ts,mjs,cjs}",
+  // Linter / formatter config (non-dotfile forms; dotfile forms covered by **/.*  above)
+  "**/eslint.config.{js,mjs,cjs,ts}",
+  "**/prettier.config.{js,mjs,cjs,ts}",
+  "**/biome.json",
+  "**/biome.jsonc",
+  "**/stylelint.config.{js,mjs,cjs,ts}",
+  "**/babel.config.{js,cjs,mjs,ts,json}",
+  // CSS / styling config
+  "**/tailwind.config.{js,ts,mjs,cjs}",
+  "**/postcss.config.{js,ts,mjs,cjs}",
+  // Framework config
+  "**/next.config.{js,ts,mjs,cjs}",
+  "**/nuxt.config.{js,ts,mjs,cjs}",
+  "**/remix.config.{js,ts,mjs,cjs}",
+  "**/astro.config.{js,ts,mjs,cjs}",
+  "**/svelte.config.{js,ts,mjs,cjs}",
+  "**/gatsby-config.{js,ts,mjs,cjs}",
+  "**/eleventy.config.{js,ts,mjs,cjs}",
+  "**/docusaurus.config.{js,ts,mjs,cjs}",
+  // Monorepo / workspace tooling
+  "**/lerna.json",
+  "**/rush.json",
+  // Deployment config
+  "**/wrangler.toml",
+  "**/wrangler.json",
+  "**/wrangler.jsonc",
+  // Mobile / cross-platform config
+  "**/capacitor.config.{json,ts}",
+  "**/ionic.config.json",
+  "**/angular.json",
+  // Commit hooks / git tooling config (non-dotfile forms)
+  "**/commitlint.config.{js,mjs,cjs,ts}",
+  "**/lint-staged.config.{js,mjs,cjs,ts}",
+  // Python project / tool config
+  "**/pyproject.toml",
+  "**/setup.cfg",
+  "**/requirements*.txt",
+  "**/tox.ini",
+  "**/pytest.ini",
+  "**/mypy.ini",
+  "**/pyrightconfig.json",
+  // Java / Gradle / Maven config
+  "**/pom.xml",
+  "**/build.gradle",
+  "**/build.gradle.kts",
+  "**/settings.gradle",
+  "**/settings.gradle.kts",
+  // Go module definition
+  "**/go.mod",
+  // Rust manifest
+  "**/Cargo.toml",
+  // .NET project / solution files
+  "**/*.csproj",
+  "**/*.fsproj",
+  "**/*.vbproj",
+  "**/*.sln",
+  "**/global.json",
+  "**/nuget.config",
+  "**/*.props",
+  "**/*.targets",
+  // Swift / iOS package / dependency config
+  "**/Package.swift",
+  "**/Podfile",
+  "**/*.podspec",
+  // PHP dependency config
+  "**/composer.json",
+  // Ruby dependency config
+  "**/Gemfile",
 ];
 
 // ---------------------------------------------------------------------------

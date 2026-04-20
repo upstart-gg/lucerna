@@ -31,7 +31,7 @@ jobs:
       # setup-node configures ~/.npmrc so NODE_AUTH_TOKEN is used for publish
       - uses: actions/setup-node@v6.3.0
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - run: pnpm install --frozen-lockfile

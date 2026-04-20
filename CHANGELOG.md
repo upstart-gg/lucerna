@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.18
+
+### Patch Changes
+
+- [#69](https://github.com/upstart-gg/lucerna/pull/69) [`7fc9eb6`](https://github.com/upstart-gg/lucerna/commit/7fc9eb60f87bfb637c7e6a595f38fa7a98502188) Thanks [@mattallty](https://github.com/mattallty)! - Change vertex auth
+
 ## 0.1.17
 
 ### Patch Changes

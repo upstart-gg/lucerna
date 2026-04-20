@@ -85,7 +85,7 @@ describe("GeminiEmbeddings — unit", () => {
       },
     );
     const emb = new GeminiEmbeddings(VALID_OPTS);
-    // 13,000-char text exceeds MAX_PER_TEXT_CHARS (6000); splits into 3 pieces
+    // 13,000-char text exceeds MAX_PER_TEXT_CHARS (4000); splits into 4 pieces
     const longText = "y".repeat(13_000);
     const result = await emb.generate([longText]);
 
@@ -105,8 +105,9 @@ describe("GeminiEmbeddings — unit", () => {
       },
     );
     const emb = new GeminiEmbeddings(VALID_OPTS);
-    // 10 texts each 6000 chars → total 60,000 chars; MAX_BATCH_CHARS=54,000 → multiple batches
-    const texts = Array.from({ length: 10 }, () => "b".repeat(6_000));
+    // 10 texts each 4000 chars = 40,000 chars total → must split into multiple batches
+    // MAX_BATCH_CHARS = 36,000 so 9 texts fit per batch, 1 in second
+    const texts = Array.from({ length: 10 }, () => "b".repeat(4_000));
     const result = await emb.generate(texts);
 
     expect(result).toHaveLength(10);

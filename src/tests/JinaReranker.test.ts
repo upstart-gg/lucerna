@@ -132,6 +132,66 @@ describe("JinaReranker — unit", () => {
     await expect(reranker.rerank("q", ["text"])).rejects.toThrow("401");
   });
 
+  test("truncates document over MAX_DOC_CHARS using head+tail", async () => {
+    let capturedBody: { documents: string[] } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ results: [{ index: 0, relevance_score: 0.5 }] }),
+          { status: 200 },
+        );
+      },
+    );
+
+    const reranker = new JinaReranker({ apiKey: "key" });
+    const longDoc = "x".repeat(20_000); // exceeds MAX_DOC_CHARS (16000)
+    await reranker.rerank("query", [longDoc]);
+
+    const sentDoc = capturedBody?.documents[0] ?? "";
+    expect(sentDoc.length).toBeLessThanOrEqual(16_000);
+    expect(sentDoc).toContain("/* … */");
+  });
+
+  test("documents within MAX_DOC_CHARS are sent unchanged", async () => {
+    let capturedBody: { documents: string[] } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ results: [{ index: 0, relevance_score: 0.8 }] }),
+          { status: 200 },
+        );
+      },
+    );
+
+    const reranker = new JinaReranker({ apiKey: "key" });
+    const shortDoc = "function hello() {}";
+    await reranker.rerank("query", [shortDoc]);
+
+    expect(capturedBody?.documents[0]).toBe(shortDoc);
+  });
+
+  test("truncates query over MAX_QUERY_CHARS", async () => {
+    let capturedBody: { query: string } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        capturedBody = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ results: [{ index: 0, relevance_score: 0.5 }] }),
+          { status: 200 },
+        );
+      },
+    );
+
+    const reranker = new JinaReranker({ apiKey: "key" });
+    const longQuery = "q".repeat(6_000); // exceeds MAX_QUERY_CHARS (4000)
+    await reranker.rerank(longQuery, ["doc"]);
+
+    expect((capturedBody?.query ?? "").length).toBeLessThanOrEqual(4_000);
+    expect(capturedBody?.query).toContain("/* … */");
+  });
+
   test("preserves order — scores[i] corresponds to texts[i]", async () => {
     (globalThis as Record<string, unknown>).fetch = mock(
       async () =>

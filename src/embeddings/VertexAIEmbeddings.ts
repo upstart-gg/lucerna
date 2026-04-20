@@ -9,9 +9,9 @@ const MODEL_DIMENSIONS: Record<string, number> = {
 };
 
 // VertexAI limits: 2,048 tokens per text, 20,000 tokens total per batch, 250 texts max.
-// Using ~3 chars/token (conservative for code); 10% safety margin on batch total.
-const MAX_PER_TEXT_CHARS = 6_000; // 2,048 tokens × 3 chars/token
-const MAX_BATCH_CHARS = 54_000; // 18,000 tokens × 3 chars/token
+// Using ~2 chars/token (conservative for code); 10% safety margin on batch total.
+const MAX_PER_TEXT_CHARS = 4_000; // 2,048 tokens × 2 chars/token
+const MAX_BATCH_CHARS = 36_000; // 18,000 tokens × 2 chars/token
 const MAX_BATCH_ITEMS = 250;
 
 export class VertexAIEmbeddings implements EmbeddingFunction {

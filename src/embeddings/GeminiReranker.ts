@@ -1,11 +1,16 @@
 import type { RerankingFunction } from "../types.js";
+import { truncateWithEllipsis } from "./utils.js";
+
+// Gemini context is 1M tokens — truncation is a cost/perf guardrail only.
+const MAX_DOC_CHARS = 8_000;
+const MAX_QUERY_CHARS = 4_000;
 
 export class GeminiReranker implements RerankingFunction {
   private readonly model: string;
   private readonly apiKey: string;
 
   constructor(options: { model?: string; apiKey?: string } = {}) {
-    this.model = options.model ?? "gemini-2.0-flash-lite";
+    this.model = options.model ?? "gemini-2.5-flash-lite";
 
     const apiKey = options.apiKey;
     if (!apiKey) {
@@ -17,13 +22,17 @@ export class GeminiReranker implements RerankingFunction {
   }
 
   async rerank(query: string, texts: string[]): Promise<number[]> {
+    const safeQuery = truncateWithEllipsis(query, MAX_QUERY_CHARS);
     const passageList = texts
-      .map((t, i) => `${i}: ${t.replace(/\n/g, " ")}`)
+      .map(
+        (t, i) =>
+          `${i}: ${truncateWithEllipsis(t, MAX_DOC_CHARS).replace(/\n/g, " ")}`,
+      )
       .join("\n");
 
     const prompt =
       `You are a relevance scoring system. For the query below, score each passage 0–1 (1 = most relevant).\n\n` +
-      `Query: ${query}\n\nPassages:\n${passageList}\n\n` +
+      `Query: ${safeQuery}\n\nPassages:\n${passageList}\n\n` +
       `Return ONLY a JSON array of numbers in the same order as the passages, e.g. [0.9, 0.3, 0.7].`;
 
     const url =

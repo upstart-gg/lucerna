@@ -1,9 +1,16 @@
 import type { EmbeddingFunction } from "../types.js";
+import { charBudgetBatches, prepareTexts, reassembleVectors } from "./utils.js";
 
 const MODEL_DIMENSIONS: Record<string, number> = {
   "text-embedding-004": 768,
   "gemini-embedding-001": 3072,
 };
+
+// Gemini limits: 2,048 tokens per text, 20,000 tokens total per batch, 250 texts max.
+// Using ~3 chars/token (conservative for code); 10% safety margin on batch total.
+const MAX_PER_TEXT_CHARS = 6_000; // 2,048 tokens × 3 chars/token
+const MAX_BATCH_CHARS = 54_000; // 18,000 tokens × 3 chars/token
+const MAX_BATCH_ITEMS = 250;
 
 /**
  * Embedding function using the Google Gemini Embeddings API.
@@ -28,7 +35,6 @@ export class GeminiEmbeddings implements EmbeddingFunction {
   readonly dimensions: number;
   readonly modelId: string;
   private readonly apiKey: string;
-  private readonly maxBatchSize = 100;
 
   constructor(options: {
     model: string;
@@ -53,12 +59,18 @@ export class GeminiEmbeddings implements EmbeddingFunction {
   }
 
   async generate(texts: string[]): Promise<number[][]> {
-    const results: number[][] = [];
-    for (let i = 0; i < texts.length; i += this.maxBatchSize) {
-      const batch = texts.slice(i, i + this.maxBatchSize);
-      results.push(...(await this.batchEmbed(batch)));
+    const { pieces, ranges } = prepareTexts(texts, MAX_PER_TEXT_CHARS);
+    const pieceVectors: number[][] = [];
+
+    for (const batch of charBudgetBatches(
+      pieces,
+      MAX_BATCH_CHARS,
+      MAX_BATCH_ITEMS,
+    )) {
+      pieceVectors.push(...(await this.batchEmbed(batch)));
     }
-    return results;
+
+    return reassembleVectors(pieceVectors, ranges);
   }
 
   private async batchEmbed(texts: string[]): Promise<number[][]> {

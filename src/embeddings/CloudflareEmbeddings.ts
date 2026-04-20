@@ -1,4 +1,5 @@
 import type { EmbeddingFunction } from "../types.js";
+import { charBudgetBatches, prepareTexts, reassembleVectors } from "./utils.js";
 
 const API_BASE = "https://api.cloudflare.com/client/v4/accounts";
 const DEFAULT_MODEL = "@cf/baai/bge-m3";
@@ -69,35 +70,19 @@ export class CloudflareEmbeddings implements EmbeddingFunction {
   }
 
   async generate(texts: string[]): Promise<number[][]> {
-    // Split oversized texts into pieces so each piece fits in one request.
-    // Track [start, end) ranges into the flattened pieces array.
-    const pieces: string[] = [];
-    const ranges: [number, number][] = [];
+    const { pieces, ranges } = prepareTexts(texts, MAX_TEXT_CHARS);
 
-    for (const text of texts) {
-      const start = pieces.length;
-      if (text.length <= MAX_TEXT_CHARS) {
-        pieces.push(text);
-      } else {
-        for (let i = 0; i < text.length; i += MAX_TEXT_CHARS) {
-          pieces.push(text.slice(i, i + MAX_TEXT_CHARS));
-        }
-      }
-      ranges.push([start, pieces.length]);
-    }
-
-    // Embed all pieces using char-budget batches.
     const pieceVectors: number[][] = [];
-    for (const batch of charBudgetBatches(pieces)) {
+    for (const batch of charBudgetBatches(
+      pieces,
+      MAX_BATCH_CHARS,
+      MAX_BATCH_ITEMS,
+    )) {
       const vectors = await this.fetchBatch(batch);
       pieceVectors.push(...vectors);
     }
 
-    // Recombine: single-piece texts return as-is; multi-piece texts are averaged.
-    return ranges.map(([start, end]) => {
-      if (end - start === 1) return pieceVectors[start] ?? [];
-      return averageVectors(pieceVectors.slice(start, end));
-    });
+    return reassembleVectors(pieceVectors, ranges);
   }
 
   private async fetchBatch(texts: string[]): Promise<number[][]> {
@@ -144,38 +129,4 @@ export class CloudflareEmbeddings implements EmbeddingFunction {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Component-wise mean of a list of equal-length vectors. */
-function averageVectors(vecs: number[][]): number[] {
-  const dim = vecs[0]?.length ?? 0;
-  const sum = new Array<number>(dim).fill(0);
-  for (const vec of vecs) {
-    for (let i = 0; i < dim; i++) sum[i] = (sum[i] ?? 0) + (vec[i] ?? 0);
-  }
-  return sum.map((v) => v / vecs.length);
-}
-
-/**
- * Split texts into batches that stay under MAX_BATCH_CHARS and MAX_BATCH_ITEMS.
- * By the time this is called, all texts are already ≤ MAX_TEXT_CHARS chars.
- */
-function* charBudgetBatches(texts: string[]): Generator<string[]> {
-  let batch: string[] = [];
-  let batchChars = 0;
-
-  for (const text of texts) {
-    const exceedsCharBudget =
-      batch.length > 0 && batchChars + text.length > MAX_BATCH_CHARS;
-    const exceedsItemLimit = batch.length >= MAX_BATCH_ITEMS;
-    if (exceedsCharBudget || exceedsItemLimit) {
-      yield batch;
-      batch = [];
-      batchChars = 0;
-    }
-    batch.push(text);
-    batchChars += text.length;
-  }
-
-  if (batch.length > 0) yield batch;
 }

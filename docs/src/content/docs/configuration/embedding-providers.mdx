@@ -117,14 +117,24 @@ export default defineConfig({
 // lucerna.config.ts
 import { defineConfig } from "@upstart.gg/lucerna";
 export default defineConfig({
-  embedding: { provider: "gemini", model: "gemini-embedding-001", apiKey: process.env.GOOGLE_API_KEY! },
+  embedding: {
+    provider: "gemini",
+    model: "gemini-embedding-2-preview",
+    apiKey: process.env.GOOGLE_API_KEY!,
+    dimensions: 256, // truncate from native 3072 for a ~12× smaller index
+  },
 });
 ```
 
 | Model | Dimensions | Price per 1M tokens | Notes |
 |-------|-----------|---------------------|-------|
-| `gemini-embedding-001` | 3072 | $0.15 (batch $0.075) | Current model, higher quality |
-| `text-embedding-004` | 768 | $0.15 | 2048-token ctx |
+| `gemini-embedding-2-preview` | 3072 (truncatable 128–3072) | — | 8K ctx, multi-modal, latest |
+| `gemini-embedding-001` | 3072 (truncatable 128–3072) | $0.15 (batch $0.075) | 2K ctx, text only |
+| `text-embedding-004` | 768 | $0.15 | Legacy, 2K ctx |
+
+Lucerna uses asymmetric code retrieval automatically: indexed chunks are embedded with `RETRIEVAL_DOCUMENT` and queries with `CODE_RETRIEVAL_QUERY`. For `gemini-embedding-2-preview` — which does not accept `task_type` — the equivalent prompt prefix is applied automatically, so no configuration is needed.
+
+Both `gemini-embedding-*` models support Matryoshka truncation via `dimensions` (128–3072). When `dimensions` is below the native 3072, Lucerna L2-normalizes each returned vector as required by the API.
 
 ---
 
@@ -155,9 +165,14 @@ export default defineConfig({
 
 | Model | Dimensions | Price per 1M tokens | Notes |
 |-------|-----------|---------------------|-------|
-| `text-embedding-005` | 768 | $0.10 | Latest, recommended |
+| `gemini-embedding-001` | 3072 (truncatable 128–3072) | — | Highest quality, 1 input per request |
+| `text-embedding-005` | 768 | $0.10 | Latest text model, up to 250 inputs per request |
 | `text-embedding-004` | 768 | $0.10 | Previous generation |
 | `text-multilingual-embedding-002` | 768 | $0.10 | Multilingual |
+
+Lucerna uses asymmetric code retrieval automatically: indexed chunks are embedded with `RETRIEVAL_DOCUMENT` and queries with `CODE_RETRIEVAL_QUERY`, so no configuration is needed. When `dimensions` is set below the model's native dim, Lucerna L2-normalizes returned vectors as required by the API.
+
+Note: `gemini-embedding-001` on Vertex accepts only one text per request (the API does not batch), so indexing is slower than `text-embedding-005`. `gemini-embedding-2-preview` is not available on Vertex — use the Gemini provider for it.
 
 ---
 

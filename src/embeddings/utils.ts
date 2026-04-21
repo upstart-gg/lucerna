@@ -26,6 +26,20 @@ export function* charBudgetBatches(
   if (batch.length > 0) yield batch;
 }
 
+/**
+ * Normalize a vector to unit L2 length. Required by some embedding APIs
+ * (e.g. Gemini) when the returned vector uses fewer than the native dimensions,
+ * since the API only normalizes at the native dim. A zero vector is returned
+ * unchanged.
+ */
+export function l2Normalize(v: number[]): number[] {
+  let sumSq = 0;
+  for (const x of v) sumSq += x * x;
+  if (sumSq === 0) return v;
+  const norm = Math.sqrt(sumSq);
+  return v.map((x) => x / norm);
+}
+
 /** Component-wise mean of a list of equal-length vectors. */
 export function averageVectors(vecs: number[][]): number[] {
   const dim = vecs[0]?.length ?? 0;

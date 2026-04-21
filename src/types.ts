@@ -73,8 +73,15 @@ export interface EmbeddingFunction {
    * model changes between runs — preventing silent vector-space corruption.
    */
   readonly modelId?: string;
-  /** Produce one embedding vector per input text */
+  /** Produce one embedding vector per input text (document-side / indexing). */
   generate(texts: string[]): Promise<number[][]>;
+  /**
+   * Optional query-side embedding. Providers that support asymmetric retrieval
+   * (e.g. Gemini/Vertex `CODE_RETRIEVAL_QUERY`) implement this to embed user
+   * queries differently from documents. When absent, callers should fall back
+   * to `generate([text])[0]`.
+   */
+  embedQuery?(text: string): Promise<number[]>;
   /** Optional: pre-load the model so the first generate() call has no cold-start delay */
   warmup?(): Promise<void>;
 }

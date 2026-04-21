@@ -75,7 +75,7 @@ function renderDefaultConfig(
   opts: { vectorStore?: "lancedb" | "sqlite" } = {},
 ): string {
   const vectorStoreLine =
-    opts.vectorStore && opts.vectorStore !== "lancedb"
+    opts.vectorStore && opts.vectorStore !== "sqlite"
       ? `  vectorStore: "${opts.vectorStore}",\n\n`
       : "";
   return `import { defineConfig } from "@upstart.gg/lucerna";

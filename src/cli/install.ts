@@ -108,17 +108,17 @@ export async function runInstall(): Promise<void> {
     message: "Which vector store do you want to use?",
     options: [
       {
-        value: "lancedb",
-        label: "LanceDB",
-        hint: "default, faster for very large repos",
-      },
-      {
         value: "sqlite",
         label: "SQLite + sqlite-vec",
-        hint: "single-file, easy to inspect with the sqlite3 CLI",
+        hint: "default, single-file, easy to inspect with the sqlite3 CLI",
+      },
+      {
+        value: "lancedb",
+        label: "LanceDB",
+        hint: "faster for very large repos, native binary",
       },
     ],
-    initialValue: "lancedb",
+    initialValue: "sqlite",
   });
   if (clack.isCancel(backendChoice)) {
     clack.cancel("Setup cancelled.");

@@ -240,8 +240,8 @@ export interface CodeIndexOptions {
   onIndexed?: (event: IndexEvent) => void;
   /**
    * Vector store backend to use for persistence.
-   *   - `"lancedb"` (default): LanceDB — fast for very large repos, native binary.
-   *   - `"sqlite"`: SQLite + sqlite-vec — single-file, easy to inspect with the `sqlite3` CLI.
+   *   - `"sqlite"` (default): SQLite + sqlite-vec — single-file, easy to inspect with the `sqlite3` CLI.
+   *   - `"lancedb"`: LanceDB — faster for very large repos, native binary.
    *
    * Each backend is an optional dependency; `lucerna install` prompts which one
    * to install. Picking a backend whose package isn't installed yields a clear
@@ -411,8 +411,8 @@ export interface LucernaConfig {
   exclude?: string[];
   /**
    * Vector store backend to use for persistence.
-   *   - `"lancedb"` (default): LanceDB — fast for very large repos, native binary.
-   *   - `"sqlite"`: SQLite + sqlite-vec — single-file, easy to inspect with the `sqlite3` CLI.
+   *   - `"sqlite"` (default): SQLite + sqlite-vec — single-file, easy to inspect with the `sqlite3` CLI.
+   *   - `"lancedb"`: LanceDB — faster for very large repos, native binary.
    */
   vectorStore?: "lancedb" | "sqlite";
 }

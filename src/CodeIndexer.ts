@@ -347,7 +347,7 @@ export class CodeIndexer {
       this.embeddingFn !== false ? this.embeddingFn.dimensions : 384;
 
     const bundle = await createStoreBundle({
-      backend: this.options.vectorStore ?? "lancedb",
+      backend: this.options.vectorStore ?? "sqlite",
       storageDir: this.storageDir,
       dimensions,
       modelId:

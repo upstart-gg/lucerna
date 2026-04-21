@@ -1,13 +1,6 @@
 import { defineConfig } from "@upstart.gg/lucerna";
 
 export default defineConfig({
-  vectorStore: "sqlite",
-  embedding: {
-    provider: "vertex",
-    model: "gemini-embedding-001",
-    project: process.env.GCP_PROJECT_ID!,
-    location: "europe-west9",
-  },
   // Configure a semantic search provider (required for semantic/vector search):
   // embedding: { provider: "voyage", model: "voyage-code-3", apiKey: "sk-..." },
   // embedding: { provider: "openai", model: "text-embedding-3-small", apiKey: "sk-..." },

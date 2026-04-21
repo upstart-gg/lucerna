@@ -37,6 +37,19 @@ function run(args: string[]): RunResult {
   };
 }
 
+/**
+ * Asserts the command exited 0. On failure, dumps stdout+stderr to the test
+ * log so CI failures aren't opaque.
+ */
+function expectSuccess(result: RunResult): void {
+  if (result.exitCode !== 0) {
+    console.error(
+      `\n--- command failed (exit=${result.exitCode}) ---\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}\n---`,
+    );
+  }
+  expect(result.exitCode).toBe(0);
+}
+
 // ---------------------------------------------------------------------------
 // Fixture setup
 // ---------------------------------------------------------------------------
@@ -57,6 +70,14 @@ beforeAll(async () => {
     `export function add(a: number, b: number): number { return a + b; }`,
   );
   await writeFile(join(projectDir, "index.ts"), `export * from "./utils.js";`);
+
+  // Pin the backend so this smoke test isn't implicitly coupled to whichever
+  // default CodeIndexer picks. Makes failures unambiguous and lets us run the
+  // suite against either backend by flipping this one line.
+  await writeFile(
+    join(projectDir, "lucerna.config.ts"),
+    `export default { vectorStore: "sqlite" };\n`,
+  );
 });
 
 afterAll(async () => {
@@ -109,7 +130,7 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
   });
 
   test("index command indexes a project (lexical only)", () => {
-    const { exitCode, stdout } = run([
+    const result = run([
       "index",
       "--dir",
       projectDir,
@@ -117,28 +138,28 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
       "--storage-dir",
       storageDir,
     ]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("Done");
-    expect(stdout).toMatch(/\d+ files/);
-    expect(stdout).toMatch(/\d+ chunks/);
+    expectSuccess(result);
+    expect(result.stdout).toContain("Done");
+    expect(result.stdout).toMatch(/\d+ files/);
+    expect(result.stdout).toMatch(/\d+ chunks/);
   });
 
   test("stats command shows project statistics", () => {
     // Relies on the index created by the previous test
-    const { exitCode, stdout } = run([
+    const result = run([
       "stats",
       "--dir",
       projectDir,
       "--storage-dir",
       storageDir,
     ]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("Total files");
-    expect(stdout).toContain("Total chunks");
+    expectSuccess(result);
+    expect(result.stdout).toContain("Total files");
+    expect(result.stdout).toContain("Total chunks");
   });
 
   test("stats --format json outputs valid JSON", () => {
-    const { exitCode, stdout } = run([
+    const result = run([
       "stats",
       "--dir",
       projectDir,
@@ -147,14 +168,14 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
       "--format",
       "json",
     ]);
-    expect(exitCode).toBe(0);
-    const parsed = JSON.parse(stdout);
+    expectSuccess(result);
+    const parsed = JSON.parse(result.stdout);
     expect(parsed).toHaveProperty("totalFiles");
     expect(parsed).toHaveProperty("totalChunks");
   });
 
   test("search command returns results", () => {
-    const { exitCode, stdout } = run([
+    const result = run([
       "search",
       "add",
       "--dir",
@@ -163,13 +184,13 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
       "--storage-dir",
       storageDir,
     ]);
-    expect(exitCode).toBe(0);
+    expectSuccess(result);
     // Either results or "No results found." — the command should not crash
-    expect(stdout.length).toBeGreaterThan(0);
+    expect(result.stdout.length).toBeGreaterThan(0);
   });
 
   test("search --format json outputs valid JSON array", () => {
-    const { exitCode, stdout } = run([
+    const result = run([
       "search",
       "add",
       "--dir",
@@ -180,10 +201,10 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
       "--format",
       "json",
     ]);
-    expect(exitCode).toBe(0);
+    expectSuccess(result);
     // Could be an empty array or results — either is valid JSON
-    if (stdout.trim().startsWith("[")) {
-      expect(() => JSON.parse(stdout)).not.toThrow();
+    if (result.stdout.trim().startsWith("[")) {
+      expect(() => JSON.parse(result.stdout)).not.toThrow();
     }
   });
 
@@ -200,14 +221,14 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
     ]);
 
     // Now clear it
-    const { exitCode, stdout } = run([
+    const result = run([
       "clear",
       "--dir",
       projectDir,
       "--storage-dir",
       clearStorage,
     ]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("Cleared");
+    expectSuccess(result);
+    expect(result.stdout).toContain("Cleared");
   });
 });

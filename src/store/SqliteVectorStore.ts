@@ -347,7 +347,10 @@ export class SqliteVectorStore implements VectorStore {
             | { rowid: number }
             | undefined;
           if (existing) {
-            stmts.deleteVecByRowid.run(existing.rowid);
+            // sqlite-vec's vec0 virtual table rejects any value not bound as
+            // SQLITE_INTEGER — and better-sqlite3 binds plain JS numbers as
+            // SQLITE_FLOAT. Pass a BigInt to force the integer affinity.
+            stmts.deleteVecByRowid.run(BigInt(existing.rowid));
             stmts.deleteChunkById.run(chunk.id);
           }
 
@@ -367,13 +370,12 @@ export class SqliteVectorStore implements VectorStore {
               chunk.name ? `${chunk.content} ${chunk.name}` : chunk.content,
             ),
           );
-          const rowid = Number(info.lastInsertRowid);
 
           const vec =
             Array.isArray(vector) && vector.length === dims
               ? vector
               : new Array(dims).fill(0);
-          stmts.insertVec.run(rowid, toFloat32Blob(vec));
+          stmts.insertVec.run(BigInt(info.lastInsertRowid), toFloat32Blob(vec));
         }
       },
     );
@@ -390,7 +392,7 @@ export class SqliteVectorStore implements VectorStore {
       for (const id of batch) {
         const row = stmts.rowidById.get(id) as { rowid: number } | undefined;
         if (row) {
-          stmts.deleteVecByRowid.run(row.rowid);
+          stmts.deleteVecByRowid.run(BigInt(row.rowid));
           stmts.deleteChunkById.run(id);
         }
       }
@@ -407,7 +409,7 @@ export class SqliteVectorStore implements VectorStore {
     const stmts = this.stmts;
     if (!stmts) return;
     const run = this.db.transaction((batch: Array<{ rowid: number }>) => {
-      for (const r of batch) stmts.deleteVecByRowid.run(r.rowid);
+      for (const r of batch) stmts.deleteVecByRowid.run(BigInt(r.rowid));
       this.db?.prepare("DELETE FROM chunks WHERE filePath = ?").run(filePath);
     });
     run(rows);

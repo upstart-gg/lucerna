@@ -71,7 +71,6 @@ export function extractClojure(
       const startLine = nsNode.startRow + 1;
       const endLine = nsNode.endRow + 1;
       importContent = sourceLines.slice(startLine - 1, endLine).join("\n");
-      const breadcrumb = `; File: ${filePath}`;
       chunks.push({
         id: "",
         projectId,
@@ -79,10 +78,10 @@ export function extractClojure(
         language,
         type: "import",
         content: importContent,
-        contextContent: `${breadcrumb}\n\n${importContent}`,
+        contextContent: importContent,
         startLine,
         endLine,
-        metadata: { breadcrumb },
+        metadata: {},
       });
       // Extract required namespaces from the ns form text using a regex
       for (const match of importContent.matchAll(
@@ -113,7 +112,7 @@ export function extractClojure(
     const content = sourceLines
       .slice(fnNode.startRow, fnNode.endRow + 1)
       .join("\n");
-    const breadcrumb = `; File: ${filePath}\n; Function: ${name}`;
+    const breadcrumb = `; Function: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);

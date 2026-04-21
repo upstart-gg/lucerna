@@ -74,7 +74,7 @@ export function extractSql(
         .join("\n");
       const label = stmtLabel[key] ?? "SQL";
       const chunkName = nameCap?.text ? `${label} ${nameCap.text}` : label;
-      const breadcrumb = `// File: ${filePath}\n// ${chunkName}`;
+      const breadcrumb = `// ${chunkName}`;
       chunks.push({
         id: "",
         projectId,

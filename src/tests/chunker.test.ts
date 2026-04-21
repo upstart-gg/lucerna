@@ -1031,7 +1031,7 @@ export class UserService {
 }
   `.trim();
 
-  test("function contextContent starts with '// File:' line", async () => {
+  test("function contextContent starts with '// Function:' line", async () => {
     const chunks = await chunker.chunkSource(
       TS_SOURCE,
       "greet.ts",
@@ -1040,7 +1040,7 @@ export class UserService {
     );
     const fn = chunks.find((c) => c.type === "function" && c.name === "greet");
     expect(fn).toBeDefined();
-    expect(fn?.contextContent.startsWith("// File: greet.ts")).toBe(true);
+    expect(fn?.contextContent.startsWith("// Function: greet")).toBe(true);
   });
 
   test("function contextContent includes '// Function: greet'", async () => {
@@ -1122,11 +1122,11 @@ export class UserService {
     await pyChunker.close();
     const fn = chunks.find((c) => c.type === "function");
     if (fn) {
-      expect(fn.contextContent).toContain("// File: calc.py");
+      expect(fn.contextContent).toContain("// Function: greet");
     }
-    // At minimum the file chunk should have a breadcrumb
+    // At minimum one chunk should have a scope breadcrumb
     expect(
-      chunks.some((c) => c.contextContent.includes("// File: calc.py")),
+      chunks.some((c) => c.contextContent.includes("// Function: greet")),
     ).toBe(true);
   });
 });

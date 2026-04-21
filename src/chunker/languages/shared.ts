@@ -294,8 +294,8 @@ export function processWithPack(
     const content = sourceLines.slice(startLine - 1, endLine).join("\n");
 
     const itemBreadcrumb = item.name
-      ? `// File: ${filePath}\n// ${capitalize(item.kind)}: ${item.name}`
-      : `// File: ${filePath}`;
+      ? `// ${capitalize(item.kind)}: ${item.name}`
+      : "";
     chunks.push({
       id: "",
       projectId,
@@ -304,10 +304,12 @@ export function processWithPack(
       type: mapKind(item.kind),
       ...(item.name ? { name: item.name } : {}),
       content,
-      contextContent: `${itemBreadcrumb}\n\n${content}`,
+      contextContent: itemBreadcrumb
+        ? `${itemBreadcrumb}\n\n${content}`
+        : content,
       startLine,
       endLine,
-      metadata: { breadcrumb: itemBreadcrumb },
+      metadata: itemBreadcrumb ? { breadcrumb: itemBreadcrumb } : {},
     });
 
     // Also add child items (e.g. methods inside classes)
@@ -315,7 +317,7 @@ export function processWithPack(
       const cStart = (child.span.startLine ?? 0) + 1;
       const cEnd = (child.span.endLine ?? 0) + 1;
       const cContent = sourceLines.slice(cStart - 1, cEnd).join("\n");
-      const childBreadcrumbParts = [`// File: ${filePath}`];
+      const childBreadcrumbParts: string[] = [];
       if (item.name) childBreadcrumbParts.push(`// Class: ${item.name}`);
       if (child.name)
         childBreadcrumbParts.push(
@@ -330,12 +332,14 @@ export function processWithPack(
         type: mapKind(child.kind),
         ...(child.name ? { name: child.name } : {}),
         content: cContent,
-        contextContent: `${childBreadcrumb}\n\n${cContent}`,
+        contextContent: childBreadcrumb
+          ? `${childBreadcrumb}\n\n${cContent}`
+          : cContent,
         startLine: cStart,
         endLine: cEnd,
         metadata: {
           ...(item.name ? { className: item.name } : {}),
-          breadcrumb: childBreadcrumb,
+          ...(childBreadcrumb ? { breadcrumb: childBreadcrumb } : {}),
         },
       });
     }
@@ -354,7 +358,6 @@ export function processWithPack(
     const startLine = Math.min(...importInfos.map((i) => i.span.startLine)) + 1;
     const endLine = Math.max(...importInfos.map((i) => i.span.endLine)) + 1;
     const content = sourceLines.slice(startLine - 1, endLine).join("\n");
-    const breadcrumb = `// File: ${filePath}`;
     chunks.unshift({
       id: "",
       projectId,
@@ -362,10 +365,10 @@ export function processWithPack(
       language,
       type: "import",
       content,
-      contextContent: `${breadcrumb}\n\n${content}`,
+      contextContent: content,
       startLine,
       endLine,
-      metadata: { breadcrumb },
+      metadata: {},
     });
     for (const imp of importInfos) {
       const mod = extractImportModule(imp.source, language);

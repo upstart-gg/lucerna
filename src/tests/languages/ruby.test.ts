@@ -118,14 +118,14 @@ end
     for (const c of chunks) expect(c.language).toBe("ruby");
   });
 
-  test("contextContent contains file breadcrumb", async () => {
+  test("contextContent does not leak file path", async () => {
     const chunks = await chunker.chunkSource(
       RB_SOURCE,
       FILE("rb"),
       PROJECT_ID,
       "ruby",
     );
-    for (const c of chunks) expect(c.contextContent).toContain("// File:");
+    for (const c of chunks) expect(c.contextContent).not.toContain("// File:");
   });
 });
 

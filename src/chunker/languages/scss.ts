@@ -58,7 +58,7 @@ export function extractScss(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumb = `/* File: ${filePath} */\n/* Mixin/Function: ${name} */`;
+    const breadcrumb = `/* Mixin/Function: ${name} */`;
     namedChunks.push({
       id: "",
       projectId,
@@ -86,7 +86,7 @@ export function extractScss(
       const content = sourceLines
         .slice(node.startRow, node.endRow + 1)
         .join("\n");
-      const breadcrumb = `/* File: ${filePath} */\n/* Selector: ${selector} */`;
+      const breadcrumb = `/* Selector: ${selector} */`;
       ruleChunks.push({
         id: "",
         projectId,

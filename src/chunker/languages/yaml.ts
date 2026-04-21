@@ -49,7 +49,7 @@ function splitYamlByTopLevelKeys(
     const nextLine = boundaries[i + 1]?.line ?? sourceLines.length + 1;
     const content = sourceLines.slice(b.line - 1, nextLine - 1).join("\n");
     if (!content.trim()) continue;
-    const breadcrumb = `# File: ${filePath}\n# Key: ${b.name}`;
+    const breadcrumb = `# Key: ${b.name}`;
     chunks.push({
       id: "",
       projectId,

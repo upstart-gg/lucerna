@@ -70,7 +70,7 @@ export function extractMatlab(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumbParts = [`% File: ${filePath}`];
+    const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`% Class: ${parentName}`);
     breadcrumbParts.push(`% ${capitalize(type)}: ${name}`);
     const breadcrumb = breadcrumbParts.join("\n");

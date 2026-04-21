@@ -176,10 +176,10 @@ export function extractTsJs(
   ) => {
     const content = nodeContent(node);
 
-    // Scope breadcrumb: file → class (if any) → symbol type + name.
-    // Prepended to contextContent so the embedding carries structural context
+    // Scope breadcrumb: class (if any) → symbol type + name. Prepended to
+    // contextContent so the embedding carries structural context
     // (e.g. a method named `validate` knows it lives in `UserAuthService`).
-    const breadcrumbParts = [`// File: ${filePath}`];
+    const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(
       `// ${type.charAt(0).toUpperCase()}${type.slice(1)}: ${name}`,

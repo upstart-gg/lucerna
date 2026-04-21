@@ -31,19 +31,30 @@ function makeIndexer(projectRoot: string, storageDir: string): CodeIndexer {
 }
 
 /**
- * Tolerant tmpdir cleanup. On Windows, SQLite (and occasionally chokidar) can
- * briefly hold file handles open after `indexer.close()`, so a naive rm races
- * against the OS's lazy handle release and fails with EBUSY. `maxRetries` +
- * `retryDelay` gives Windows time to drop the locks. Linux/macOS return
- * immediately on the first attempt.
+ * Tolerant tmpdir cleanup.
+ *
+ * On POSIX this is a straight `rm -rf`. On Windows, better-sqlite3's native
+ * file handles are released asynchronously after `db.close()`, and Defender /
+ * indexer services routinely hold files open for a second or two after the
+ * process releases them. Retries help but aren't deterministic — we can't
+ * guarantee any bounded wait will clear the lock.
+ *
+ * Since CI tmpdirs are ephemeral and disappear with the runner, failed cleanup
+ * is cosmetic. We retry aggressively, then swallow on Windows so the test
+ * suite isn't held hostage by OS-level file-lock races.
  */
 async function cleanupTmp(tmpDir: string): Promise<void> {
-  await rm(tmpDir, {
-    recursive: true,
-    force: true,
-    maxRetries: 10,
-    retryDelay: 100,
-  });
+  try {
+    await rm(tmpDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 150,
+    });
+  } catch (err) {
+    if (process.platform !== "win32") throw err;
+    // Silent on Windows — the runner is wiped between jobs.
+  }
 }
 
 // ---------------------------------------------------------------------------

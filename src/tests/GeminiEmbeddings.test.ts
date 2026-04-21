@@ -38,10 +38,27 @@ describe("GeminiEmbeddings — unit", () => {
     expect(emb.dimensions).toBe(768);
   });
 
-  test("dimensions is 3072 for gemini-embedding-001", () => {
+  test("dimensions defaults to 256 for gemini-embedding-001", () => {
     const emb = new GeminiEmbeddings({
       model: "gemini-embedding-001",
       apiKey: "key",
+    });
+    expect(emb.dimensions).toBe(256);
+  });
+
+  test("dimensions defaults to 256 for gemini-embedding-2-preview", () => {
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-2-preview",
+      apiKey: "key",
+    });
+    expect(emb.dimensions).toBe(256);
+  });
+
+  test("explicit dimensions override the default", () => {
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-001",
+      apiKey: "key",
+      dimensions: 3072,
     });
     expect(emb.dimensions).toBe(3072);
   });
@@ -125,5 +142,195 @@ describe("GeminiEmbeddings — unit", () => {
     );
     const emb = new GeminiEmbeddings(VALID_OPTS);
     await expect(emb.generate(["test"])).rejects.toThrow("401");
+  });
+
+  test("generate() sends taskType RETRIEVAL_DOCUMENT on gemini-embedding-001", async () => {
+    let captured:
+      | {
+          requests: {
+            taskType?: string;
+            content: { parts: { text: string }[] };
+          }[];
+        }
+      | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return makeEmbeddingResponse(captured?.requests.length ?? 0);
+      },
+    );
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-001",
+      apiKey: "k",
+    });
+    await emb.generate(["hello"]);
+    expect(captured?.requests[0]?.taskType).toBe("RETRIEVAL_DOCUMENT");
+    expect(captured?.requests[0]?.content.parts[0]?.text).toBe("hello");
+  });
+
+  test("embedQuery() sends taskType CODE_RETRIEVAL_QUERY on gemini-embedding-001", async () => {
+    let captured:
+      | {
+          requests: {
+            taskType?: string;
+            content: { parts: { text: string }[] };
+          }[];
+        }
+      | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return makeEmbeddingResponse(captured?.requests.length ?? 0);
+      },
+    );
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-001",
+      apiKey: "k",
+    });
+    await emb.embedQuery("how does auth work");
+    expect(captured?.requests[0]?.taskType).toBe("CODE_RETRIEVAL_QUERY");
+    expect(captured?.requests[0]?.content.parts[0]?.text).toBe(
+      "how does auth work",
+    );
+  });
+
+  test("generate() on gemini-embedding-2-preview omits taskType and sends text as-is", async () => {
+    let captured:
+      | {
+          requests: {
+            taskType?: string;
+            content: { parts: { text: string }[] };
+          }[];
+        }
+      | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return makeEmbeddingResponse(captured?.requests.length ?? 0);
+      },
+    );
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-2-preview",
+      apiKey: "k",
+    });
+    await emb.generate(["function foo() {}"]);
+    expect(captured?.requests[0]?.taskType).toBeUndefined();
+    expect(captured?.requests[0]?.content.parts[0]?.text).toBe(
+      "function foo() {}",
+    );
+  });
+
+  test("embedQuery() on gemini-embedding-2-preview omits taskType and prepends code-retrieval prefix", async () => {
+    let captured:
+      | {
+          requests: {
+            taskType?: string;
+            content: { parts: { text: string }[] };
+          }[];
+        }
+      | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return makeEmbeddingResponse(captured?.requests.length ?? 0);
+      },
+    );
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-2-preview",
+      apiKey: "k",
+    });
+    await emb.embedQuery("how does auth work");
+    expect(captured?.requests[0]?.taskType).toBeUndefined();
+    expect(captured?.requests[0]?.content.parts[0]?.text).toBe(
+      "task: code retrieval | query: how does auth work",
+    );
+  });
+
+  test("explicit dimensions: 256 passes outputDimensionality in the request body", async () => {
+    let captured: { requests: { outputDimensionality?: number }[] } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        // Return a 256-dim vector (arbitrary values) so we can validate normalization
+        return new Response(
+          JSON.stringify({
+            embeddings: [{ values: Array.from({ length: 256 }, () => 2) }],
+          }),
+          { status: 200 },
+        );
+      },
+    );
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-2-preview",
+      apiKey: "k",
+      dimensions: 256,
+    });
+    await emb.generate(["hi"]);
+    expect(captured?.requests[0]?.outputDimensionality).toBe(256);
+  });
+
+  test("sub-native dimensions produce L2-normalized unit vectors", async () => {
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            // Unnormalized, length != 1
+            embeddings: [{ values: [3, 4, 0, 0] }],
+          }),
+          { status: 200 },
+        ),
+    );
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-2-preview",
+      apiKey: "k",
+      dimensions: 4,
+    });
+    const [v] = await emb.generate(["x"]);
+    const norm = Math.sqrt((v ?? []).reduce((s, x) => s + x * x, 0));
+    expect(norm).toBeCloseTo(1, 6);
+    expect(v).toHaveLength(4);
+  });
+
+  test("native dimensions skip outputDimensionality and normalization", async () => {
+    let captured: { requests: { outputDimensionality?: number }[] } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        // Return unnormalized vector to prove we don't post-process
+        return new Response(
+          JSON.stringify({ embeddings: [{ values: [3, 4, 0] }] }),
+          { status: 200 },
+        );
+      },
+    );
+    const emb = new GeminiEmbeddings({
+      model: "text-embedding-004",
+      apiKey: "k",
+    });
+    const [v] = await emb.generate(["x"]);
+    expect(captured?.requests[0]?.outputDimensionality).toBeUndefined();
+    // Not re-normalized client-side
+    expect(v).toEqual([3, 4, 0]);
+  });
+
+  test("gemini-embedding-001 at default dim sends outputDimensionality: 256", async () => {
+    let captured: { requests: { outputDimensionality?: number }[] } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({
+            embeddings: [{ values: Array.from({ length: 256 }, () => 1) }],
+          }),
+          { status: 200 },
+        );
+      },
+    );
+    const emb = new GeminiEmbeddings({
+      model: "gemini-embedding-001",
+      apiKey: "k",
+    });
+    await emb.generate(["x"]);
+    expect(captured?.requests[0]?.outputDimensionality).toBe(256);
   });
 });

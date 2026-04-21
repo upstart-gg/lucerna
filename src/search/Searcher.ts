@@ -54,7 +54,7 @@ export class Searcher {
         "Semantic search is disabled (embeddingFunction: false). Use searchLexical() instead.",
       );
     }
-    const [vector] = await this.embeddingFn.generate([query]);
+    const vector = await embedQueryVector(this.embeddingFn, query);
     if (!vector) return [];
     const limit = options.limit ?? 10;
     const results = await this.store.searchVector(vector, {
@@ -88,9 +88,10 @@ export class Searcher {
 
     if (this.store.searchHybrid) {
       // Native path: single round-trip, LanceDB handles RRF fusion
-      const [vector] = await (this.embeddingFn as EmbeddingFunction).generate([
+      const vector = await embedQueryVector(
+        this.embeddingFn as EmbeddingFunction,
         query,
-      ]);
+      );
       if (!vector) return [];
       fused = (
         await this.store
@@ -175,6 +176,15 @@ function applyMinScore(
 ): SearchResult[] {
   if (minScore === undefined) return results;
   return results.filter((r) => r.score >= minScore);
+}
+
+async function embedQueryVector(
+  fn: EmbeddingFunction,
+  query: string,
+): Promise<number[] | undefined> {
+  if (fn.embedQuery) return fn.embedQuery(query);
+  const [v] = await fn.generate([query]);
+  return v;
 }
 
 async function applyReranking(

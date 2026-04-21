@@ -3,7 +3,13 @@ import { MistralEmbeddings } from "../embeddings/MistralEmbeddings.js";
 
 const REAL_FETCH = globalThis.fetch;
 
-const VALID_OPTS = { model: "codestral-embed", apiKey: "my-key" };
+// Pin to native 1024 for these tests so vector-value assertions aren't
+// affected by L2 normalization (which kicks in at sub-native dims).
+const VALID_OPTS = {
+  model: "codestral-embed",
+  apiKey: "my-key",
+  dimensions: 1024,
+};
 
 function makeMistralResponse(batchSize: number) {
   return new Response(
@@ -34,9 +40,63 @@ describe("MistralEmbeddings — unit", () => {
     ).toThrow("Unknown Mistral model");
   });
 
-  test("dimensions is 1024 for codestral-embed", () => {
+  test("dimensions defaults to 512 for codestral-embed", () => {
+    const emb = new MistralEmbeddings({
+      model: "codestral-embed",
+      apiKey: "my-key",
+    });
+    expect(emb.dimensions).toBe(512);
+  });
+
+  test("dimensions defaults to 512 for mistral-embed", () => {
+    const emb = new MistralEmbeddings({
+      model: "mistral-embed",
+      apiKey: "my-key",
+    });
+    expect(emb.dimensions).toBe(512);
+  });
+
+  test("explicit dimensions override the default", () => {
     const emb = new MistralEmbeddings(VALID_OPTS);
     expect(emb.dimensions).toBe(1024);
+  });
+
+  test("default dim sends output_dimension: 512 and L2-normalizes", async () => {
+    let captured: { output_dimension?: number } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ data: [{ index: 0, embedding: [3, 4, 0, 0] }] }),
+          { status: 200 },
+        );
+      },
+    );
+    const emb = new MistralEmbeddings({
+      model: "codestral-embed",
+      apiKey: "k",
+    });
+    const [v] = await emb.generate(["x"]);
+    expect(captured?.output_dimension).toBe(512);
+    const norm = Math.sqrt((v ?? []).reduce((s, x) => s + x * x, 0));
+    expect(norm).toBeCloseTo(1, 6);
+  });
+
+  test("native dim omits output_dimension and skips L2 norm", async () => {
+    let captured: { output_dimension?: number } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({ data: [{ index: 0, embedding: [3, 4, 0] }] }),
+          { status: 200 },
+        );
+      },
+    );
+    const emb = new MistralEmbeddings(VALID_OPTS);
+    const [v] = await emb.generate(["x"]);
+    expect(captured?.output_dimension).toBeUndefined();
+    expect(v).toEqual([3, 4, 0]);
   });
 
   test("returns vectors for a small batch", async () => {

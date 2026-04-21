@@ -189,6 +189,48 @@ describe("Searcher — searchSemantic()", () => {
     const results = await searcher.searchSemantic("foo", { limit: 2 });
     expect(results).toHaveLength(2);
   });
+
+  test("prefers embedQuery() over generate() when provider exposes it", async () => {
+    const calls: { method: "generate" | "embedQuery"; input: unknown }[] = [];
+    const asymmetric: EmbeddingFunction = {
+      dimensions: 4,
+      generate: async (texts) => {
+        calls.push({ method: "generate", input: texts });
+        return texts.map(() => [0.9, 0, 0, 0]);
+      },
+      embedQuery: async (text) => {
+        calls.push({ method: "embedQuery", input: text });
+        return [0.1, 0.2, 0.3, 0.4];
+      },
+    };
+    let captured: number[] | undefined;
+    const store = makeMockStore({
+      searchVector: async (v) => {
+        captured = v;
+        return [makeResult("x", 0.9)];
+      },
+    });
+    const searcher = new Searcher(store, asymmetric);
+    await searcher.searchSemantic("how does auth work");
+    expect(calls).toEqual([
+      { method: "embedQuery", input: "how does auth work" },
+    ]);
+    expect(captured).toEqual([0.1, 0.2, 0.3, 0.4]);
+  });
+
+  test("falls back to generate() when provider has no embedQuery", async () => {
+    const calls: string[][] = [];
+    const symmetric: EmbeddingFunction = {
+      dimensions: 4,
+      generate: async (texts) => {
+        calls.push(texts);
+        return texts.map(() => [1, 2, 3, 4]);
+      },
+    };
+    const searcher = new Searcher(makeMockStore(), symmetric);
+    await searcher.searchSemantic("foo");
+    expect(calls).toEqual([["foo"]]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -532,6 +574,34 @@ describe("Searcher — native hybrid path (searchHybrid)", () => {
     expect(capturedQuery).toBe("find auth");
     // mockEmbedding returns [0.1, 0.2, 0.3, 0.4] for any text
     expect(capturedVector).toEqual([0.1, 0.2, 0.3, 0.4]);
+  });
+
+  test("native hybrid path uses embedQuery() when provider exposes it", async () => {
+    let generateCalled = false;
+    let embedQueryCalled = false;
+    const asymmetric: EmbeddingFunction = {
+      dimensions: 4,
+      generate: async (texts) => {
+        generateCalled = true;
+        return texts.map(() => [9, 9, 9, 9]);
+      },
+      embedQuery: async () => {
+        embedQueryCalled = true;
+        return [1, 2, 3, 4];
+      },
+    };
+    let capturedVector: number[] | undefined;
+    const store = makeMockStore({
+      searchHybrid: async (v) => {
+        capturedVector = v;
+        return [makeResult("a", 0.9, "semantic")];
+      },
+    });
+    const searcher = new Searcher(store, asymmetric);
+    await searcher.search("find auth");
+    expect(embedQueryCalled).toBe(true);
+    expect(generateCalled).toBe(false);
+    expect(capturedVector).toEqual([1, 2, 3, 4]);
   });
 
   test("results tagged as 'hybrid' matchType from native path", async () => {

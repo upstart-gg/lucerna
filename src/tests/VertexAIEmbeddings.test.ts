@@ -156,6 +156,139 @@ describe("VertexAIEmbeddings — unit", () => {
     expect(totalItems).toBe(10);
   });
 
+  test("generate() sends task_type RETRIEVAL_DOCUMENT", async () => {
+    let captured: { instances: { task_type: string }[] } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return makeVertexResponse(captured?.instances.length ?? 0);
+      },
+    );
+    const emb = new VertexAIEmbeddings(VALID_OPTS);
+    await emb.generate(["some code"]);
+    expect(captured?.instances[0]?.task_type).toBe("RETRIEVAL_DOCUMENT");
+  });
+
+  test("embedQuery() sends task_type CODE_RETRIEVAL_QUERY", async () => {
+    let captured:
+      | { instances: { task_type: string; content: string }[] }
+      | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return makeVertexResponse(captured?.instances.length ?? 0);
+      },
+    );
+    const emb = new VertexAIEmbeddings(VALID_OPTS);
+    const v = await emb.embedQuery("how does auth work");
+    expect(captured?.instances[0]?.task_type).toBe("CODE_RETRIEVAL_QUERY");
+    expect(captured?.instances[0]?.content).toBe("how does auth work");
+    expect(v).toEqual([1, 0]);
+  });
+
+  test("dimensions defaults to 256 for gemini-embedding-001", () => {
+    const emb = new VertexAIEmbeddings({
+      model: "gemini-embedding-001",
+      project: "proj",
+    });
+    expect(emb.dimensions).toBe(256);
+  });
+
+  test("explicit dimensions override the default for gemini-embedding-001", () => {
+    const emb = new VertexAIEmbeddings({
+      model: "gemini-embedding-001",
+      project: "proj",
+      dimensions: 3072,
+    });
+    expect(emb.dimensions).toBe(3072);
+  });
+
+  test("gemini-embedding-001 sends one text per request (no batching)", async () => {
+    const fetchCalls: { instancesLen: number; task_type: string }[] = [];
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(init.body as string) as {
+          instances: { task_type: string }[];
+        };
+        fetchCalls.push({
+          instancesLen: body.instances.length,
+          task_type: body.instances[0]?.task_type ?? "",
+        });
+        return makeVertexResponse(body.instances.length);
+      },
+    );
+    const emb = new VertexAIEmbeddings({
+      model: "gemini-embedding-001",
+      project: "proj",
+    });
+    const result = await emb.generate(["a", "b", "c"]);
+    expect(result).toHaveLength(3);
+    expect(fetchCalls).toHaveLength(3);
+    expect(fetchCalls.every((c) => c.instancesLen === 1)).toBe(true);
+    expect(fetchCalls.every((c) => c.task_type === "RETRIEVAL_DOCUMENT")).toBe(
+      true,
+    );
+  });
+
+  test("explicit dimensions puts outputDimensionality in parameters", async () => {
+    let captured:
+      | { parameters?: { outputDimensionality?: number } }
+      | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return new Response(
+          JSON.stringify({
+            predictions: [
+              { embeddings: { values: Array.from({ length: 256 }, () => 1) } },
+            ],
+          }),
+          { status: 200 },
+        );
+      },
+    );
+    const emb = new VertexAIEmbeddings({
+      model: "gemini-embedding-001",
+      project: "proj",
+      dimensions: 256,
+    });
+    await emb.generate(["hi"]);
+    expect(captured?.parameters?.outputDimensionality).toBe(256);
+  });
+
+  test("sub-native dimensions produce L2-normalized unit vectors", async () => {
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            predictions: [{ embeddings: { values: [3, 4, 0, 0] } }],
+          }),
+          { status: 200 },
+        ),
+    );
+    const emb = new VertexAIEmbeddings({
+      model: "gemini-embedding-001",
+      project: "proj",
+      dimensions: 4,
+    });
+    const [v] = await emb.generate(["x"]);
+    const norm = Math.sqrt((v ?? []).reduce((s, x) => s + x * x, 0));
+    expect(norm).toBeCloseTo(1, 6);
+  });
+
+  test("native dimensions omit parameters block", async () => {
+    let captured: { parameters?: unknown } | undefined;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        captured = JSON.parse(init.body as string);
+        return makeVertexResponse(1);
+      },
+    );
+    const emb = new VertexAIEmbeddings(VALID_OPTS);
+    await emb.generate(["x"]);
+    expect(captured?.parameters).toBeUndefined();
+  });
+
   test("throws on API error", async () => {
     (globalThis as Record<string, unknown>).fetch = mock(
       async () =>

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   averageVectors,
   charBudgetBatches,
+  l2Normalize,
   prepareTexts,
   reassembleVectors,
   splitTextToChunks,
@@ -44,6 +45,26 @@ describe("charBudgetBatches", () => {
   test("empty input → no batches", () => {
     const batches = [...charBudgetBatches([], 100, 10)];
     expect(batches).toHaveLength(0);
+  });
+});
+
+describe("l2Normalize", () => {
+  test("scales a non-unit vector to unit length", () => {
+    const v = l2Normalize([3, 4, 0]);
+    const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+    expect(norm).toBeCloseTo(1, 6);
+    expect(v[0]).toBeCloseTo(0.6);
+    expect(v[1]).toBeCloseTo(0.8);
+    expect(v[2]).toBe(0);
+  });
+
+  test("returns zero vector unchanged", () => {
+    expect(l2Normalize([0, 0, 0])).toEqual([0, 0, 0]);
+  });
+
+  test("already-unit vector stays unit", () => {
+    const v = l2Normalize([1, 0, 0]);
+    expect(v).toEqual([1, 0, 0]);
   });
 });
 

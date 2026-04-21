@@ -25,13 +25,20 @@ export default defineConfig({
 });
 ```
 
-| Model | Dimensions | Price per 1M tokens | Notes |
-|-------|-----------|---------------------|-------|
-| `voyage-4` | 1024 | — | Latest generation |
-| `voyage-4-lite` | 512 | — | Faster, lower cost |
-| `voyage-code-3` | 1024 | $0.18 | Code-optimized, 32K ctx — **top pick** |
-| `voyage-3` | 1024 | $0.06 | General text |
-| `voyage-3-lite` | 512 | $0.02 | Faster, lower cost |
+All Voyage models are Matryoshka-trained. Lucerna defaults to a reduced dimensionality (see "Default dim" below) for a ~50% smaller index with negligible quality loss; pass `dimensions` to override.
+
+| Model | Native dim | Default dim | Price per 1M tokens | Notes |
+|-------|-----------|-------------|---------------------|-------|
+| `voyage-4` | 1024 | 512 | — | Latest generation |
+| `voyage-4-lite` | 512 | 512 | — | Faster, lower cost |
+| `voyage-code-3` | 1024 | 512 | $0.18 | Code-optimized, 32K ctx — **top pick** |
+| `voyage-3-large` | 2048 | 1024 | — | Highest quality general-purpose |
+| `voyage-3.5` | 1024 | 512 | — | Improved general quality |
+| `voyage-3.5-lite` | 1024 | 512 | — | Faster, lower cost |
+| `voyage-3` | 1024 | 512 | $0.06 | General text |
+| `voyage-3-lite` | 512 | 512 | $0.02 | Faster, lower cost |
+
+Lucerna uses asymmetric retrieval automatically: indexed chunks use `input_type: "document"` and queries use `input_type: "query"`, matching Voyage's recommendation for best retrieval quality.
 
 ---
 
@@ -45,17 +52,17 @@ export default defineConfig({
 });
 ```
 
-OpenAI's `text-embedding-3` models support server-side Matryoshka truncation — passing a smaller `dimensions` value produces shorter vectors directly from the API (better quality than post-hoc truncation):
+OpenAI's `text-embedding-3` models are Matryoshka-trained. Lucerna passes a reduced `dimensions` to the API by default (512 for small, 768 for large) — at these sizes the MTEB numbers still beat `text-embedding-ada-002` at its full 1536, per OpenAI's own benchmarks. Override via the `dimensions` option:
 
 ```ts
-embedding: { provider: "openai", model: "text-embedding-3-large", apiKey: process.env.OPENAI_API_KEY!, dimensions: 256 },
+embedding: { provider: "openai", model: "text-embedding-3-large", apiKey: process.env.OPENAI_API_KEY!, dimensions: 3072 },
 ```
 
-| Model | Dimensions | Price per 1M tokens | Notes |
-|-------|-----------|---------------------|-------|
-| `text-embedding-3-small` | 1536 | $0.02 | Good quality/cost balance |
-| `text-embedding-3-large` | 3072 | $0.13 | Higher quality |
-| `text-embedding-ada-002` | 1536 | $0.10 | Legacy |
+| Model | Native dim | Default dim | Price per 1M tokens | Notes |
+|-------|-----------|-------------|---------------------|-------|
+| `text-embedding-3-small` | 1536 | 512 | $0.02 | Good quality/cost balance |
+| `text-embedding-3-large` | 3072 | 768 | $0.13 | Higher quality |
+| `text-embedding-ada-002` | 1536 | 1536 | $0.10 | Legacy, not Matryoshka |
 
 ---
 
@@ -88,9 +95,13 @@ export default defineConfig({
 });
 ```
 
-| Model | Dimensions | Price per 1M tokens | Notes |
-|-------|-----------|---------------------|-------|
-| `jina-embeddings-v3` | 1024 | ~$0.02 | 8K ctx, good for long code chunks |
+`jina-embeddings-v3` is Matryoshka-trained and supports truncation down to 32 dimensions with minimal quality loss (~92% retention at 64 per Jina's benchmarks). Lucerna defaults to 512 for a ~50% smaller index at near-full quality — override via `dimensions`. Asymmetric retrieval is used automatically: `task: "retrieval.passage"` for indexed chunks and `task: "retrieval.query"` for queries.
+
+| Model | Native dim | Default dim | Price per 1M tokens | Notes |
+|-------|-----------|-------------|---------------------|-------|
+| `jina-embeddings-v3` | 1024 | 512 | ~$0.02 | 8K ctx, Matryoshka, good for long code chunks |
+| `jina-embeddings-v2-base-code` | 768 | 768 | — | Code-specific, no Matryoshka |
+| `jina-embeddings-v2-base-en` | 768 | 768 | — | English only, no Matryoshka |
 
 ---
 
@@ -104,10 +115,12 @@ export default defineConfig({
 });
 ```
 
-| Model | Dimensions | Price per 1M tokens | Notes |
-|-------|-----------|---------------------|-------|
-| `codestral-embed` | 1024 | $0.15 | Code-specific — **recommended** |
-| `mistral-embed` | 1024 | $0.10 | Mixed text + code |
+Both Mistral embedding models are Matryoshka-trained. Lucerna defaults to 512 for a ~50% smaller index at negligible quality loss — override via `dimensions` if you need more.
+
+| Model | Native dim | Default dim | Price per 1M tokens | Notes |
+|-------|-----------|-------------|---------------------|-------|
+| `codestral-embed` | 1024 | 512 | $0.15 | Code-specific — **recommended** |
+| `mistral-embed` | 1024 | 512 | $0.10 | Mixed text + code |
 
 ---
 
@@ -117,14 +130,24 @@ export default defineConfig({
 // lucerna.config.ts
 import { defineConfig } from "@upstart.gg/lucerna";
 export default defineConfig({
-  embedding: { provider: "gemini", model: "gemini-embedding-001", apiKey: process.env.GOOGLE_API_KEY! },
+  embedding: {
+    provider: "gemini",
+    model: "gemini-embedding-2-preview",
+    apiKey: process.env.GOOGLE_API_KEY!,
+    // dimensions defaults to 256 for gemini-* models; override with e.g. `dimensions: 3072` for full native dim
+  },
 });
 ```
 
-| Model | Dimensions | Price per 1M tokens | Notes |
-|-------|-----------|---------------------|-------|
-| `gemini-embedding-001` | 3072 | $0.15 (batch $0.075) | Current model, higher quality |
-| `text-embedding-004` | 768 | $0.15 | 2048-token ctx |
+| Model | Native dim | Default dim | Price per 1M tokens | Notes |
+|-------|-----------|-------------|---------------------|-------|
+| `gemini-embedding-2-preview` | 3072 (truncatable 128–3072) | 256 | — | 8K ctx, multi-modal, latest |
+| `gemini-embedding-001` | 3072 (truncatable 128–3072) | 256 | $0.15 (batch $0.075) | 2K ctx, text only |
+| `text-embedding-004` | 768 | 768 | $0.15 | Legacy, 2K ctx |
+
+Lucerna uses asymmetric code retrieval automatically: indexed chunks are embedded with `RETRIEVAL_DOCUMENT` and queries with `CODE_RETRIEVAL_QUERY`. For `gemini-embedding-2-preview` — which does not accept `task_type` — the equivalent prompt prefix is applied automatically, so no configuration is needed.
+
+Both `gemini-embedding-*` models support Matryoshka truncation via `dimensions` (128–3072), and Lucerna defaults to `256` to keep the index ~12× smaller and faster to search with minimal quality loss. When `dimensions` is below the native 3072, Lucerna L2-normalizes each returned vector as required by the API.
 
 ---
 
@@ -153,11 +176,16 @@ export default defineConfig({
 });
 ```
 
-| Model | Dimensions | Price per 1M tokens | Notes |
-|-------|-----------|---------------------|-------|
-| `text-embedding-005` | 768 | $0.10 | Latest, recommended |
-| `text-embedding-004` | 768 | $0.10 | Previous generation |
-| `text-multilingual-embedding-002` | 768 | $0.10 | Multilingual |
+| Model | Native dim | Default dim | Price per 1M tokens | Notes |
+|-------|-----------|-------------|---------------------|-------|
+| `gemini-embedding-001` | 3072 (truncatable 128–3072) | 256 | — | Highest quality, 1 input per request |
+| `text-embedding-005` | 768 | 768 | $0.10 | Latest text model, up to 250 inputs per request |
+| `text-embedding-004` | 768 | 768 | $0.10 | Previous generation |
+| `text-multilingual-embedding-002` | 768 | 768 | $0.10 | Multilingual |
+
+Lucerna uses asymmetric code retrieval automatically: indexed chunks are embedded with `RETRIEVAL_DOCUMENT` and queries with `CODE_RETRIEVAL_QUERY`, so no configuration is needed. When `dimensions` is set below the model's native dim, Lucerna L2-normalizes returned vectors as required by the API.
+
+Note: `gemini-embedding-001` on Vertex accepts only one text per request (the API does not batch), so indexing is slower than `text-embedding-005`. `gemini-embedding-2-preview` is not available on Vertex — use the Gemini provider for it.
 
 ---
 

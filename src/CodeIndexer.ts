@@ -300,24 +300,34 @@ export class CodeIndexer {
       `[lucerna] ${this._isLeader ? "Leader" : "Follower"} (PID ${process.pid})\n`,
     );
 
-    // Auto-clear stale index when the embedding model or dimensions change
+    // Auto-clear stale index when the embedding model or dimensions change.
+    // Skipped when no embedding function is configured (e.g. `stats --no-semantic`):
+    // without a target dim/model we can't meaningfully compare, and defaulting would
+    // wipe a valid index built by a semantic run.
     const metaPath = join(this.storageDir, "index-meta.json");
-    const currentDimensions =
-      this.embeddingFn !== false ? this.embeddingFn.dimensions : 384;
-    const currentModelId =
-      this.embeddingFn !== false ? this.embeddingFn.modelId : undefined;
+    let existingMeta: { modelId?: string; dimensions: number } | null = null;
     try {
       const raw = await readFile(metaPath, "utf8");
-      const meta = JSON.parse(raw) as { modelId?: string; dimensions: number };
-      const dimChanged = meta.dimensions !== currentDimensions;
+      existingMeta = JSON.parse(raw) as {
+        modelId?: string;
+        dimensions: number;
+      };
+    } catch {
+      // No meta file yet — fresh index, nothing to clear
+    }
+
+    if (this.embeddingFn !== false && existingMeta) {
+      const currentDimensions = this.embeddingFn.dimensions;
+      const currentModelId = this.embeddingFn.modelId;
+      const dimChanged = existingMeta.dimensions !== currentDimensions;
       const modelChanged =
-        meta.modelId !== undefined &&
+        existingMeta.modelId !== undefined &&
         currentModelId !== undefined &&
-        meta.modelId !== currentModelId;
+        existingMeta.modelId !== currentModelId;
       if (dimChanged || modelChanged) {
         const reason = dimChanged
-          ? `dimensions changed (${meta.dimensions} → ${currentDimensions})`
-          : `model changed ("${meta.modelId}" → "${currentModelId}")`;
+          ? `dimensions changed (${existingMeta.dimensions} → ${currentDimensions})`
+          : `model changed ("${existingMeta.modelId}" → "${currentModelId}")`;
         console.warn(
           `[lucerna] Embedding ${reason} — clearing index for full reindex.`,
         );
@@ -331,9 +341,8 @@ export class CodeIndexer {
         });
         await rm(metaPath, { force: true });
         await rm(join(this.storageDir, "file-hashes.json"), { force: true });
+        existingMeta = null;
       }
-    } catch {
-      // No meta file yet — fresh index, nothing to clear
     }
 
     this.chunker = new TreeSitterChunker({
@@ -343,15 +352,24 @@ export class CodeIndexer {
     });
     await this.chunker.initialize();
 
+    // When no embedding function is configured, reuse the existing index's
+    // dims/model so read-only commands (stats, lexical search) can open a
+    // store built by a prior semantic run. Fall back to 384 only when there
+    // is no existing index at all.
     const dimensions =
-      this.embeddingFn !== false ? this.embeddingFn.dimensions : 384;
+      this.embeddingFn !== false
+        ? this.embeddingFn.dimensions
+        : (existingMeta?.dimensions ?? 384);
+    const modelId =
+      this.embeddingFn !== false
+        ? this.embeddingFn.modelId
+        : existingMeta?.modelId;
 
     const bundle = await createStoreBundle({
       backend: this.options.vectorStore ?? "sqlite",
       storageDir: this.storageDir,
       dimensions,
-      modelId:
-        this.embeddingFn !== false ? this.embeddingFn.modelId : undefined,
+      modelId,
     });
     this.store = bundle.vectorStore;
     this.graphStore = bundle.graphStore;
@@ -1123,6 +1141,10 @@ export class CodeIndexer {
       const data = await readFile(this.hashFilePath, "utf8");
       const obj = JSON.parse(data) as Record<string, string>;
       this.fileHashes = new Map(Object.entries(obj));
+      // file-hashes.json is rewritten on every successful index, so its mtime
+      // is a good proxy for "last indexed" across process boundaries.
+      const s = await stat(this.hashFilePath).catch(() => null);
+      if (s) this.lastIndexed = s.mtime;
     } catch {
       this.fileHashes = new Map();
     }

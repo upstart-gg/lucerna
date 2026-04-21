@@ -297,6 +297,45 @@ describe("CodeIndexer — semantic search", () => {
     const indexer = new CodeIndexer({ projectRoot, storageDir });
     expect(indexer).toBeDefined();
   });
+
+  test("initialize with embeddingFunction: false preserves an existing semantic index", async () => {
+    // Regression: `stats --no-semantic` after `index` used to wipe the index
+    // because the dim-change check defaulted to 384 when no embedder was
+    // configured, mismatching any non-384 index.
+    const semanticIndexer = new CodeIndexer({
+      projectRoot,
+      storageDir,
+      embeddingFunction: mockEmbeddingFn(), // 4-dim
+    });
+    await semanticIndexer.initialize();
+    const built = await semanticIndexer.indexProject();
+    expect(built.totalChunks).toBeGreaterThan(0);
+    await semanticIndexer.close();
+
+    // Re-open without an embedder (mirrors the `stats --no-semantic` path).
+    const lexicalIndexer = new CodeIndexer({
+      projectRoot,
+      storageDir,
+      embeddingFunction: false,
+    });
+    await lexicalIndexer.initialize();
+    const stats = await lexicalIndexer.getStats();
+    expect(stats.totalChunks).toBe(built.totalChunks);
+    expect(stats.totalFiles).toBe(built.totalFiles);
+    await lexicalIndexer.close();
+
+    // Re-open again with the original embedder — meta dims/model should be
+    // unchanged, so no spurious clear happens.
+    const semanticAgain = new CodeIndexer({
+      projectRoot,
+      storageDir,
+      embeddingFunction: mockEmbeddingFn(),
+    });
+    await semanticAgain.initialize();
+    const statsAgain = await semanticAgain.getStats();
+    expect(statsAgain.totalChunks).toBe(built.totalChunks);
+    await semanticAgain.close();
+  });
 });
 
 // ---------------------------------------------------------------------------

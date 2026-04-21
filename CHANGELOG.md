@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.23
+
+### Patch Changes
+
+- [#79](https://github.com/upstart-gg/lucerna/pull/79) [`e1eddd5`](https://github.com/upstart-gg/lucerna/commit/e1eddd5a5900e3efab84911e27fc52ff9efeb22c) Thanks [@mattallty](https://github.com/mattallty)! - Tweak embedding models and add gemini models
+
 ## 0.1.22
 
 ### Patch Changes

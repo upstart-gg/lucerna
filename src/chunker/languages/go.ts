@@ -75,7 +75,6 @@ export function extractGo(
     const startLine = Math.min(...importInfos.map((i) => i.span.startLine)) + 1;
     const endLine = Math.max(...importInfos.map((i) => i.span.endLine)) + 1;
     importContent = sourceLines.slice(startLine - 1, endLine).join("\n");
-    const breadcrumb = `// File: ${filePath}`;
     chunks.push({
       id: "",
       projectId,
@@ -83,10 +82,10 @@ export function extractGo(
       language: "go",
       type: "import",
       content: importContent,
-      contextContent: `${breadcrumb}\n\n${importContent}`,
+      contextContent: importContent,
       startLine,
       endLine,
-      metadata: { breadcrumb },
+      metadata: {},
     });
     for (const imp of importInfos) {
       if (imp.source.includes("\n")) continue; // skip block wrapper
@@ -112,7 +111,7 @@ export function extractGo(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumbParts = [`// File: ${filePath}`];
+    const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
     const breadcrumb = breadcrumbParts.join("\n");

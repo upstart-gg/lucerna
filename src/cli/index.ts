@@ -582,6 +582,7 @@ function printList(results: SearchResult[]): void {
   for (const r of results) {
     const header = `${r.chunk.filePath}:${r.chunk.startLine}-${r.chunk.endLine}  [${r.chunk.type}]${r.chunk.name ? ` ${r.chunk.name}` : ""}`;
     const ctx = Object.entries(r.chunk.metadata)
+      .filter(([k]) => k !== "breadcrumb")
       .map(([k, v]) => `${k}=${v}`)
       .join(" ");
     console.log(ctx ? `${header}  ${ctx}` : header);

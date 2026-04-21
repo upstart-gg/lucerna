@@ -59,7 +59,7 @@ export function extractVue(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumb = `// File: ${filePath}\n// Section: ${blockName}`;
+    const breadcrumb = `// Section: ${blockName}`;
     chunks.push({
       id: "",
       projectId,

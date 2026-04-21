@@ -74,7 +74,6 @@ export function extractElixir(
     const startLine = Math.min(...nodes.map((n) => n.startRow)) + 1;
     const endLine = Math.max(...nodes.map((n) => n.endRow)) + 1;
     importContent = sourceLines.slice(startLine - 1, endLine).join("\n");
-    const breadcrumb = `# File: ${filePath}`;
     chunks.push({
       id: "",
       projectId,
@@ -82,10 +81,10 @@ export function extractElixir(
       language,
       type: "import",
       content: importContent,
-      contextContent: `${breadcrumb}\n\n${importContent}`,
+      contextContent: importContent,
       startLine,
       endLine,
-      metadata: { breadcrumb },
+      metadata: {},
     });
     for (const m of importMatches) {
       const mod = cap(m, "module")?.text ?? "";
@@ -111,7 +110,7 @@ export function extractElixir(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumb = `# File: ${filePath}\n# Module: ${name}`;
+    const breadcrumb = `# Module: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -152,7 +151,7 @@ export function extractElixir(
     const content = sourceLines
       .slice(fnNode.startRow, fnNode.endRow + 1)
       .join("\n");
-    const breadcrumbParts = [`# File: ${filePath}`];
+    const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`# Module: ${parentName}`);
     breadcrumbParts.push(`# Function: ${name}`);
     const breadcrumb = breadcrumbParts.join("\n");

@@ -38,10 +38,10 @@ export function extractHtml(
           language,
           type: "file",
           content: source,
-          contextContent: `<!-- File: ${filePath} -->\n\n${source}`,
+          contextContent: source,
           startLine: 1,
           endLine: sourceLines.length,
-          metadata: { breadcrumb: `<!-- File: ${filePath} -->` },
+          metadata: {},
         },
       ],
       rawEdges,
@@ -65,7 +65,7 @@ export function extractHtml(
       const content = sourceLines
         .slice(node.startRow, node.endRow + 1)
         .join("\n");
-      const breadcrumb = `<!-- File: ${filePath} -->\n<!-- Element: ${tagName} -->`;
+      const breadcrumb = `<!-- Element: ${tagName} -->`;
       chunks.push({
         id: "",
         projectId,
@@ -83,7 +83,6 @@ export function extractHtml(
     if (chunks.length > 0) return { chunks, rawEdges };
   }
 
-  const breadcrumb = `<!-- File: ${filePath} -->`;
   return {
     chunks: [
       {
@@ -93,10 +92,10 @@ export function extractHtml(
         language,
         type: "file",
         content: source,
-        contextContent: `${breadcrumb}\n\n${source}`,
+        contextContent: source,
         startLine: 1,
         endLine: sourceLines.length,
-        metadata: { breadcrumb },
+        metadata: {},
       },
     ],
     rawEdges,

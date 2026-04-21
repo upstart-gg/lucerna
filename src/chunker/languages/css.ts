@@ -51,7 +51,7 @@ export function extractCss(
       const content = sourceLines
         .slice(node.startRow, node.endRow + 1)
         .join("\n");
-      const breadcrumb = `/* File: ${filePath} */\n/* Selector: ${selector} */`;
+      const breadcrumb = `/* Selector: ${selector} */`;
       chunks.push({
         id: "",
         projectId,

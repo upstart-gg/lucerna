@@ -55,7 +55,7 @@ export function extractSvelte(
       const content = sourceLines
         .slice(node.startRow, node.endRow + 1)
         .join("\n");
-      const breadcrumb = `// File: ${filePath}\n// Section: ${blockName}`;
+      const breadcrumb = `// Section: ${blockName}`;
       namedBlocks.push({
         id: "",
         projectId,
@@ -89,7 +89,7 @@ export function extractSvelte(
 
   if (templateLines.length > 0 && templateLines.join("").trim()) {
     const content = templateLines.join("\n");
-    const breadcrumb = `// File: ${filePath}\n// Section: template`;
+    const breadcrumb = `// Section: template`;
     chunks.push({
       id: "",
       projectId,

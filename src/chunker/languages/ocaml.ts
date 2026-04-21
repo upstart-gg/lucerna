@@ -69,7 +69,6 @@ export function extractOcaml(
     const startLine = Math.min(...nodes.map((n) => n.startRow)) + 1;
     const endLine = Math.max(...nodes.map((n) => n.endRow)) + 1;
     importContent = sourceLines.slice(startLine - 1, endLine).join("\n");
-    const breadcrumb = `// File: ${filePath}`;
     chunks.push({
       id: "",
       projectId,
@@ -77,10 +76,10 @@ export function extractOcaml(
       language,
       type: "import",
       content: importContent,
-      contextContent: `${breadcrumb}\n\n${importContent}`,
+      contextContent: importContent,
       startLine,
       endLine,
-      metadata: { breadcrumb },
+      metadata: {},
     });
     for (const m of openMatches) {
       const raw = cap(m, "imp")?.text ?? "";
@@ -106,7 +105,7 @@ export function extractOcaml(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumb = `// File: ${filePath}\n// ${capitalize(type)}: ${name}`;
+    const breadcrumb = `// ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);

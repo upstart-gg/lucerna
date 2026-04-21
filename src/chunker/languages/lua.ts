@@ -71,7 +71,6 @@ export function extractLua(
     const startLine = Math.min(...nodes.map((n) => n.startRow)) + 1;
     const endLine = Math.max(...nodes.map((n) => n.endRow)) + 1;
     importContent = sourceLines.slice(startLine - 1, endLine).join("\n");
-    const breadcrumb = `-- File: ${filePath}`;
     chunks.push({
       id: "",
       projectId,
@@ -79,10 +78,10 @@ export function extractLua(
       language,
       type: "import",
       content: importContent,
-      contextContent: `${breadcrumb}\n\n${importContent}`,
+      contextContent: importContent,
       startLine,
       endLine,
-      metadata: { breadcrumb },
+      metadata: {},
     });
     for (const m of requireMatches) {
       const raw = cap(m, "module")?.text ?? "";
@@ -107,7 +106,7 @@ export function extractLua(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumb = `-- File: ${filePath}\n-- Function: ${name}`;
+    const breadcrumb = `-- Function: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);

@@ -81,7 +81,6 @@ export function extractKotlin(
     const startLine = Math.min(...nodes.map((n) => n.startRow)) + 1;
     const endLine = Math.max(...nodes.map((n) => n.endRow)) + 1;
     importContent = sourceLines.slice(startLine - 1, endLine).join("\n");
-    const breadcrumb = `// File: ${filePath}`;
     chunks.push({
       id: "",
       projectId,
@@ -89,10 +88,10 @@ export function extractKotlin(
       language,
       type: "import",
       content: importContent,
-      contextContent: `${breadcrumb}\n\n${importContent}`,
+      contextContent: importContent,
       startLine,
       endLine,
-      metadata: { breadcrumb },
+      metadata: {},
     });
     for (const m of importMatches) {
       const raw = cap(m, "imp")?.text ?? "";
@@ -118,7 +117,7 @@ export function extractKotlin(
     const content = sourceLines
       .slice(node.startRow, node.endRow + 1)
       .join("\n");
-    const breadcrumbParts = [`// File: ${filePath}`];
+    const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
     const breadcrumb = breadcrumbParts.join("\n");

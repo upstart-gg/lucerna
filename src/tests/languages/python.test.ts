@@ -139,13 +139,13 @@ class UserService:
     for (const c of chunks) expect(c.language).toBe("python");
   });
 
-  test("all chunks contextContent starts with // File:", async () => {
+  test("chunks do not leak file path in contextContent", async () => {
     const chunks = await chunker.chunkSource(
       PY_SOURCE,
       FILE("py"),
       PROJECT_ID,
       "python",
     );
-    for (const c of chunks) expect(c.contextContent).toContain("// File:");
+    for (const c of chunks) expect(c.contextContent).not.toContain("// File:");
   });
 });

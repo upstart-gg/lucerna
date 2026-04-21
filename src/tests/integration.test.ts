@@ -30,6 +30,22 @@ function makeIndexer(projectRoot: string, storageDir: string): CodeIndexer {
   return new CodeIndexer({ projectRoot, storageDir, embeddingFunction: false });
 }
 
+/**
+ * Tolerant tmpdir cleanup. On Windows, SQLite (and occasionally chokidar) can
+ * briefly hold file handles open after `indexer.close()`, so a naive rm races
+ * against the OS's lazy handle release and fails with EBUSY. `maxRetries` +
+ * `retryDelay` gives Windows time to drop the locks. Linux/macOS return
+ * immediately on the first attempt.
+ */
+async function cleanupTmp(tmpDir: string): Promise<void> {
+  await rm(tmpDir, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 1. FTS index persistence across sessions (regression for ftsIndexExists bug)
 // ---------------------------------------------------------------------------
@@ -53,7 +69,7 @@ describe("FTS index persistence across sessions", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("searchLexical() returns results in a fresh indexer opened on an existing store", async () => {
@@ -118,7 +134,7 @@ describe("Lexical search — identifier expansion", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("camelCase sub-word search finds the function", async () => {
@@ -178,7 +194,7 @@ describe("File update propagates to search", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("indexFile() replaces stale chunks after file change", async () => {
@@ -231,7 +247,7 @@ describe("File removal propagates to search", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("removeFile() makes chunks unsearchable while leaving other files intact", async () => {
@@ -282,7 +298,7 @@ describe("getStats() accuracy", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("reports correct file and chunk counts after indexing", async () => {
@@ -334,7 +350,7 @@ describe("Language filter restricts results", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("language: markdown returns only markdown chunks", async () => {
@@ -399,7 +415,7 @@ export function standalone(): void { console.log("standalone"); }
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("types: ['function'] returns only function chunks", async () => {
@@ -446,7 +462,7 @@ describe("Graph: callers and callees", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("getCallers() returns a chunk from the calling file", async () => {
@@ -515,7 +531,7 @@ describe("Graph: getDependencies and getDependents", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("getDependencies(main.ts) includes utils.ts", async () => {
@@ -567,7 +583,7 @@ describe("Watcher: new file gets indexed", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("creating a new file while watching causes it to appear in listFiles()", async () => {
@@ -641,7 +657,7 @@ describe("Watcher: deleted file gets removed", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("deleting a file while watching removes it from listFiles() and getChunks()", async () => {

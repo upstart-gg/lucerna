@@ -9,8 +9,9 @@ import { GraphTraverser } from "./graph/GraphTraverser.js";
 import { SymbolResolver } from "./graph/SymbolResolver.js";
 import type { ChunkingWithEdgesResult, RawEdge } from "./graph/types.js";
 import { Searcher } from "./search/Searcher.js";
-import { GraphStore } from "./store/GraphStore.js";
-import { LanceDBStore } from "./store/LanceDBStore.js";
+import { createStoreBundle } from "./store/factory.js";
+import type { GraphStoreInterface } from "./store/GraphStoreInterface.js";
+import type { VectorStore } from "./store/VectorStore.js";
 import type {
   CodeChunk,
   CodeIndexOptions,
@@ -210,8 +211,8 @@ export class CodeIndexer {
   private readonly options: CodeIndexOptions;
 
   private chunker!: TreeSitterChunker;
-  private store!: LanceDBStore;
-  private graphStore!: GraphStore;
+  private store!: VectorStore;
+  private graphStore!: GraphStoreInterface;
   private searcher!: Searcher;
   private graphTraverser!: GraphTraverser;
   private symbolResolver!: SymbolResolver;
@@ -324,6 +325,10 @@ export class CodeIndexer {
           recursive: true,
           force: true,
         });
+        await rm(join(this.storageDir, "sqlite"), {
+          recursive: true,
+          force: true,
+        });
         await rm(metaPath, { force: true });
         await rm(join(this.storageDir, "file-hashes.json"), { force: true });
       }
@@ -341,16 +346,15 @@ export class CodeIndexer {
     const dimensions =
       this.embeddingFn !== false ? this.embeddingFn.dimensions : 384;
 
-    this.store = new LanceDBStore({
+    const bundle = await createStoreBundle({
+      backend: this.options.vectorStore ?? "lancedb",
       storageDir: this.storageDir,
       dimensions,
       modelId:
         this.embeddingFn !== false ? this.embeddingFn.modelId : undefined,
     });
-    await this.store.initialize();
-
-    this.graphStore = new GraphStore(this.storageDir);
-    await this.graphStore.initialize();
+    this.store = bundle.vectorStore;
+    this.graphStore = bundle.graphStore;
 
     this.searcher = new Searcher(
       this.store,
@@ -519,7 +523,7 @@ export class CodeIndexer {
         clearTimeout(this.optimizeTimer);
         this.optimizeTimer = null;
       }
-      await this.store.optimize?.();
+      await this.store.optimize?.({ vacuum: true });
       this.lastIndexed = new Date();
       this.emit({
         type: "indexed",

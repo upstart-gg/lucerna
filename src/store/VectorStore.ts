@@ -1,4 +1,10 @@
-import type { CodeChunk, SearchOptions, SearchResult } from "../types.js";
+import type {
+  ChunkType,
+  CodeChunk,
+  Language,
+  SearchOptions,
+  SearchResult,
+} from "../types.js";
 
 /**
  * Abstract vector store interface.
@@ -46,12 +52,35 @@ export interface VectorStore {
   /** Return the total number of chunks stored. */
   count(): Promise<number>;
 
+  /** Return chunk counts grouped by language. */
+  countByLanguage(): Promise<Partial<Record<Language, number>>>;
+
+  /** Return chunk counts grouped by chunk type. */
+  countByType(): Promise<Partial<Record<ChunkType, number>>>;
+
+  /**
+   * Return all top-level symbols (functions, classes, methods, etc.) — used to
+   * build the repo map.
+   */
+  getAllSymbols(): Promise<
+    Array<{
+      filePath: string;
+      type: string;
+      name: string;
+      startLine: number;
+      endLine: number;
+    }>
+  >;
+
   /** Release all resources (close DB connection). */
   close(): Promise<void>;
 
   /**
    * Compact data files and refresh indexes after batch writes.
    * Optional — stores that don't need explicit optimization can omit it.
+   * `vacuum: true` requests the most expensive full rewrite/compaction
+   * (e.g. SQLite `VACUUM`); callers should reserve it for end-of-batch,
+   * not per-watcher-event calls.
    */
-  optimize?(): Promise<void>;
+  optimize?(opts?: { vacuum?: boolean }): Promise<void>;
 }

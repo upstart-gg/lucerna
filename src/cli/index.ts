@@ -567,6 +567,7 @@ async function buildIndexer(
     ...(resolvedExclude !== undefined ? { exclude: resolvedExclude } : {}),
     ...(embeddingFunction !== undefined ? { embeddingFunction } : {}),
     ...(rerankingFunction !== undefined ? { rerankingFunction } : {}),
+    ...(cfg.vectorStore !== undefined ? { vectorStore: cfg.vectorStore } : {}),
     ...(opts.watchDebounce !== undefined
       ? { watchDebounce: opts.watchDebounce as number }
       : {}),

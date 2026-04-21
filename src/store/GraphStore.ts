@@ -1,9 +1,26 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Connection, Table } from "@lancedb/lancedb";
-import * as lancedb from "@lancedb/lancedb";
 import { hashEdgeId } from "../graph/types.js";
 import type { GraphEdge, RelationshipType } from "../types.js";
+import type { GraphStoreInterface } from "./GraphStoreInterface.js";
+
+// Dynamic import keeps `@lancedb/lancedb` an optional dep.
+type LanceDB = typeof import("@lancedb/lancedb");
+let lancedbModule: LanceDB | null = null;
+async function loadLanceDB(): Promise<LanceDB> {
+  if (lancedbModule) return lancedbModule;
+  try {
+    lancedbModule = await import("@lancedb/lancedb");
+    return lancedbModule;
+  } catch (err) {
+    throw new Error(
+      `The "@lancedb/lancedb" package is required for the lancedb backend but could not be loaded. ` +
+        `Install it with 'pnpm add @lancedb/lancedb' (or run 'lucerna install' and pick lancedb). ` +
+        `Underlying error: ${(err as Error).message}`,
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -27,7 +44,7 @@ interface EdgeRow extends Record<string, unknown> {
  * Persists knowledge-graph edges in a LanceDB "edges" table stored alongside
  * the chunks table in the same `storageDir/lance/` directory.
  */
-export class GraphStore {
+export class GraphStore implements GraphStoreInterface {
   private readonly storageDir: string;
   private db: Connection | null = null;
   private table: Table | null = null;
@@ -39,6 +56,7 @@ export class GraphStore {
 
   async initialize(): Promise<void> {
     await mkdir(this.storageDir, { recursive: true });
+    const lancedb = await loadLanceDB();
     this.db = await lancedb.connect(this.storageDir);
 
     const tableNames = await this.db.tableNames();

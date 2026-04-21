@@ -76,6 +76,28 @@ describe("FTS index persistence across sessions", () => {
     );
     expect(found).toBe(true);
   });
+
+  test("sqlite backend indexes and searches end-to-end", async () => {
+    const indexer = new CodeIndexer({
+      projectRoot,
+      storageDir,
+      embeddingFunction: false,
+      vectorStore: "sqlite",
+    });
+    await indexer.initialize();
+    await indexer.indexProject();
+    const results = await indexer.searchLexical("greetUser", { limit: 5 });
+    const stats = await indexer.getStats();
+    await indexer.close();
+
+    expect(stats.totalChunks).toBeGreaterThan(0);
+    expect(results.length).toBeGreaterThan(0);
+    const found = results.some(
+      (r) =>
+        r.chunk.content.includes("greetUser") || r.chunk.name === "greetUser",
+    );
+    expect(found).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

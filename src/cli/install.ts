@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import * as clack from "@clack/prompts";
 import { createDefaultConfig } from "../config.js";
+import type { VectorStoreBackend } from "../store/factory.js";
 
 // ---------------------------------------------------------------------------
 // Package manager detection
@@ -84,6 +85,11 @@ function runAddMcp(): boolean {
 // Main wizard
 // ---------------------------------------------------------------------------
 
+const BACKEND_PACKAGES: Record<VectorStoreBackend, string[]> = {
+  lancedb: ["@lancedb/lancedb@^0.27.2"],
+  sqlite: ["better-sqlite3@^11", "sqlite-vec@^0.1"],
+};
+
 export async function runInstall(): Promise<void> {
   clack.intro("Lucerna setup");
 
@@ -97,7 +103,30 @@ export async function runInstall(): Promise<void> {
     s1.stop("add-mcp reported an error — you may need to register manually.");
   }
 
-  // --- Step 2: Config file ---
+  // --- Step 2: Pick vector-store backend ---
+  const backendChoice = await clack.select<VectorStoreBackend>({
+    message: "Which vector store do you want to use?",
+    options: [
+      {
+        value: "lancedb",
+        label: "LanceDB",
+        hint: "default, faster for very large repos",
+      },
+      {
+        value: "sqlite",
+        label: "SQLite + sqlite-vec",
+        hint: "single-file, easy to inspect with the sqlite3 CLI",
+      },
+    ],
+    initialValue: "lancedb",
+  });
+  if (clack.isCancel(backendChoice)) {
+    clack.cancel("Setup cancelled.");
+    return;
+  }
+  const backend = backendChoice;
+
+  // --- Step 3: Config file + dependencies ---
   const cwd = process.cwd();
   const configPath = join(cwd, "lucerna.config.ts");
 
@@ -113,15 +142,26 @@ export async function runInstall(): Promise<void> {
           ? "Installed @upstart.gg/lucerna."
           : "Install failed — run it manually.",
       );
+
+      for (const pkg of BACKEND_PACKAGES[backend]) {
+        const depSpinner = clack.spinner();
+        depSpinner.start(`Installing ${pkg}…`);
+        const depOk = installDevDep(pkg, cwd);
+        depSpinner.stop(
+          depOk
+            ? `Installed ${pkg}.`
+            : `Install of ${pkg} failed — run it manually.`,
+        );
+      }
     }
-    await createDefaultConfig(cwd);
+    await createDefaultConfig(cwd, { vectorStore: backend });
     clack.note(
       "Created lucerna.config.ts — edit it to configure your embedding provider.",
       "Config",
     );
   }
 
-  // --- Step 3: .gitignore ---
+  // --- Step 4: .gitignore ---
   await ensureGitignore(cwd);
 
   clack.outro(

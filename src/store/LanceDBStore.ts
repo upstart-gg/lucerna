@@ -1,7 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Connection, Table } from "@lancedb/lancedb";
-import * as lancedb from "@lancedb/lancedb";
 import type {
   ChunkType,
   CodeChunk,
@@ -9,7 +8,26 @@ import type {
   SearchOptions,
   SearchResult,
 } from "../types.js";
+import { expandIdentifiers } from "./identifierExpansion.js";
 import type { VectorStore } from "./VectorStore.js";
+
+// Dynamically imported so `@lancedb/lancedb` remains an optional dep — users
+// who pick the SQLite backend don't need the native LanceDB binary installed.
+type LanceDB = typeof import("@lancedb/lancedb");
+let lancedbModule: LanceDB | null = null;
+async function loadLanceDB(): Promise<LanceDB> {
+  if (lancedbModule) return lancedbModule;
+  try {
+    lancedbModule = await import("@lancedb/lancedb");
+    return lancedbModule;
+  } catch (err) {
+    throw new Error(
+      `The "@lancedb/lancedb" package is required for the lancedb backend but could not be loaded. ` +
+        `Install it with 'pnpm add @lancedb/lancedb' (or run 'lucerna install' and pick lancedb). ` +
+        `Underlying error: ${(err as Error).message}`,
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Schema types
@@ -74,6 +92,7 @@ export class LanceDBStore implements VectorStore {
 
   async initialize(): Promise<void> {
     await mkdir(this.storageDir, { recursive: true });
+    const lancedb = await loadLanceDB();
     this.db = await lancedb.connect(this.storageDir);
 
     const tableNames = await this.db.tableNames();
@@ -255,6 +274,7 @@ export class LanceDBStore implements VectorStore {
     const limit = options.limit ?? 20;
     const ftsColumn = this.searchContentAvailable ? "searchContent" : "content";
     const rrfK = options.rrfK ?? DEFAULT_RRF_K;
+    const lancedb = await loadLanceDB();
     const rrf = await lancedb.rerankers.RRFReranker.create(rrfK);
 
     let q = this.table
@@ -376,10 +396,15 @@ export class LanceDBStore implements VectorStore {
    * move the cost of incremental index maintenance out of the search path.
    * Advisory: failures are swallowed since stale indexes remain queryable.
    */
-  async optimize(): Promise<void> {
+  async optimize(_opts?: { vacuum?: boolean }): Promise<void> {
+    // `vacuum` is accepted for interface parity with SqliteVectorStore;
+    // LanceDB has no equivalent heavy-rewrite mode — its standard optimize()
+    // already compacts fragments, so the flag is a no-op here.
     if (!this.table) return;
     const count = await this.table.countRows();
     if (count === 0) return;
+
+    const lancedb = await loadLanceDB();
 
     // Bootstrap FTS index on first run so optimize() has something to compact.
     if (!this.ftsIndexExists) {
@@ -470,6 +495,7 @@ export class LanceDBStore implements VectorStore {
       return;
     }
     const column = this.searchContentAvailable ? "searchContent" : "content";
+    const lancedb = await loadLanceDB();
     if (this.ftsIndexExists) {
       // Incremental update: merge new row fragments into the existing index.
       // optimize() is much faster than a full createIndex() rebuild.
@@ -504,6 +530,7 @@ export class LanceDBStore implements VectorStore {
     // enough and avoids noisy KMeans empty-cluster warnings.
     if (count >= 65_536) {
       const numPartitions = Math.max(1, Math.floor(count / 256));
+      const lancedb = await loadLanceDB();
       try {
         await this.table.createIndex("vector", {
           config: lancedb.Index.ivfPq({ numPartitions }),
@@ -534,33 +561,6 @@ function rowToChunk(row: ChunkRow): CodeChunk {
     endLine: row.endLine,
     metadata: JSON.parse(row.metadata) as Record<string, unknown>,
   };
-}
-
-/**
- * Expands camelCase, PascalCase, and snake_case identifiers so BM25 can match
- * sub-words. The original token is preserved so exact-match queries still work.
- *
- * Examples:
- *   getUserById  → "getUserById get user by id"
- *   parse_json   → "parse_json parse json"
- *   HTTPSClient  → "HTTPSClient https client"
- */
-function expandIdentifiers(text: string): string {
-  return text.replace(/[A-Za-z][A-Za-z0-9_]*[A-Za-z0-9]/g, (token) => {
-    const parts = token
-      .split("_")
-      .flatMap((part) =>
-        part
-          .replace(/([a-z])([A-Z])/g, "$1 $2")
-          .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-          .split(" "),
-      )
-      .map((p) => p.toLowerCase())
-      .filter(Boolean);
-    const unique = [...new Set(parts)];
-    if (unique.length <= 1) return token;
-    return `${token} ${unique.join(" ")}`;
-  });
 }
 
 /** Safely escapes a string value for interpolation into a LanceDB SQL filter. */

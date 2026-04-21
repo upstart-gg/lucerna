@@ -71,7 +71,14 @@ export async function loadConfig(
 // Auto-create default config
 // ---------------------------------------------------------------------------
 
-const DEFAULT_CONFIG_TEMPLATE = `import { defineConfig } from "@upstart.gg/lucerna";
+function renderDefaultConfig(
+  opts: { vectorStore?: "lancedb" | "sqlite" } = {},
+): string {
+  const vectorStoreLine =
+    opts.vectorStore && opts.vectorStore !== "lancedb"
+      ? `  vectorStore: "${opts.vectorStore}",\n\n`
+      : "";
+  return `import { defineConfig } from "@upstart.gg/lucerna";
 
 export default defineConfig({
   // Configure a semantic search provider (required for semantic/vector search):
@@ -87,16 +94,21 @@ export default defineConfig({
 
   // Add extra exclusion patterns (node_modules, .git etc. are always excluded):
   // exclude: ["**/*.test.ts", "**/fixtures/**"],
-});
+
+${vectorStoreLine}});
 `;
+}
 
 /**
  * Creates a `lucerna.config.ts` template in the given directory.
  * Logs a message to stderr so it doesn't interfere with MCP stdio.
  */
-export async function createDefaultConfig(dir: string): Promise<void> {
+export async function createDefaultConfig(
+  dir: string,
+  opts: { vectorStore?: "lancedb" | "sqlite" } = {},
+): Promise<void> {
   const path = join(dir, "lucerna.config.ts");
-  await writeFile(path, DEFAULT_CONFIG_TEMPLATE, "utf-8");
+  await writeFile(path, renderDefaultConfig(opts), "utf-8");
   process.stderr.write(
     `[lucerna] Created ${path} — edit it to configure your embedding provider.\n`,
   );

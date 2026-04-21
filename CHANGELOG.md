@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.25
+
+### Patch Changes
+
+- [#83](https://github.com/upstart-gg/lucerna/pull/83) [`1804d1e`](https://github.com/upstart-gg/lucerna/commit/1804d1e13c11e019d4d7398ad9e53dfdab833abb) Thanks [@mattallty](https://github.com/mattallty)! - Fix reindexing bug
+
 ## 0.1.24
 
 ### Patch Changes

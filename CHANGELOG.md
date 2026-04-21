@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.26
+
+### Patch Changes
+
+- [#85](https://github.com/upstart-gg/lucerna/pull/85) [`1cb94d4`](https://github.com/upstart-gg/lucerna/commit/1cb94d4503b3e2376b09d276c5ee990fe8b02148) Thanks [@mattallty](https://github.com/mattallty)! - Improve metadata
+
 ## 0.1.25
 
 ### Patch Changes

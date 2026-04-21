@@ -1,4 +1,4 @@
-import type { GraphStore } from "../store/GraphStore.js";
+import type { GraphStoreInterface } from "../store/GraphStoreInterface.js";
 import type { VectorStore } from "../store/VectorStore.js";
 import type {
   CodeChunk,
@@ -14,10 +14,10 @@ import type {
  * all reachable neighbours within `depth` hops, with their connecting edges.
  */
 export class GraphTraverser {
-  private readonly graphStore: GraphStore;
+  private readonly graphStore: GraphStoreInterface;
   private readonly vectorStore: VectorStore;
 
-  constructor(graphStore: GraphStore, vectorStore: VectorStore) {
+  constructor(graphStore: GraphStoreInterface, vectorStore: VectorStore) {
     this.graphStore = graphStore;
     this.vectorStore = vectorStore;
   }

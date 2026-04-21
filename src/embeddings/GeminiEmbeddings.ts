@@ -1,7 +1,9 @@
 import type { EmbeddingFunction } from "../types.js";
 import {
   charBudgetBatches,
+  fetchWithRetry,
   l2Normalize,
+  mapWithConcurrency,
   prepareTexts,
   reassembleVectors,
 } from "./utils.js";
@@ -15,6 +17,12 @@ type ModelCapabilities = {
   supportsTaskType: boolean;
   /** Max input chars per text (1 char = 1 token worst case). */
   maxPerTextChars: number;
+  /**
+   * Default number of concurrent batchEmbedContents requests. Picked to fit
+   * the Gemini API's default paid-tier RPM quotas; override via the
+   * `concurrency` option if your project quota is higher/lower.
+   */
+  defaultConcurrency: number;
 };
 
 const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
@@ -23,18 +31,23 @@ const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     defaultDim: 768,
     supportsTaskType: true,
     maxPerTextChars: 2_000,
+    defaultConcurrency: 3,
   },
   "gemini-embedding-001": {
     nativeDim: 3072,
     defaultDim: 256,
     supportsTaskType: true,
     maxPerTextChars: 2_000,
+    // Paid-tier default is ~3,000 RPM; 3 concurrent large batches leaves
+    // headroom and absorbs 429s via retries with Retry-After.
+    defaultConcurrency: 3,
   },
   "gemini-embedding-2-preview": {
     nativeDim: 3072,
     defaultDim: 256,
     supportsTaskType: false,
     maxPerTextChars: 8_000,
+    defaultConcurrency: 3,
   },
 };
 
@@ -76,11 +89,17 @@ export class GeminiEmbeddings implements EmbeddingFunction {
   private readonly caps: ModelCapabilities;
   /** Set when the effective dim is below the model's native dim — triggers outputDimensionality + L2 norm. */
   private readonly outputDimensionality: number | undefined;
+  private readonly concurrency: number;
 
   constructor(options: {
     model: string;
     apiKey?: string;
     dimensions?: number;
+    /**
+     * Number of concurrent batchEmbedContents requests during indexing.
+     * Defaults per-model to fit Gemini's default RPM quotas.
+     */
+    concurrency?: number;
   }) {
     const apiKey = options.apiKey ?? "";
     if (!apiKey)
@@ -102,10 +121,15 @@ export class GeminiEmbeddings implements EmbeddingFunction {
       defaultDim: dims,
       supportsTaskType: false,
       maxPerTextChars: 2_000,
+      defaultConcurrency: 3,
     };
     this.dimensions = options.dimensions ?? this.caps.defaultDim;
     this.outputDimensionality =
       this.dimensions < this.caps.nativeDim ? this.dimensions : undefined;
+    this.concurrency = Math.max(
+      1,
+      options.concurrency ?? this.caps.defaultConcurrency,
+    );
   }
 
   async generate(texts: string[]): Promise<number[][]> {
@@ -129,17 +153,17 @@ export class GeminiEmbeddings implements EmbeddingFunction {
       formatted,
       this.caps.maxPerTextChars,
     );
-    const pieceVectors: number[][] = [];
+    const batches = Array.from(
+      charBudgetBatches(pieces, MAX_BATCH_CHARS, MAX_BATCH_ITEMS),
+    );
 
-    for (const batch of charBudgetBatches(
-      pieces,
-      MAX_BATCH_CHARS,
-      MAX_BATCH_ITEMS,
-    )) {
-      pieceVectors.push(...(await this.sendBatch(batch, task)));
-    }
+    const batchVectors = await mapWithConcurrency(
+      batches,
+      this.concurrency,
+      (batch) => this.sendBatch(batch, task),
+    );
 
-    return reassembleVectors(pieceVectors, ranges);
+    return reassembleVectors(batchVectors.flat(), ranges);
   }
 
   private async sendBatch(
@@ -149,21 +173,25 @@ export class GeminiEmbeddings implements EmbeddingFunction {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:batchEmbedContents?key=${this.apiKey}`;
     const taskType =
       task === "query" ? "CODE_RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT";
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requests: texts.map((text) => ({
-          model: `models/${this.modelId}`,
-          content: { parts: [{ text }] },
-          ...(this.caps.supportsTaskType ? { taskType } : {}),
-          ...(this.outputDimensionality !== undefined
-            ? { outputDimensionality: this.outputDimensionality }
-            : {}),
-        })),
-      }),
-      signal: AbortSignal.timeout(60_000),
+    const payload = JSON.stringify({
+      requests: texts.map((text) => ({
+        model: `models/${this.modelId}`,
+        content: { parts: [{ text }] },
+        ...(this.caps.supportsTaskType ? { taskType } : {}),
+        ...(this.outputDimensionality !== undefined
+          ? { outputDimensionality: this.outputDimensionality }
+          : {}),
+      })),
     });
+
+    const response = await fetchWithRetry(() =>
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        signal: AbortSignal.timeout(60_000),
+      }),
+    );
     if (!response.ok) {
       throw new Error(
         `Gemini Embeddings request failed: ${response.status} ${response.statusText}`,

@@ -47,6 +47,9 @@ function makeMockStore(overrides: Partial<VectorStore> = {}): VectorStore {
     getChunksByFile: async () => [],
     getChunksByIds: async () => [],
     count: async () => 0,
+    countByLanguage: async () => ({}),
+    countByType: async () => ({}),
+    getAllSymbols: async () => [],
     close: async () => {},
     ...overrides,
   };

@@ -30,6 +30,33 @@ function makeIndexer(projectRoot: string, storageDir: string): CodeIndexer {
   return new CodeIndexer({ projectRoot, storageDir, embeddingFunction: false });
 }
 
+/**
+ * Tolerant tmpdir cleanup.
+ *
+ * On POSIX this is a straight `rm -rf`. On Windows, better-sqlite3's native
+ * file handles are released asynchronously after `db.close()`, and Defender /
+ * indexer services routinely hold files open for a second or two after the
+ * process releases them. Retries help but aren't deterministic — we can't
+ * guarantee any bounded wait will clear the lock.
+ *
+ * Since CI tmpdirs are ephemeral and disappear with the runner, failed cleanup
+ * is cosmetic. We retry aggressively, then swallow on Windows so the test
+ * suite isn't held hostage by OS-level file-lock races.
+ */
+async function cleanupTmp(tmpDir: string): Promise<void> {
+  try {
+    await rm(tmpDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 150,
+    });
+  } catch (err) {
+    if (process.platform !== "win32") throw err;
+    // Silent on Windows — the runner is wiped between jobs.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 1. FTS index persistence across sessions (regression for ftsIndexExists bug)
 // ---------------------------------------------------------------------------
@@ -53,7 +80,7 @@ describe("FTS index persistence across sessions", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("searchLexical() returns results in a fresh indexer opened on an existing store", async () => {
@@ -69,6 +96,28 @@ describe("FTS index persistence across sessions", () => {
     const results = await indexerB.searchLexical("greetUser", { limit: 5 });
     await indexerB.close();
 
+    expect(results.length).toBeGreaterThan(0);
+    const found = results.some(
+      (r) =>
+        r.chunk.content.includes("greetUser") || r.chunk.name === "greetUser",
+    );
+    expect(found).toBe(true);
+  });
+
+  test("sqlite backend indexes and searches end-to-end", async () => {
+    const indexer = new CodeIndexer({
+      projectRoot,
+      storageDir,
+      embeddingFunction: false,
+      vectorStore: "sqlite",
+    });
+    await indexer.initialize();
+    await indexer.indexProject();
+    const results = await indexer.searchLexical("greetUser", { limit: 5 });
+    const stats = await indexer.getStats();
+    await indexer.close();
+
+    expect(stats.totalChunks).toBeGreaterThan(0);
     expect(results.length).toBeGreaterThan(0);
     const found = results.some(
       (r) =>
@@ -96,7 +145,7 @@ describe("Lexical search — identifier expansion", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("camelCase sub-word search finds the function", async () => {
@@ -156,7 +205,7 @@ describe("File update propagates to search", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("indexFile() replaces stale chunks after file change", async () => {
@@ -209,7 +258,7 @@ describe("File removal propagates to search", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("removeFile() makes chunks unsearchable while leaving other files intact", async () => {
@@ -260,7 +309,7 @@ describe("getStats() accuracy", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("reports correct file and chunk counts after indexing", async () => {
@@ -312,7 +361,7 @@ describe("Language filter restricts results", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("language: markdown returns only markdown chunks", async () => {
@@ -377,7 +426,7 @@ export function standalone(): void { console.log("standalone"); }
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("types: ['function'] returns only function chunks", async () => {
@@ -424,7 +473,7 @@ describe("Graph: callers and callees", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("getCallers() returns a chunk from the calling file", async () => {
@@ -493,7 +542,7 @@ describe("Graph: getDependencies and getDependents", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("getDependencies(main.ts) includes utils.ts", async () => {
@@ -545,7 +594,7 @@ describe("Watcher: new file gets indexed", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("creating a new file while watching causes it to appear in listFiles()", async () => {
@@ -619,7 +668,7 @@ describe("Watcher: deleted file gets removed", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await cleanupTmp(tmpDir);
   });
 
   test("deleting a file while watching removes it from listFiles() and getChunks()", async () => {

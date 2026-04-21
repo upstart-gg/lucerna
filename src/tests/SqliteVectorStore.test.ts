@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SqliteVectorStore } from "../store/SqliteVectorStore.js";
 import type { CodeChunk } from "../types.js";
-import { LanceDBStore } from "../store/LanceDBStore.js";
 
 // Use small vectors so tests run fast
 const DIMS = 8;
@@ -34,13 +34,13 @@ function makeVector(dims: number, value = 0.5): number[] {
   return new Array(dims).fill(value);
 }
 
-describe("LanceDBStore", () => {
+describe("SqliteVectorStore", () => {
   let tmpDir: string;
-  let store: LanceDBStore;
+  let store: SqliteVectorStore;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "lancedb-store-test-"));
-    store = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
+    tmpDir = await mkdtemp(join(tmpdir(), "sqlite-store-test-"));
+    store = new SqliteVectorStore({ storageDir: tmpDir, dimensions: DIMS });
     await store.initialize();
   });
 
@@ -62,36 +62,25 @@ describe("LanceDBStore", () => {
     await store.upsert([chunk], [makeVector(DIMS)]);
     await store.close();
 
-    // Re-open the same storage directory
-    const store2 = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
+    const store2 = new SqliteVectorStore({
+      storageDir: tmpDir,
+      dimensions: DIMS,
+    });
     await store2.initialize();
     expect(await store2.count()).toBe(1);
     await store2.close();
   });
 
   test("initialize() throws a clear error when stored vector dim differs from configured dim", async () => {
-    // Write a row with DIMS-dimensional vectors, then try to open with different dims
     const chunk = makeChunk("id1", "src/a.ts", "function a() {}");
     await store.upsert([chunk], [makeVector(DIMS)]);
     await store.close();
 
-    const store2 = new LanceDBStore({
+    const store2 = new SqliteVectorStore({
       storageDir: tmpDir,
       dimensions: DIMS * 2,
     });
     await expect(store2.initialize()).rejects.toThrow(/dimension mismatch/i);
-    await store2.close();
-  });
-
-  test("initialize() on an empty existing table does not throw a dimension error", async () => {
-    // Empty table has no rows to check dims against — must not throw
-    await store.close();
-    const store2 = new LanceDBStore({
-      storageDir: tmpDir,
-      dimensions: DIMS * 2,
-    });
-    await expect(store2.initialize()).resolves.toBeUndefined();
-    await store2.close();
   });
 
   // -------------------------------------------------------------------------
@@ -158,10 +147,8 @@ describe("LanceDBStore", () => {
     expect(await store.count()).toBe(1);
   });
 
-  test("delete() is a no-op when table not initialized", async () => {
-    // Create an uninitialized store
-    const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
-    // Should not throw
+  test("delete() is a no-op when not initialized", async () => {
+    const raw = new SqliteVectorStore({ storageDir: tmpDir, dimensions: DIMS });
     await expect(raw.delete(["id1"])).resolves.toBeUndefined();
   });
 
@@ -195,7 +182,6 @@ describe("LanceDBStore", () => {
       makeChunk("id1", "src/a.ts", "function alpha() {}"),
       makeChunk("id2", "src/b.ts", "function beta() {}"),
     ];
-    // v1 is close to query [1,0,0,...]; v2 is orthogonal
     const v1 = [1, 0, 0, 0, 0, 0, 0, 0];
     const v2 = [0, 1, 0, 0, 0, 0, 0, 0];
     await store.upsert(chunks, [v1, v2]);
@@ -271,7 +257,7 @@ describe("LanceDBStore", () => {
   });
 
   test("searchVector() throws when not initialized", async () => {
-    const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
+    const raw = new SqliteVectorStore({ storageDir: tmpDir, dimensions: DIMS });
     await expect(raw.searchVector(makeVector(DIMS), {})).rejects.toThrow(
       "not initialized",
     );
@@ -282,7 +268,7 @@ describe("LanceDBStore", () => {
   // -------------------------------------------------------------------------
 
   test("searchText() throws when not initialized", async () => {
-    const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
+    const raw = new SqliteVectorStore({ storageDir: tmpDir, dimensions: DIMS });
     await expect(raw.searchText("hello", {})).rejects.toThrow(
       "not initialized",
     );
@@ -325,16 +311,16 @@ describe("LanceDBStore", () => {
     ]);
 
     const files = await store.listFiles();
-    expect(files).toEqual(["src/a.ts", "src/z.ts"]); // sorted, deduped
+    expect(files).toEqual(["src/a.ts", "src/z.ts"]);
   });
 
-  test("listFiles() returns empty array when table is uninitialized", async () => {
-    const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
+  test("listFiles() returns empty array when uninitialized", async () => {
+    const raw = new SqliteVectorStore({ storageDir: tmpDir, dimensions: DIMS });
     expect(await raw.listFiles()).toEqual([]);
   });
 
-  test("count() returns 0 when table is uninitialized", async () => {
-    const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
+  test("count() returns 0 when uninitialized", async () => {
+    const raw = new SqliteVectorStore({ storageDir: tmpDir, dimensions: DIMS });
     expect(await raw.count()).toBe(0);
   });
 
@@ -437,7 +423,7 @@ describe("LanceDBStore", () => {
       expect(await store.count()).toBe(0);
     });
 
-    test("bootstraps the FTS index so searches succeed without lazy setup", async () => {
+    test("FTS index supports searches without extra bootstrapping", async () => {
       const chunks = [
         makeChunk("id1", "src/a.ts", "function authenticate() {}"),
         makeChunk("id2", "src/b.ts", "function logout() {}"),

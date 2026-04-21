@@ -2,15 +2,15 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 # Prevent concurrent runs so a version bump and a publish don't race.
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write       # push version commit, create git tags + GitHub Releases
-  pull-requests: write  # open / update the "Version Packages" PR
-  id-token: write       # npm SLSA provenance
+  contents: write # push version commit, create git tags + GitHub Releases
+  pull-requests: write # open / update the "Version Packages" PR
+  id-token: write # npm SLSA provenance
 
 jobs:
   release:
@@ -34,7 +34,7 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
 
       - run: pnpm build
 

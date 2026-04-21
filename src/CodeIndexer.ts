@@ -9,8 +9,9 @@ import { GraphTraverser } from "./graph/GraphTraverser.js";
 import { SymbolResolver } from "./graph/SymbolResolver.js";
 import type { ChunkingWithEdgesResult, RawEdge } from "./graph/types.js";
 import { Searcher } from "./search/Searcher.js";
-import { GraphStore } from "./store/GraphStore.js";
-import { LanceDBStore } from "./store/LanceDBStore.js";
+import { createStoreBundle } from "./store/factory.js";
+import type { GraphStoreInterface } from "./store/GraphStoreInterface.js";
+import type { VectorStore } from "./store/VectorStore.js";
 import type {
   CodeChunk,
   CodeIndexOptions,
@@ -210,8 +211,8 @@ export class CodeIndexer {
   private readonly options: CodeIndexOptions;
 
   private chunker!: TreeSitterChunker;
-  private store!: LanceDBStore;
-  private graphStore!: GraphStore;
+  private store!: VectorStore;
+  private graphStore!: GraphStoreInterface;
   private searcher!: Searcher;
   private graphTraverser!: GraphTraverser;
   private symbolResolver!: SymbolResolver;
@@ -235,6 +236,9 @@ export class CodeIndexer {
 
   /** Timer used to batch saveFileHashes() writes in the watcher path. */
   private saveHashesTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Timer used to debounce store.optimize() calls triggered by watcher events. */
+  private optimizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Cross-process exclusive lock: the holder is the only process that indexes. */
   private lock!: IndexLock;
@@ -321,6 +325,10 @@ export class CodeIndexer {
           recursive: true,
           force: true,
         });
+        await rm(join(this.storageDir, "sqlite"), {
+          recursive: true,
+          force: true,
+        });
         await rm(metaPath, { force: true });
         await rm(join(this.storageDir, "file-hashes.json"), { force: true });
       }
@@ -338,16 +346,15 @@ export class CodeIndexer {
     const dimensions =
       this.embeddingFn !== false ? this.embeddingFn.dimensions : 384;
 
-    this.store = new LanceDBStore({
+    const bundle = await createStoreBundle({
+      backend: this.options.vectorStore ?? "sqlite",
       storageDir: this.storageDir,
       dimensions,
       modelId:
         this.embeddingFn !== false ? this.embeddingFn.modelId : undefined,
     });
-    await this.store.initialize();
-
-    this.graphStore = new GraphStore(this.storageDir);
-    await this.graphStore.initialize();
+    this.store = bundle.vectorStore;
+    this.graphStore = bundle.graphStore;
 
     this.searcher = new Searcher(
       this.store,
@@ -510,6 +517,13 @@ export class CodeIndexer {
       }
 
       await this.saveFileHashes();
+      // Compact LanceDB indexes now so the first search pays no setup cost.
+      // Cancel any pending debounced optimize — this explicit call supersedes it.
+      if (this.optimizeTimer !== null) {
+        clearTimeout(this.optimizeTimer);
+        this.optimizeTimer = null;
+      }
+      await this.store.optimize?.({ vacuum: true });
       this.lastIndexed = new Date();
       this.emit({
         type: "indexed",
@@ -551,6 +565,7 @@ export class CodeIndexer {
     this.cachedChunksByFile.delete(relPath);
     this.fileHashes.delete(relPath);
     await this.saveFileHashes();
+    this.scheduleOptimize();
     this.emit({ type: "removed", filePath: relPath });
   }
 
@@ -932,6 +947,11 @@ export class CodeIndexer {
       this.saveHashesTimer = null;
       await this.saveFileHashes();
     }
+    // Drop any pending optimize — advisory; the next session will optimize again
+    if (this.optimizeTimer !== null) {
+      clearTimeout(this.optimizeTimer);
+      this.optimizeTimer = null;
+    }
     await this.stopWatching();
     await this.lock?.release();
     if (this.store) await this.store.close();
@@ -1001,6 +1021,9 @@ export class CodeIndexer {
       this.fileHashes.set(relPath, hash);
       // Debounce disk writes: many rapid watcher events should not hammer the FS
       this.scheduleSaveFileHashes();
+      // Debounce LanceDB compaction similarly — bursts of watcher events would
+      // otherwise trigger an optimize() per file.
+      this.scheduleOptimize();
 
       this.emit({
         type: "indexed",
@@ -1080,6 +1103,15 @@ export class CodeIndexer {
       this.saveHashesTimer = null;
       this.saveFileHashes().catch(() => {});
     }, 2_000);
+  }
+
+  /** Schedule a debounced store.optimize() call (5 s after the latest watcher event). */
+  private scheduleOptimize(): void {
+    if (this.optimizeTimer !== null) return;
+    this.optimizeTimer = setTimeout(() => {
+      this.optimizeTimer = null;
+      this.store.optimize?.().catch(() => {});
+    }, 5_000);
   }
 
   private get hashFilePath(): string {

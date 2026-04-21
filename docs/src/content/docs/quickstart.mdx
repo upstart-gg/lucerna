@@ -38,22 +38,19 @@ The installer will:
 
 1. **Detect and configure your AI clients** — registers the Lucerna MCP server with every AI coding assistant found on your machine (Claude Code, Cursor, Windsurf, Zed, VS Code, and [more](https://github.com/neondatabase/add-mcp))
 2. **Scaffold `lucerna.config.ts`** — creates a config file at your project root if one doesn't exist yet (edit it afterwards to configure an embedding provider for semantic search)
-3. **Update `.gitignore`** — appends `.lucerna/` so the index directory is never committed
+3. **Scope the index for version control** — writes a narrow `.lucerna/.gitignore` (excludes only ephemeral files like SQLite WAL journals and the process lock) and a `.lucerna/.gitattributes` (marks DB files binary / generated). The `.lucerna/` directory itself is safe to commit by default, so teammates pick up a pre-built index on clone.
 
 Restart your AI client after running the installer to load the MCP server.
+
+:::note[Prefer not to commit the index?]
+Add `.lucerna/` to your root `.gitignore` and the index stays out of version control, same as before. Upgrading from an older Lucerna that added this line automatically? The installer will detect it and leave it in place — remove it yourself when you're ready to start committing the index.
+:::
 
 :::tip[Manual setup]
 Prefer to configure things yourself? Use [`add-mcp`](https://github.com/neondatabase/add-mcp) directly to register the MCP server, then create a `lucerna.config.ts` manually. See [Config File](/configuration/config-file) for the full reference.
 
 ```bash
 npx -y add-mcp "npx -y @upstart.gg/lucerna@latest mcp-server" --name lucerna
-```
-
-Also add `.lucerna/` to your `.gitignore` so the index directory is never committed:
-
-```
-# .gitignore
-.lucerna/
 ```
 :::
 

@@ -300,4 +300,88 @@ describe("VertexAIEmbeddings — unit", () => {
     const emb = new VertexAIEmbeddings(VALID_OPTS);
     await expect(emb.generate(["test"])).rejects.toThrow("400");
   });
+
+  test("retries on 429 and succeeds on second attempt", async () => {
+    let calls = 0;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        calls++;
+        if (calls === 1) {
+          return new Response("Rate limited", {
+            status: 429,
+            headers: { "retry-after": "0" },
+          });
+        }
+        const body = JSON.parse(init.body as string) as {
+          instances: unknown[];
+        };
+        return makeVertexResponse(body.instances.length);
+      },
+    );
+    const emb = new VertexAIEmbeddings(VALID_OPTS);
+    const result = await emb.generate(["hello"]);
+    expect(calls).toBe(2);
+    expect(result).toHaveLength(1);
+  });
+
+  test("retries on 5xx and succeeds on retry", async () => {
+    let calls = 0;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        calls++;
+        if (calls === 1) {
+          return new Response("Service Unavailable", {
+            status: 503,
+            headers: { "retry-after": "0" },
+          });
+        }
+        const body = JSON.parse(init.body as string) as {
+          instances: unknown[];
+        };
+        return makeVertexResponse(body.instances.length);
+      },
+    );
+    const emb = new VertexAIEmbeddings(VALID_OPTS);
+    const result = await emb.generate(["hello"]);
+    expect(calls).toBe(2);
+    expect(result).toHaveLength(1);
+  });
+
+  test("gives up on persistent 4xx (non-429) without retrying", async () => {
+    let calls = 0;
+    (globalThis as Record<string, unknown>).fetch = mock(async () => {
+      calls++;
+      return new Response("Bad Request", { status: 400 });
+    });
+    const emb = new VertexAIEmbeddings(VALID_OPTS);
+    await expect(emb.generate(["hello"])).rejects.toThrow("400");
+    expect(calls).toBe(1);
+  });
+
+  test("dispatches gemini-embedding-001 requests concurrently", async () => {
+    let inFlight = 0;
+    let peakConcurrency = 0;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        inFlight++;
+        peakConcurrency = Math.max(peakConcurrency, inFlight);
+        await new Promise((r) => setTimeout(r, 15));
+        const body = JSON.parse(init.body as string) as {
+          instances: unknown[];
+        };
+        const res = makeVertexResponse(body.instances.length);
+        inFlight--;
+        return res;
+      },
+    );
+    const emb = new VertexAIEmbeddings({
+      model: "gemini-embedding-001",
+      project: "proj",
+      concurrency: 4,
+    });
+    // 6 texts × 1 instance/request = 6 sequential-in-serial, parallel-in-concurrent
+    await emb.generate(["a", "b", "c", "d", "e", "f"]);
+    expect(peakConcurrency).toBeGreaterThan(1);
+    expect(peakConcurrency).toBeLessThanOrEqual(4);
+  });
 });

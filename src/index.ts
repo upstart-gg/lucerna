@@ -46,8 +46,17 @@ export { VoyageReranker } from "./embeddings/VoyageReranker.js";
 export { GraphTraverser, SymbolResolver } from "./graph/index.js";
 // Search engine (for standalone use)
 export { Searcher } from "./search/Searcher.js";
+export {
+  createStoreBundle,
+  type CreateStoreBundleOptions,
+  type StoreBundle,
+  type VectorStoreBackend,
+} from "./store/factory.js";
 export { GraphStore } from "./store/GraphStore.js";
+export type { GraphStoreInterface } from "./store/GraphStoreInterface.js";
 export { LanceDBStore } from "./store/LanceDBStore.js";
+export { SqliteGraphStore } from "./store/SqliteGraphStore.js";
+export { SqliteVectorStore } from "./store/SqliteVectorStore.js";
 // Store (for custom backends)
 export type { VectorStore } from "./store/VectorStore.js";
 // Config helper

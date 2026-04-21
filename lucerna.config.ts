@@ -14,4 +14,5 @@ export default defineConfig({
 
   // Add extra exclusion patterns (node_modules, .git etc. are always excluded):
   // exclude: ["**/*.test.ts", "**/fixtures/**"],
+
 });

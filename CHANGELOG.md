@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.1.24
+
+### Patch Changes
+
+- [#81](https://github.com/upstart-gg/lucerna/pull/81) [`81fc234`](https://github.com/upstart-gg/lucerna/commit/81fc2347307a869ee0f8ea0b133d62cd79891201) Thanks [@mattallty](https://github.com/mattallty)! - Vector db improvements (sqlite)
+
 ## 0.1.23
 
 ### Patch Changes

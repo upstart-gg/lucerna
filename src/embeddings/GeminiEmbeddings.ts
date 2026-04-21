@@ -9,6 +9,8 @@ import {
 type ModelCapabilities = {
   /** Native output dimensionality of the model. */
   nativeDim: number;
+  /** Default output dimensionality when the user does not pass `dimensions` explicitly. */
+  defaultDim: number;
   /** Whether the model accepts `taskType` in the request body. */
   supportsTaskType: boolean;
   /** Max input chars per text (1 char = 1 token worst case). */
@@ -18,16 +20,19 @@ type ModelCapabilities = {
 const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
   "text-embedding-004": {
     nativeDim: 768,
+    defaultDim: 768,
     supportsTaskType: true,
     maxPerTextChars: 2_000,
   },
   "gemini-embedding-001": {
     nativeDim: 3072,
+    defaultDim: 256,
     supportsTaskType: true,
     maxPerTextChars: 2_000,
   },
   "gemini-embedding-2-preview": {
     nativeDim: 3072,
+    defaultDim: 256,
     supportsTaskType: false,
     maxPerTextChars: 8_000,
   },
@@ -69,7 +74,7 @@ export class GeminiEmbeddings implements EmbeddingFunction {
   readonly modelId: string;
   private readonly apiKey: string;
   private readonly caps: ModelCapabilities;
-  /** Present only when the user explicitly requested a non-native dimensionality. */
+  /** Set when the effective dim is below the model's native dim — triggers outputDimensionality + L2 norm. */
   private readonly outputDimensionality: number | undefined;
 
   constructor(options: {
@@ -91,14 +96,16 @@ export class GeminiEmbeddings implements EmbeddingFunction {
         `Unknown Gemini model "${options.model}" — pass dimensions explicitly via constructor option or "gemini:${options.model}:<dims>" format`,
       );
     }
+    const dims = options.dimensions ?? 0;
     this.caps = caps ?? {
-      nativeDim: options.dimensions ?? 0,
+      nativeDim: dims,
+      defaultDim: dims,
       supportsTaskType: false,
       maxPerTextChars: 2_000,
     };
-    this.dimensions = options.dimensions ?? this.caps.nativeDim;
+    this.dimensions = options.dimensions ?? this.caps.defaultDim;
     this.outputDimensionality =
-      options.dimensions !== undefined ? options.dimensions : undefined;
+      this.dimensions < this.caps.nativeDim ? this.dimensions : undefined;
   }
 
   async generate(texts: string[]): Promise<number[][]> {

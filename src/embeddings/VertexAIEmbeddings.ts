@@ -9,6 +9,8 @@ import { type VertexAuthOptions, getVertexAccessToken } from "./vertexAuth.js";
 
 type VertexModelCaps = {
   nativeDim: number;
+  /** Default output dimensionality when the user does not pass `dimensions` explicitly. */
+  defaultDim: number;
   /**
    * Max input items per :predict request. `text-embedding-*` allow up to 250;
    * `gemini-embedding-001` requires one input per request (no server-side
@@ -18,10 +20,18 @@ type VertexModelCaps = {
 };
 
 const MODEL_CAPS: Record<string, VertexModelCaps> = {
-  "text-embedding-005": { nativeDim: 768, maxBatchItems: 250 },
-  "text-embedding-004": { nativeDim: 768, maxBatchItems: 250 },
-  "text-multilingual-embedding-002": { nativeDim: 768, maxBatchItems: 250 },
-  "gemini-embedding-001": { nativeDim: 3072, maxBatchItems: 1 },
+  "text-embedding-005": { nativeDim: 768, defaultDim: 768, maxBatchItems: 250 },
+  "text-embedding-004": { nativeDim: 768, defaultDim: 768, maxBatchItems: 250 },
+  "text-multilingual-embedding-002": {
+    nativeDim: 768,
+    defaultDim: 768,
+    maxBatchItems: 250,
+  },
+  "gemini-embedding-001": {
+    nativeDim: 3072,
+    defaultDim: 256,
+    maxBatchItems: 1,
+  },
 };
 
 // Vertex limits: 2,048 tokens per text, 20,000 tokens total per batch.
@@ -37,7 +47,7 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
   private readonly location: string;
   private readonly authOptions: VertexAuthOptions;
   private readonly caps: VertexModelCaps;
-  /** Present only when the user explicitly requested a non-native dimensionality. */
+  /** Set when the effective dim is below the model's native dim — triggers outputDimensionality + L2 norm. */
   private readonly outputDimensionality: number | undefined;
 
   constructor(options: {
@@ -66,13 +76,15 @@ export class VertexAIEmbeddings implements EmbeddingFunction {
         `VertexAIEmbeddings: unknown model "${options.model}". Pass options.dimensions explicitly or use "vertex:${options.model}:<dims>" format.`,
       );
     }
+    const dims = options.dimensions ?? 0;
     this.caps = caps ?? {
-      nativeDim: options.dimensions ?? 0,
+      nativeDim: dims,
+      defaultDim: dims,
       maxBatchItems: 250,
     };
-    this.dimensions = options.dimensions ?? this.caps.nativeDim;
+    this.dimensions = options.dimensions ?? this.caps.defaultDim;
     this.outputDimensionality =
-      options.dimensions !== undefined ? options.dimensions : undefined;
+      this.dimensions < this.caps.nativeDim ? this.dimensions : undefined;
   }
 
   async generate(texts: string[]): Promise<number[][]> {

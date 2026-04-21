@@ -186,10 +186,19 @@ describe("VertexAIEmbeddings — unit", () => {
     expect(v).toEqual([1, 0]);
   });
 
-  test("dimensions is 3072 for gemini-embedding-001", () => {
+  test("dimensions defaults to 256 for gemini-embedding-001", () => {
     const emb = new VertexAIEmbeddings({
       model: "gemini-embedding-001",
       project: "proj",
+    });
+    expect(emb.dimensions).toBe(256);
+  });
+
+  test("explicit dimensions override the default for gemini-embedding-001", () => {
+    const emb = new VertexAIEmbeddings({
+      model: "gemini-embedding-001",
+      project: "proj",
+      dimensions: 3072,
     });
     expect(emb.dimensions).toBe(3072);
   });

@@ -313,6 +313,60 @@ describe("GeminiEmbeddings — unit", () => {
     expect(v).toEqual([3, 4, 0]);
   });
 
+  test("retries on 429 and succeeds on second attempt", async () => {
+    let calls = 0;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        calls++;
+        if (calls === 1) {
+          return new Response("Rate limited", {
+            status: 429,
+            headers: { "retry-after": "0" },
+          });
+        }
+        const body = JSON.parse(init.body as string) as { requests: unknown[] };
+        return makeEmbeddingResponse(body.requests.length);
+      },
+    );
+    const emb = new GeminiEmbeddings(VALID_OPTS);
+    const result = await emb.generate(["hello"]);
+    expect(calls).toBe(2);
+    expect(result).toHaveLength(1);
+  });
+
+  test("gives up on persistent 4xx (non-429) without retrying", async () => {
+    let calls = 0;
+    (globalThis as Record<string, unknown>).fetch = mock(async () => {
+      calls++;
+      return new Response("Unauthorized", { status: 401 });
+    });
+    const emb = new GeminiEmbeddings(VALID_OPTS);
+    await expect(emb.generate(["hello"])).rejects.toThrow("401");
+    expect(calls).toBe(1);
+  });
+
+  test("dispatches multiple batches concurrently", async () => {
+    let inFlight = 0;
+    let peakConcurrency = 0;
+    (globalThis as Record<string, unknown>).fetch = mock(
+      async (_url: string, init: RequestInit) => {
+        inFlight++;
+        peakConcurrency = Math.max(peakConcurrency, inFlight);
+        await new Promise((r) => setTimeout(r, 15));
+        const body = JSON.parse(init.body as string) as { requests: unknown[] };
+        const res = makeEmbeddingResponse(body.requests.length);
+        inFlight--;
+        return res;
+      },
+    );
+    const emb = new GeminiEmbeddings({ ...VALID_OPTS, concurrency: 4 });
+    // 30 texts × 2,000 chars = 60k chars → at MAX_BATCH_CHARS=18k we get 4 batches
+    const texts = Array.from({ length: 30 }, () => "c".repeat(2_000));
+    await emb.generate(texts);
+    expect(peakConcurrency).toBeGreaterThan(1);
+    expect(peakConcurrency).toBeLessThanOrEqual(4);
+  });
+
   test("gemini-embedding-001 at default dim sends outputDimensionality: 256", async () => {
     let captured: { requests: { outputDimensionality?: number }[] } | undefined;
     (globalThis as Record<string, unknown>).fetch = mock(

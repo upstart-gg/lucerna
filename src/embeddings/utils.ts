@@ -90,6 +90,92 @@ export function reassembleVectors(
 }
 
 /**
+ * Run `worker` over `items` with at most `limit` concurrent invocations.
+ * Results are returned in input order regardless of completion order.
+ * Fails fast on the first rejection (remaining in-flight workers still settle).
+ */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (limit <= 0) throw new Error("mapWithConcurrency: limit must be > 0");
+  if (items.length === 0) return [];
+  const effectiveLimit = Math.min(limit, items.length);
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const runWorker = async (): Promise<void> => {
+    while (true) {
+      const i = nextIndex++;
+      if (i >= items.length) return;
+      const item = items[i] as T;
+      results[i] = await worker(item, i);
+    }
+  };
+
+  await Promise.all(Array.from({ length: effectiveLimit }, () => runWorker()));
+  return results;
+}
+
+/**
+ * Fetch with retry on transient failures (429 rate limit, 5xx server errors,
+ * network errors). Honours the `Retry-After` header when present, otherwise
+ * backs off exponentially with jitter. The fetcher is re-invoked each attempt
+ * so callers can create a fresh AbortSignal per try.
+ */
+export async function fetchWithRetry(
+  fetcher: () => Promise<Response>,
+  options: { maxRetries?: number; maxDelayMs?: number } = {},
+): Promise<Response> {
+  const { maxRetries = 4, maxDelayMs = 30_000 } = options;
+  let attempt = 0;
+  while (true) {
+    let response: Response;
+    try {
+      response = await fetcher();
+    } catch (err) {
+      if (attempt >= maxRetries) throw err;
+      await sleep(backoffMs(attempt, maxDelayMs));
+      attempt++;
+      continue;
+    }
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt >= maxRetries) return response;
+    const waitMs = retryDelayMs(response, attempt, maxDelayMs);
+    // Drain the body so the connection can be reused
+    await response.body?.cancel().catch(() => {});
+    await sleep(waitMs);
+    attempt++;
+  }
+}
+
+function backoffMs(attempt: number, maxDelayMs: number): number {
+  const base = 500 * 2 ** attempt;
+  const jitter = Math.floor(Math.random() * 250);
+  return Math.min(maxDelayMs, base + jitter);
+}
+
+function retryDelayMs(
+  response: Response,
+  attempt: number,
+  maxDelayMs: number,
+): number {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const secs = Number.parseInt(retryAfter, 10);
+    if (Number.isFinite(secs) && secs > 0) {
+      return Math.min(secs * 1000, maxDelayMs);
+    }
+  }
+  return backoffMs(attempt, maxDelayMs);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Split all texts into pieces (chunking oversized ones), track the ranges of
  * pieces that belong to each original text, and return char-budget batches.
  *

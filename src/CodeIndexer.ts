@@ -236,6 +236,9 @@ export class CodeIndexer {
   /** Timer used to batch saveFileHashes() writes in the watcher path. */
   private saveHashesTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Timer used to debounce store.optimize() calls triggered by watcher events. */
+  private optimizeTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** Cross-process exclusive lock: the holder is the only process that indexes. */
   private lock!: IndexLock;
   private _isLeader = false;
@@ -510,6 +513,13 @@ export class CodeIndexer {
       }
 
       await this.saveFileHashes();
+      // Compact LanceDB indexes now so the first search pays no setup cost.
+      // Cancel any pending debounced optimize — this explicit call supersedes it.
+      if (this.optimizeTimer !== null) {
+        clearTimeout(this.optimizeTimer);
+        this.optimizeTimer = null;
+      }
+      await this.store.optimize?.();
       this.lastIndexed = new Date();
       this.emit({
         type: "indexed",
@@ -551,6 +561,7 @@ export class CodeIndexer {
     this.cachedChunksByFile.delete(relPath);
     this.fileHashes.delete(relPath);
     await this.saveFileHashes();
+    this.scheduleOptimize();
     this.emit({ type: "removed", filePath: relPath });
   }
 
@@ -932,6 +943,11 @@ export class CodeIndexer {
       this.saveHashesTimer = null;
       await this.saveFileHashes();
     }
+    // Drop any pending optimize — advisory; the next session will optimize again
+    if (this.optimizeTimer !== null) {
+      clearTimeout(this.optimizeTimer);
+      this.optimizeTimer = null;
+    }
     await this.stopWatching();
     await this.lock?.release();
     if (this.store) await this.store.close();
@@ -1001,6 +1017,9 @@ export class CodeIndexer {
       this.fileHashes.set(relPath, hash);
       // Debounce disk writes: many rapid watcher events should not hammer the FS
       this.scheduleSaveFileHashes();
+      // Debounce LanceDB compaction similarly — bursts of watcher events would
+      // otherwise trigger an optimize() per file.
+      this.scheduleOptimize();
 
       this.emit({
         type: "indexed",
@@ -1080,6 +1099,15 @@ export class CodeIndexer {
       this.saveHashesTimer = null;
       this.saveFileHashes().catch(() => {});
     }, 2_000);
+  }
+
+  /** Schedule a debounced store.optimize() call (5 s after the latest watcher event). */
+  private scheduleOptimize(): void {
+    if (this.optimizeTimer !== null) return;
+    this.optimizeTimer = setTimeout(() => {
+      this.optimizeTimer = null;
+      this.store.optimize?.().catch(() => {});
+    }, 5_000);
   }
 
   private get hashFilePath(): string {

@@ -426,4 +426,34 @@ describe("LanceDBStore", () => {
       expect(ids).toContain("chunk-abc");
     });
   });
+
+  // -------------------------------------------------------------------------
+  // optimize()
+  // -------------------------------------------------------------------------
+
+  describe("optimize()", () => {
+    test("is a no-op on an empty store", async () => {
+      await expect(store.optimize()).resolves.toBeUndefined();
+      expect(await store.count()).toBe(0);
+    });
+
+    test("bootstraps the FTS index so searches succeed without lazy setup", async () => {
+      const chunks = [
+        makeChunk("id1", "src/a.ts", "function authenticate() {}"),
+        makeChunk("id2", "src/b.ts", "function logout() {}"),
+      ];
+      await store.upsert(chunks, [makeVector(DIMS), makeVector(DIMS)]);
+      await store.optimize();
+
+      const results = await store.searchText("authenticate", { limit: 5 });
+      expect(results.map((r) => r.chunk.id)).toContain("id1");
+    });
+
+    test("is idempotent — repeated calls succeed", async () => {
+      const chunk = makeChunk("id1", "src/a.ts", "function foo() {}");
+      await store.upsert([chunk], [makeVector(DIMS)]);
+      await store.optimize();
+      await expect(store.optimize()).resolves.toBeUndefined();
+    });
+  });
 });

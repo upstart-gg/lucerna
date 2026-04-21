@@ -48,4 +48,10 @@ export interface VectorStore {
 
   /** Release all resources (close DB connection). */
   close(): Promise<void>;
+
+  /**
+   * Compact data files and refresh indexes after batch writes.
+   * Optional — stores that don't need explicit optimization can omit it.
+   */
+  optimize?(): Promise<void>;
 }

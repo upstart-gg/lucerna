@@ -371,6 +371,48 @@ export class LanceDBStore implements VectorStore {
     this.db = null;
   }
 
+  /**
+   * Compact data files and refresh indexes. Call after batch indexing to
+   * move the cost of incremental index maintenance out of the search path.
+   * Advisory: failures are swallowed since stale indexes remain queryable.
+   */
+  async optimize(): Promise<void> {
+    if (!this.table) return;
+    const count = await this.table.countRows();
+    if (count === 0) return;
+
+    // Bootstrap FTS index on first run so optimize() has something to compact.
+    if (!this.ftsIndexExists) {
+      const column = this.searchContentAvailable ? "searchContent" : "content";
+      try {
+        await this.table.createIndex(column, { config: lancedb.Index.fts() });
+      } catch {
+        // May already exist from a prior session — flag and continue.
+      }
+      this.ftsIndexExists = true;
+    }
+
+    // Bootstrap IVF_PQ vector index once there are enough rows for it to pay off.
+    if (count >= 65_536 && !this.vectorIndexed) {
+      try {
+        const numPartitions = Math.max(1, Math.floor(count / 256));
+        await this.table.createIndex("vector", {
+          config: lancedb.Index.ivfPq({ numPartitions }),
+        });
+      } catch {
+        // Already exists or insufficient data — ignored.
+      }
+      this.vectorIndexed = true;
+    }
+
+    try {
+      await this.table.optimize();
+      this.ftsIndexed = true;
+    } catch {
+      // Non-fatal — optimize is advisory.
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Internal helpers
   // ---------------------------------------------------------------------------

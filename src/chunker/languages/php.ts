@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -19,12 +21,19 @@ const PHP_QUERIES = {
   callExpressions: `(function_call_expression function: [(name) @callee (member_call_expression name: (name) @callee)]) @call`,
 };
 
+// PHP 8+ constructs — grammar coverage varies
+const PHP_EXTRA_QUERIES = {
+  enums: `(enum_declaration name: (name) @name) @enum`,
+  consts: `(const_declaration (const_element (name) @name)) @const`,
+  properties: `(property_declaration (property_element (variable_name (name) @name))) @prop`,
+};
+
 const PHP_INHERIT_QUERIES = {
-  // base_clause wraps parent class name directly (no named_type wrapper in this grammar version)
   extends: `(class_declaration name: (name) @name (base_clause (name) @base)) @cls`,
-  // class_interface_clause contains each implemented interface name
   implements: `(class_declaration name: (name) @name (class_interface_clause (name) @iface)) @cls`,
 };
+
+const MIN_CONST_CHARS = 40;
 
 export function extractPhp(
   source: string,
@@ -93,8 +102,6 @@ export function extractPhp(
     });
     for (const m of useMatches) {
       const raw = cap(m, "imp")?.text ?? "";
-      // "use App\Models\User;" → "App\Models\User"
-      // "use function App\helpers;" → "App\helpers"
       let mod = raw
         .replace(/^use\s+/, "")
         .replace(/;$/, "")
@@ -114,15 +121,18 @@ export function extractPhp(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "function" | "class" | "interface" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -139,7 +149,7 @@ export function extractPhp(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -165,11 +175,62 @@ export function extractPhp(
     if (node && name) addChunk(node, name, "interface");
   }
 
-  // traits map to interface type (nearest semantic equivalent)
   for (const m of getMatches("traits")) {
     const node = cap(m, "trait")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "interface");
+    if (node && name) addChunk(node, name, "trait");
+  }
+
+  // PHP 8+ extras — grammar coverage varies
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+    const ex: any = packExtract(source, {
+      language,
+      patterns: Object.fromEntries(
+        Object.entries(PHP_EXTRA_QUERIES).map(([k, q]) => [
+          k,
+          { query: q, captureOutput: "Full" },
+        ]),
+      ),
+    });
+    const exR = ex.results as Record<string, { matches: PatternMatch[] }>;
+    const exM = (key: string) => exR[key]?.matches ?? [];
+    for (const m of exM("enums")) {
+      const node = cap(m, "enum")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (node && name) addChunk(node, name, "enum");
+    }
+    for (const m of exM("consts")) {
+      const node = cap(m, "const")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (!node || !name) continue;
+      const content = sourceLines
+        .slice(node.startRow, node.endRow + 1)
+        .join("\n");
+      if (content.length < MIN_CONST_CHARS) continue;
+      addChunk(node, name, "const");
+    }
+    for (const m of exM("properties")) {
+      const node = cap(m, "prop")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (!node || !name) continue;
+      let parentName: string | undefined;
+      for (const chunk of chunks) {
+        if (
+          (chunk.type === "class" ||
+            chunk.type === "interface" ||
+            chunk.type === "trait") &&
+          chunk.startLine <= node.startRow + 1 &&
+          chunk.endLine >= node.endRow + 1
+        ) {
+          parentName = chunk.name;
+          break;
+        }
+      }
+      addChunk(node, name, "property", parentName);
+    }
+  } catch {
+    /* PHP extras unsupported — skip */
   }
 
   for (const m of getMatches("methods")) {
@@ -179,7 +240,10 @@ export function extractPhp(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        (chunk.type === "class" || chunk.type === "interface") &&
+        (chunk.type === "class" ||
+          chunk.type === "interface" ||
+          chunk.type === "trait" ||
+          chunk.type === "enum") &&
         chunk.startLine <= methodNode.startRow + 1 &&
         chunk.endLine >= methodNode.endRow + 1
       ) {
@@ -190,7 +254,7 @@ export function extractPhp(
     addChunk(methodNode, name, "method", parentName);
   }
 
-  // --- EXTENDS / IMPLEMENTS edges (separate extraction to avoid breaking structure queries) ---
+  // --- EXTENDS / IMPLEMENTS edges ---
   try {
     // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
     const inh: any = packExtract(source, {

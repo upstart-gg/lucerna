@@ -106,15 +106,15 @@ class UserService {
     expect(names).toContain("Authenticator");
   });
 
-  test("trait maps to interface type with name", async () => {
+  test("trait emitted as trait chunk", async () => {
     const chunks = await chunker.chunkSource(
       PHP_SOURCE,
       FILE("php"),
       PROJECT_ID,
       "php",
     );
-    const ifaces = chunksByType(chunks, "interface");
-    const names = ifaces.map((c) => c.name);
+    const traits = chunksByType(chunks, "trait");
+    const names = traits.map((c) => c.name);
     expect(names).toContain("Loggable");
   });
 
@@ -203,5 +203,55 @@ class UserService extends BaseService implements Loggable {
     const impl = rawEdges.filter((e) => e.type === "IMPLEMENTS");
     expect(impl.length).toBeGreaterThan(0);
     expect(impl[0]?.targetSymbol).toBe("Loggable");
+  });
+});
+
+describe("PHP — enums, consts, properties (PHP 8+)", () => {
+  const SRC = `<?php
+
+enum Status: string {
+    case Active = 'active';
+    case Inactive = 'inactive';
+}
+
+class User {
+    const VERSION = 'A long enough constant value to pass the min char filter';
+    public string $name;
+    public int $age;
+}
+`;
+
+  test("enum emitted as enum chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("php"),
+      PROJECT_ID,
+      "php",
+    );
+    const names = chunksByType(chunks, "enum").map((c) => c.name);
+    expect(names).toContain("Status");
+  });
+
+  test("class const emitted as const chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("php"),
+      PROJECT_ID,
+      "php",
+    );
+    const names = chunksByType(chunks, "const").map((c) => c.name);
+    expect(names).toContain("VERSION");
+  });
+
+  test("class properties emitted as property chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("php"),
+      PROJECT_ID,
+      "php",
+    );
+    const names = chunksByType(chunks, "property").map((c) => c.name);
+    expect(names).toContain("name");
+    expect(names).toContain("age");
   });
 });

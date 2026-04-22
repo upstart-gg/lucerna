@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -9,12 +11,19 @@ import {
   type PatternMatch,
 } from "./shared.js";
 
+// tree-sitter-powershell exposes `function_name`/`simple_name`/`command_name`
+// as positional children (no named fields). `using_statement` and other
+// optional rules vary across grammar versions, so they live in EXTRA queries
+// that run independently to avoid taking down the whole batch.
 const POWERSHELL_QUERIES = {
-  // using module / using assembly statements
+  functions: `(function_statement (function_name) @name) @fn`,
+  classes: `(class_statement (simple_name) @name) @cls`,
+  callExpressions: `(command (command_name) @callee) @call`,
+};
+
+const POWERSHELL_EXTRA_QUERIES = {
   imports: `(using_statement) @imp`,
-  functions: `(function_statement name: (user_word) @name) @fn`,
-  classes: `(class_statement name: (type_identifier) @name) @cls`,
-  callExpressions: `(command name: (command_name) @callee) @call`,
+  paramBlocks: `(param_block) @param`,
 };
 
 export function extractPowerShell(
@@ -60,9 +69,31 @@ export function extractPowerShell(
   const chunks: CodeChunk[] = [];
   const rawEdges: RawEdge[] = [];
 
-  // --- Import chunk (using statements) ---
+  // Per-key tryExtra: run optional EXTRA queries independently so a missing
+  // node type doesn't take down the rest.
+  const tryExtra = (
+    key: keyof typeof POWERSHELL_EXTRA_QUERIES,
+  ): PatternMatch[] => {
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+      const ex: any = packExtract(source, {
+        language,
+        patterns: {
+          [key]: {
+            query: POWERSHELL_EXTRA_QUERIES[key],
+            captureOutput: "Full",
+          },
+        },
+      });
+      return (ex.results[key]?.matches as PatternMatch[]) ?? [];
+    } catch {
+      return [];
+    }
+  };
+
+  // --- Import chunk (using statements — optional, grammar coverage varies) ---
   let importContent = "";
-  const usingMatches = getMatches("imports");
+  const usingMatches = tryExtra("imports");
   if (usingMatches.length > 0) {
     const nodes = usingMatches
       .map((m) => cap(m, "imp")?.node)
@@ -100,15 +131,18 @@ export function extractPowerShell(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`# Class: ${parentName}`);
     breadcrumbParts.push(`# ${capitalize(type)}: ${name}`);
@@ -125,7 +159,7 @@ export function extractPowerShell(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -155,6 +189,20 @@ export function extractPowerShell(
       }
     }
     addChunk(fnNode, name, parentName ? "method" : "function", parentName);
+  }
+
+  // --- Param blocks (only script-scope) ---
+  for (const m of tryExtra("paramBlocks")) {
+    const node = cap(m, "param")?.node;
+    if (!node) continue;
+    const insideFn = chunks.some(
+      (c) =>
+        (c.type === "function" || c.type === "method" || c.type === "class") &&
+        c.startLine <= node.startRow + 1 &&
+        c.endLine >= node.endRow + 1,
+    );
+    if (insideFn) continue;
+    addChunk(node, "param", "param_block");
   }
 
   if (chunks.length === 0) {

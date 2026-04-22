@@ -71,3 +71,36 @@ cleanup() {
     for (const c of chunks) expect(c.language).toBe("bash");
   });
 });
+
+describe("Bash — top-level variable assignments", () => {
+  const SRC = `#!/bin/bash
+DATABASE_URL="postgres://app_user:hunter2@db.example.com:5432/app_production"
+SHORT=x
+
+deploy() {
+    echo "deploying with $DATABASE_URL"
+}
+`;
+
+  test("long top-level assignments emitted as const chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("sh"),
+      PROJECT_ID,
+      "bash",
+    );
+    const consts = chunksByType(chunks, "const").map((c) => c.name);
+    expect(consts).toContain("DATABASE_URL");
+  });
+
+  test("short top-level assignments are filtered out", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("sh"),
+      PROJECT_ID,
+      "bash",
+    );
+    const consts = chunksByType(chunks, "const").map((c) => c.name);
+    expect(consts).not.toContain("SHORT");
+  });
+});

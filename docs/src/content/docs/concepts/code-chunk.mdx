@@ -22,14 +22,64 @@ A `CodeChunk` is the atomic unit of the index. Every chunk represents a single l
 
 ## Chunk types
 
+The `type` field distinguishes the kind of construct each chunk represents. Lucerna emits a fine-grained set of types so you can filter searches and repo-maps precisely (e.g. `types: ["enum", "trait"]`).
+
+### Core kinds
+
 | Type | Produced from |
 |---|---|
-| `function` | Function declarations, generator functions, arrow functions, Rust/Go/Python/Bash functions |
-| `class` | Class declarations; also Rust `struct` and `impl` blocks, Ruby/Python `module` |
-| `method` | Individual methods inside a class (Java, C#, PHP, Go receiver methods, …) |
-| `interface` | TypeScript `interface`; also Rust `trait`, Swift `protocol` |
-| `type` | TypeScript `type` alias; also Rust/Java/Kotlin `enum` |
-| `variable` | Variable declarations |
-| `import` | All import statements in a file, grouped as one chunk |
-| `section` | Markdown heading section (H1–H3) |
-| `file` | Whole-file fallback for small or structureless files (e.g. SQL) |
+| `function` | Free-standing function declarations across all languages |
+| `class` | Class declarations |
+| `method` | Functions/methods defined inside a class/struct/protocol/trait |
+| `interface` | Java/Kotlin/C#/TypeScript `interface` |
+| `type` | TypeScript `type` alias and other one-off type definitions |
+| `variable` | Top-level variable declarations |
+| `import` | All `import` / `use` / `using` / `open` / `library` / `require` statements in a file, grouped into one chunk |
+| `section` | Markdown heading section (H1–H3); SCSS `@media` blocks; large CSS rule groups |
+| `file` | Whole-file fallback for small or structureless files |
+
+### Type system & data
+
+| Type | Produced from |
+|---|---|
+| `enum` | TS/JS, Java, C#, Kotlin, Swift, Rust, Dart, Solidity, PHP 8.1, Scala 3 enums |
+| `struct` | Rust, C, C++, Swift, Solidity, Julia, Zig structs (and C `union`) |
+| `record` | Java, C#, Scala case-class, Clojure `defrecord`/`deftype`, Erlang records |
+| `protocol` | Swift, Objective-C, Elixir `defprotocol`, Clojure `defprotocol` |
+| `trait` | Rust, PHP, Scala traits |
+| `mixin` | Dart `mixin` |
+| `extension` | Swift, Dart extensions; Objective-C categories |
+| `object` | Kotlin `object`, Scala `object` |
+| `actor` | Swift `actor` |
+| `typealias` | TS/JS `type`, Rust `type`, C `typedef`, Kotlin/Swift/Scala/Dart aliases, Julia/Haskell type aliases, OCaml `module type`, C++ `using` aliases |
+| `newtype` | Haskell `newtype` |
+| `module` | Rust `mod`, OCaml `module`, Elixir `defmodule`, Julia `module`, Ruby `module` |
+| `module_type` | OCaml module types |
+| `functor` | OCaml functors |
+| `namespace` | TS/JS `namespace`, C# / C++ namespaces |
+| `library` | Solidity `library` |
+
+### Values & members
+
+| Type | Produced from |
+|---|---|
+| `const` | Top-level constants (TS/JS `export const`, Python module assignment, Rust `const`/`static`, Go `const`/`var`, C `#define`, Clojure `def`, Julia `const`, Bash variable, SCSS variable). Filtered by minimum size to skip trivial values. |
+| `property` | Class/struct properties (C#, Kotlin, Swift, Objective-C, PHP, Matlab, Perl Moose `has`) |
+| `macro` | Rust `macro_rules!`, C `#define`, Elixir `defmacro`, Clojure `defmacro`, Julia `macro` |
+| `instance` | Elixir `defimpl`, Scala 3 `given`, Haskell `instance` |
+| `event` | Solidity events; C# events |
+| `modifier` | Solidity modifiers |
+| `error` | Solidity custom errors |
+| `state_variable` | Solidity state variables |
+
+### Tests, params, DSL calls
+
+| Type | Produced from |
+|---|---|
+| `test` | Zig `test` blocks |
+| `param_block` | PowerShell script-scope `param( ... )` blocks |
+| `dsl_call` | Ruby Rails-style class-body DSLs (`has_many`, `validates`, `before_action`, `attr_accessor`, …) |
+
+### Doc comments, decorators, annotations & attributes
+
+Leading doc comments, decorators, annotations, and attributes are *absorbed* into the chunk that follows them — they are not emitted as standalone chunks. This means the `content` field of a function or class includes its preceding JSDoc, Python decorators, Rust `#[derive(...)]` attributes, Java annotations, C# XML doc, etc. The absorb scan is capped at 80 lines to avoid pulling in license headers.

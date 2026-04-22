@@ -22,7 +22,34 @@ export type ChunkType =
   | "variable"
   | "import"
   | "section" // markdown heading section
-  | "file"; // whole-file fallback
+  | "file" // whole-file fallback
+  | "enum"
+  | "const"
+  | "macro"
+  | "namespace"
+  | "struct"
+  | "record"
+  | "protocol"
+  | "trait"
+  | "mixin"
+  | "extension"
+  | "object"
+  | "actor"
+  | "typealias"
+  | "module"
+  | "property"
+  | "instance"
+  | "newtype"
+  | "functor"
+  | "module_type"
+  | "test"
+  | "param_block"
+  | "dsl_call"
+  | "state_variable"
+  | "event"
+  | "modifier"
+  | "error"
+  | "library";
 
 // ---------------------------------------------------------------------------
 // Core data model

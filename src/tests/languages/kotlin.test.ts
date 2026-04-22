@@ -99,6 +99,69 @@ fun greet(name: String): String = "Hello, $name!"
   });
 });
 
+describe("Kotlin — objects, enums, interfaces, typealiases", () => {
+  const SRC = `package com.example
+
+object Settings {
+    val maxRetries = 5
+}
+
+enum class Color { RED, GREEN, BLUE }
+
+interface Repository {
+    fun findAll(): List<String>
+}
+
+typealias UserId = String
+`;
+
+  test("object emitted as object chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("kt"),
+      PROJECT_ID,
+      "kotlin",
+    );
+    expect(chunksByType(chunks, "object").map((c) => c.name)).toContain(
+      "Settings",
+    );
+  });
+
+  test("enum class emitted as enum chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("kt"),
+      PROJECT_ID,
+      "kotlin",
+    );
+    expect(chunksByType(chunks, "enum").map((c) => c.name)).toContain("Color");
+  });
+
+  test("interface emitted as interface chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("kt"),
+      PROJECT_ID,
+      "kotlin",
+    );
+    expect(chunksByType(chunks, "interface").map((c) => c.name)).toContain(
+      "Repository",
+    );
+  });
+
+  test("typealias emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("kt"),
+      PROJECT_ID,
+      "kotlin",
+    );
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "UserId",
+    );
+  });
+});
+
 describe("Graph edges — Kotlin EXTENDS + IMPLEMENTS", () => {
   const SOURCE = `interface Greetable {}
 open class BaseService {}

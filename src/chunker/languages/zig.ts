@@ -1,6 +1,9 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
+  capitalize,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -8,11 +11,14 @@ import {
   type PatternMatch,
 } from "./shared.js";
 
+// The tree-sitter-zig grammar uses CamelCase node names (VarDecl, FnProto,
+// TestDecl, ContainerDecl). VarDecl text is regex-scanned for @import to
+// detect imports, since the grammar exposes builtins as BUILTINIDENTIFIER
+// without a structured argument hierarchy.
 const ZIG_QUERIES = {
-  // const std = @import("std");
-  imports: `(variable_declaration name: (identifier) @name value: (builtin_call_expression builtin: "@import" argument: (string_literal) @module)) @imp`,
-  functions: `(function_declaration name: (identifier) @name) @fn`,
-  callExpressions: `(call_expression function: (identifier) @callee) @call`,
+  varDecls: `(VarDecl (IDENTIFIER) @name) @decl`,
+  fns: `(_ (FnProto (IDENTIFIER) @name)) @fn`,
+  tests: `(TestDecl) @test`,
 };
 
 export function extractZig(
@@ -58,12 +64,15 @@ export function extractZig(
   const chunks: CodeChunk[] = [];
   const rawEdges: RawEdge[] = [];
 
-  // --- Import chunk (@import declarations) ---
+  // --- Import chunk (@import declarations detected by text) ---
   let importContent = "";
-  const importMatches = getMatches("imports");
-  if (importMatches.length > 0) {
-    const nodes = importMatches
-      .map((m) => cap(m, "imp")?.node)
+  const allVarDecls = getMatches("varDecls");
+  const importDecls = allVarDecls.filter((m) =>
+    /@import\s*\(/.test(cap(m, "decl")?.text ?? ""),
+  );
+  if (importDecls.length > 0) {
+    const nodes = importDecls
+      .map((m) => cap(m, "decl")?.node)
       .filter((n): n is NonNullable<typeof n> => n != null);
     const startLine = Math.min(...nodes.map((n) => n.startRow)) + 1;
     const endLine = Math.max(...nodes.map((n) => n.endRow)) + 1;
@@ -80,10 +89,9 @@ export function extractZig(
       endLine,
       metadata: {},
     });
-    for (const m of importMatches) {
-      const raw = cap(m, "module")?.text ?? "";
-      // strip surrounding quotes: `"std"` → `std`
-      const mod = raw.replace(/^["']|["']$/g, "");
+    for (const m of importDecls) {
+      const text = cap(m, "decl")?.text ?? "";
+      const mod = text.match(/@import\s*\(\s*["']([^"']+)["']/)?.[1] ?? "";
       if (mod)
         rawEdges.push({
           sourceChunkId: "",
@@ -96,14 +104,18 @@ export function extractZig(
     }
   }
 
-  for (const m of getMatches("functions")) {
-    const fnNode = cap(m, "fn")?.node;
-    const name = cap(m, "name")?.text ?? "";
-    if (!fnNode || !name) continue;
-    const content = sourceLines
-      .slice(fnNode.startRow, fnNode.endRow + 1)
-      .join("\n");
-    const breadcrumb = `// Function: ${name}`;
+  const absorb = getAbsorb(language);
+
+  const addChunk = (
+    node: NonNullable<MatchCapture["node"]>,
+    name: string,
+    type: ChunkType,
+  ) => {
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
+    const breadcrumb = `// ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -112,14 +124,58 @@ export function extractZig(
       projectId,
       filePath,
       language,
-      type: "function",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: fnNode.startRow + 1,
-      endLine: fnNode.endRow + 1,
+      startLine: startRow + 1,
+      endLine: node.endRow + 1,
       metadata: { breadcrumb },
     });
+  };
+
+  // Containers (struct / enum / union declared via `const X = <kind> { ... }`).
+  // Detect by inspecting VarDecl text; the grammar exposes ContainerDecl but
+  // not its kind via a clean field, so text matching is the reliable path.
+  for (const m of allVarDecls) {
+    const node = cap(m, "decl")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    const text = cap(m, "decl")?.text ?? "";
+    if (!node || !name) continue;
+    if (/@import\s*\(/.test(text)) continue; // already an import
+    const containerMatch = text.match(
+      /=\s*(?:packed\s+|extern\s+)?(struct|enum|union)\b/,
+    );
+    if (!containerMatch) continue;
+    const kind = containerMatch[1];
+    const type: ChunkType = kind === "enum" ? "enum" : "struct";
+    addChunk(node, name, type);
+  }
+
+  for (const m of getMatches("tests")) {
+    const node = cap(m, "test")?.node;
+    if (!node) continue;
+    const text = cap(m, "test")?.text ?? "";
+    const name = text.match(/^test\s+"([^"]+)"/)?.[1] ?? "anonymous";
+    addChunk(node, name, "test");
+  }
+
+  for (const m of getMatches("fns")) {
+    const fnNode = cap(m, "fn")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!fnNode || !name) continue;
+    let parentName: string | undefined;
+    for (const chunk of chunks) {
+      if (
+        (chunk.type === "struct" || chunk.type === "enum") &&
+        chunk.startLine <= fnNode.startRow + 1 &&
+        chunk.endLine >= fnNode.endRow + 1
+      ) {
+        parentName = chunk.name;
+        break;
+      }
+    }
+    addChunk(fnNode, name, parentName ? "method" : "function");
   }
 
   if (chunks.length === 0) {
@@ -130,26 +186,6 @@ export function extractZig(
       language,
       minMergeChars,
     );
-  }
-
-  // CALLS edges
-  for (const m of getMatches("callExpressions")) {
-    const callee = cap(m, "callee")?.text ?? "";
-    const callNode = cap(m, "call")?.node;
-    if (!callee || !callNode) continue;
-    const enclosing = chunks.find(
-      (c) =>
-        c.type === "function" &&
-        c.startLine <= callNode.startRow + 1 &&
-        c.endLine >= callNode.endRow + 1,
-    );
-    rawEdges.push({
-      sourceChunkId: enclosing?.id ?? "",
-      sourceFilePath: filePath,
-      type: "CALLS",
-      targetSymbol: callee,
-      metadata: {},
-    });
   }
 
   return { chunks: mergeSiblingChunks(chunks, minMergeChars), rawEdges };

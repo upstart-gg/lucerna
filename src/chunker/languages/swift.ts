@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -9,16 +11,33 @@ import {
   type PatternMatch,
 } from "./shared.js";
 
-// Note: in tree-sitter-swift (this pack version), struct/class/enum all use
-// class_declaration. The "enum" keyword literal distinguishes enums.
+// Note: in tree-sitter-swift (this pack version), struct/class/enum/actor/extension
+// all use class_declaration. We disambiguate by inspecting the leading keyword in
+// the matched node text (no `extension_declaration` node type exists).
 const SWIFT_QUERIES = {
   imports: `(import_declaration) @imp`,
-  enums: `(class_declaration "enum" name: (type_identifier) @name) @cls`,
-  classes: `(class_declaration name: (type_identifier) @name) @cls`,
+  classes: `(class_declaration name: (_) @name) @cls`,
   protocols: `(protocol_declaration name: (type_identifier) @name) @p`,
+  typealiases: `(typealias_declaration name: (type_identifier) @name) @alias`,
   functions: `(function_declaration name: (simple_identifier) @name) @fn`,
   callExpressions: `(call_expression (simple_identifier) @callee) @call`,
 };
+
+function classifySwiftClassDecl(text: string): ChunkType {
+  const trimmed = text.trimStart();
+  // Skip leading attributes like @MainActor, modifiers like public/private/final
+  const stripped = trimmed
+    .replace(/^(?:@\w+(?:\([^)]*\))?\s+)+/, "")
+    .replace(
+      /^(?:public|private|internal|fileprivate|open|final|indirect|static|mutating|nonisolated|distributed|isolated)\s+/g,
+      "",
+    );
+  if (stripped.startsWith("struct")) return "struct";
+  if (stripped.startsWith("enum")) return "enum";
+  if (stripped.startsWith("actor")) return "actor";
+  if (stripped.startsWith("extension")) return "extension";
+  return "class";
+}
 
 const SWIFT_INHERIT_QUERIES = {
   // inheritance_specifier is emitted once per parent/protocol (one match per conformance)
@@ -108,15 +127,18 @@ export function extractSwift(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "interface" | "type" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -133,7 +155,7 @@ export function extractSwift(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -141,28 +163,23 @@ export function extractSwift(
     });
   };
 
-  // Enums first — claim rows so the classes query doesn't double-add them
-  const claimedRows = new Set<number>();
-  for (const m of getMatches("enums")) {
-    const node = cap(m, "cls")?.node;
-    const name = cap(m, "name")?.text ?? "";
-    if (node && name) {
-      claimedRows.add(node.startRow);
-      addChunk(node, name, "type");
-    }
-  }
-
   for (const m of getMatches("classes")) {
     const node = cap(m, "cls")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name && !claimedRows.has(node.startRow))
-      addChunk(node, name, "class");
+    const text = cap(m, "cls")?.text ?? "";
+    if (node && name) addChunk(node, name, classifySwiftClassDecl(text));
   }
 
   for (const m of getMatches("protocols")) {
     const node = cap(m, "p")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "interface");
+    if (node && name) addChunk(node, name, "protocol");
+  }
+
+  for (const m of getMatches("typealiases")) {
+    const node = cap(m, "alias")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "typealias");
   }
 
   // function_declaration covers both top-level functions and struct/class methods
@@ -173,7 +190,12 @@ export function extractSwift(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        (chunk.type === "class" || chunk.type === "interface") &&
+        (chunk.type === "class" ||
+          chunk.type === "struct" ||
+          chunk.type === "protocol" ||
+          chunk.type === "extension" ||
+          chunk.type === "actor" ||
+          chunk.type === "enum") &&
         chunk.startLine <= fnNode.startRow + 1 &&
         chunk.endLine >= fnNode.endRow + 1
       ) {

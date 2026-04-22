@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -13,6 +15,10 @@ const C_QUERIES = {
   includes: `(preproc_include) @imp`,
   functions: `(function_definition declarator: (function_declarator declarator: (identifier) @name)) @fn`,
   structs: `(struct_specifier name: (type_identifier) @name) @struct`,
+  unions: `(union_specifier name: (type_identifier) @name) @union`,
+  enums: `(enum_specifier name: (type_identifier) @name) @enum`,
+  typedefs: `(type_definition declarator: (type_identifier) @name) @typedef`,
+  macros: `(preproc_def name: (identifier) @name) @macro`,
   callExpressions: `(call_expression function: (identifier) @callee) @call`,
 };
 
@@ -100,14 +106,17 @@ export function extractC(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "function" | "class",
+    type: ChunkType,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumb = `// ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
@@ -121,7 +130,7 @@ export function extractC(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: { breadcrumb },
     });
@@ -130,7 +139,34 @@ export function extractC(
   for (const m of getMatches("structs")) {
     const node = cap(m, "struct")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "class");
+    if (node && name) addChunk(node, name, "struct");
+  }
+  for (const m of getMatches("unions")) {
+    const node = cap(m, "union")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "struct");
+  }
+  for (const m of getMatches("enums")) {
+    const node = cap(m, "enum")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "enum");
+  }
+  for (const m of getMatches("typedefs")) {
+    const node = cap(m, "typedef")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "typealias");
+  }
+
+  const MIN_MACRO_CHARS = 20;
+  for (const m of getMatches("macros")) {
+    const node = cap(m, "macro")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!node || !name) continue;
+    const content = sourceLines
+      .slice(node.startRow, node.endRow + 1)
+      .join("\n");
+    if (content.length < MIN_MACRO_CHARS) continue;
+    addChunk(node, name, "macro");
   }
 
   for (const m of getMatches("functions")) {

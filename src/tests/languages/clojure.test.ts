@@ -71,3 +71,66 @@ describe("Clojure", () => {
     for (const c of chunks) expect(c.language).toBe("clojure");
   });
 });
+
+describe("Clojure — protocols, records, macros, multimethods", () => {
+  const SRC = `(defprotocol Greetable
+  (greet [this]))
+
+(defrecord User [name email]
+  Greetable
+  (greet [this] (str "Hi, " name)))
+
+(defmacro when-let [binding & body]
+  \`(let [~(first binding) ~(second binding)]
+     (when ~(first binding) ~@body)))
+
+(defmulti area :shape)
+
+(defmethod area :circle [s] 1.0)
+`;
+
+  test("defprotocol emitted as protocol chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("clj"),
+      PROJECT_ID,
+      "clojure",
+    );
+    expect(chunksByType(chunks, "protocol").map((c) => c.name)).toContain(
+      "Greetable",
+    );
+  });
+
+  test("defrecord emitted as record chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("clj"),
+      PROJECT_ID,
+      "clojure",
+    );
+    expect(chunksByType(chunks, "record").map((c) => c.name)).toContain("User");
+  });
+
+  test("defmacro emitted as macro chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("clj"),
+      PROJECT_ID,
+      "clojure",
+    );
+    expect(chunksByType(chunks, "macro").map((c) => c.name)).toContain(
+      "when-let",
+    );
+  });
+
+  test("defmulti/defmethod emitted as method chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("clj"),
+      PROJECT_ID,
+      "clojure",
+    );
+    const methods = chunksByType(chunks, "method").map((c) => c.name);
+    expect(methods).toContain("area");
+  });
+});

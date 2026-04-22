@@ -81,3 +81,51 @@ $secondary: #666;
     for (const c of chunks) expect(c.language).toBe("scss");
   });
 });
+
+describe("SCSS — variables, keyframes, media", () => {
+  const SRC = `$brand-primary-color: #ff5500aaaaaaa;
+$brand-secondary-color: #00aaff77;
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .container { width: 100%; }
+}
+`;
+
+  test("$variables emitted as const chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("scss"),
+      PROJECT_ID,
+      "scss",
+    );
+    const consts = chunks.filter((c) => c.type === "const").map((c) => c.name);
+    expect(consts).toContain("$brand-primary-color");
+  });
+
+  test("@keyframes emitted as function chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("scss"),
+      PROJECT_ID,
+      "scss",
+    );
+    const fns = chunks.filter((c) => c.type === "function").map((c) => c.name);
+    expect(fns).toContain("spin");
+  });
+
+  test("@media emitted as section chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("scss"),
+      PROJECT_ID,
+      "scss",
+    );
+    const sections = chunks.filter((c) => c.type === "section");
+    expect(sections.length).toBeGreaterThan(0);
+  });
+});

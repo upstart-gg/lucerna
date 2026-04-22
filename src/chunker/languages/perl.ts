@@ -1,6 +1,9 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
+  capitalize,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -8,11 +11,14 @@ import {
   type PatternMatch,
 } from "./shared.js";
 
+// tree-sitter-perl exposes statement nodes but doesn't surface their identifier
+// children with stable field names; we capture the full statement and regex the
+// name from its text. function_call doesn't exist in this grammar — the Perl
+// runtime's call sites are matched via `expression_statement` text scans below.
 const PERL_QUERIES = {
-  uses: `(use_no_statement (package_name) @module) @imp`,
-  subs: `(subroutine_declaration_statement name: (name_token) @name) @fn`,
-  packages: `(package_statement (package_name) @name) @pkg`,
-  callExpressions: `(function_call (name_token) @callee) @call`,
+  uses: `(use_statement) @imp`,
+  subs: `(subroutine_declaration_statement) @fn`,
+  packages: `(package_statement) @pkg`,
 };
 
 export function extractPerl(
@@ -81,7 +87,8 @@ export function extractPerl(
       metadata: {},
     });
     for (const m of useMatches) {
-      const mod = cap(m, "module")?.text ?? "";
+      const text = cap(m, "imp")?.text ?? "";
+      const mod = text.match(/^use\s+([A-Za-z_][\w:]*)/)?.[1] ?? "";
       if (mod)
         rawEdges.push({
           sourceChunkId: "",
@@ -94,14 +101,22 @@ export function extractPerl(
     }
   }
 
-  for (const m of getMatches("subs")) {
-    const fnNode = cap(m, "fn")?.node;
-    const name = cap(m, "name")?.text ?? "";
-    if (!fnNode || !name) continue;
-    const content = sourceLines
-      .slice(fnNode.startRow, fnNode.endRow + 1)
-      .join("\n");
-    const breadcrumb = `# Function: ${name}`;
+  const absorb = getAbsorb(language);
+
+  const addChunk = (
+    node: NonNullable<MatchCapture["node"]>,
+    name: string,
+    type: ChunkType,
+    parentName?: string,
+  ) => {
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
+    const breadcrumbParts: string[] = [];
+    if (parentName) breadcrumbParts.push(`# Package: ${parentName}`);
+    breadcrumbParts.push(`# ${capitalize(type)}: ${name}`);
+    const breadcrumb = breadcrumbParts.join("\n");
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -110,14 +125,47 @@ export function extractPerl(
       projectId,
       filePath,
       language,
-      type: "function",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: fnNode.startRow + 1,
-      endLine: fnNode.endRow + 1,
-      metadata: { breadcrumb },
+      startLine: startRow + 1,
+      endLine: node.endRow + 1,
+      metadata: parentName
+        ? { className: parentName, breadcrumb }
+        : { breadcrumb },
     });
+  };
+
+  for (const m of getMatches("subs")) {
+    const fnNode = cap(m, "fn")?.node;
+    if (!fnNode) continue;
+    const text = cap(m, "fn")?.text ?? "";
+    const name = text.match(/^sub\s+([A-Za-z_][\w]*)/)?.[1] ?? "";
+    if (!name) continue;
+    addChunk(fnNode, name, "function");
+  }
+
+  // --- Moose / Moo `has` attribute declarations → property.
+  // Match by scanning each non-function source line for `has NAME => (` or
+  // `has 'NAME' => (`. The grammar doesn't expose a generic call_expression
+  // node, so we walk the source directly.
+  for (let row = 0; row < sourceLines.length; row++) {
+    const line = sourceLines[row] ?? "";
+    const m = line.match(/^\s*has\s+(?:['"])?([A-Za-z_][\w]*)/);
+    if (!m) continue;
+    const propName = m[1] ?? "";
+    if (!propName) continue;
+    const insideFn = chunks.some(
+      (c) =>
+        c.type === "function" && c.startLine <= row + 1 && c.endLine >= row + 1,
+    );
+    if (insideFn) continue;
+    addChunk(
+      { startRow: row, endRow: row } as NonNullable<MatchCapture["node"]>,
+      propName,
+      "property",
+    );
   }
 
   if (chunks.length === 0) {
@@ -128,26 +176,6 @@ export function extractPerl(
       language,
       minMergeChars,
     );
-  }
-
-  // CALLS edges
-  for (const m of getMatches("callExpressions")) {
-    const callee = cap(m, "callee")?.text ?? "";
-    const callNode = cap(m, "call")?.node;
-    if (!callee || !callNode) continue;
-    const enclosing = chunks.find(
-      (c) =>
-        c.type === "function" &&
-        c.startLine <= callNode.startRow + 1 &&
-        c.endLine >= callNode.endRow + 1,
-    );
-    rawEdges.push({
-      sourceChunkId: enclosing?.id ?? "",
-      sourceFilePath: filePath,
-      type: "CALLS",
-      targetSymbol: callee,
-      metadata: {},
-    });
   }
 
   return { chunks: mergeSiblingChunks(chunks, minMergeChars), rawEdges };

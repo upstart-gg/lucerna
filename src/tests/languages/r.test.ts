@@ -78,3 +78,32 @@ add <- function(a, b) {
     for (const c of chunks) expect(c.language).toBe("r");
   });
 });
+
+describe("R — S4 class system", () => {
+  const SRC = `setClass("Person", representation(name = "character", age = "numeric"))
+
+setGeneric("greet", function(x) standardGeneric("greet"))
+
+setMethod("greet", "Person", function(x) {
+  paste("Hello,", x@name)
+})
+`;
+
+  test("setClass emitted as class chunk", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("R"), PROJECT_ID, "r");
+    const names = chunksByType(chunks, "class").map((c) => c.name);
+    expect(names).toContain("Person");
+  });
+
+  test("setMethod emitted as method chunk", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("R"), PROJECT_ID, "r");
+    const names = chunksByType(chunks, "method").map((c) => c.name);
+    expect(names).toContain("greet");
+  });
+
+  test("setGeneric emitted as function chunk", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("R"), PROJECT_ID, "r");
+    const names = chunksByType(chunks, "function").map((c) => c.name);
+    expect(names).toContain("greet");
+  });
+});

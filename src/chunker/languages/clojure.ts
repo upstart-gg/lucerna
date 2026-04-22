@@ -1,6 +1,9 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
+  capitalize,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -9,11 +12,25 @@ import {
 } from "./shared.js";
 
 const CLOJURE_QUERIES = {
-  // (defn name ...) / (defn- name ...) / (defmacro name ...)
+  // (defn name ...) / (defn- name ...) / (defmacro name ...) / (defprotocol ...) / (defrecord ...) / (def ...)
   defns: `(list_lit . (sym_lit) @def . (sym_lit) @name) @form`,
   // (ns my.namespace ...) — the entire ns form is the import chunk
   ns: `(list_lit . (sym_lit) @def . (sym_lit) @name) @form`,
   callExpressions: `(list_lit . (sym_lit) @callee) @call`,
+};
+
+const MIN_CONST_CHARS = 40;
+
+const DEF_KEY_TO_TYPE: Record<string, ChunkType> = {
+  defn: "function",
+  "defn-": "function",
+  defmacro: "macro",
+  defprotocol: "protocol",
+  defrecord: "record",
+  deftype: "record",
+  defmulti: "method",
+  defmethod: "method",
+  def: "const",
 };
 
 export function extractClojure(
@@ -101,18 +118,22 @@ export function extractClojure(
     }
   }
 
-  // defn / defn- / defmacro
-  const defNames = new Set(["defn", "defn-", "defmacro"]);
-  for (const m of getMatches("defns").filter((m) =>
-    defNames.has(cap(m, "def")?.text ?? ""),
-  )) {
+  const absorb = getAbsorb(language);
+
+  for (const m of getMatches("defns")) {
+    const defKey = cap(m, "def")?.text ?? "";
+    const type = DEF_KEY_TO_TYPE[defKey];
+    if (!type) continue;
     const fnNode = cap(m, "form")?.node;
     const name = cap(m, "name")?.text ?? "";
     if (!fnNode || !name) continue;
-    const content = sourceLines
-      .slice(fnNode.startRow, fnNode.endRow + 1)
-      .join("\n");
-    const breadcrumb = `; Function: ${name}`;
+    const startRow = absorb
+      ? absorbUpward(sourceLines, fnNode.startRow, absorb)
+      : fnNode.startRow;
+    const content = sourceLines.slice(startRow, fnNode.endRow + 1).join("\n");
+    // Filter tiny `def` constants
+    if (type === "const" && content.length < MIN_CONST_CHARS) continue;
+    const breadcrumb = `; ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -121,11 +142,11 @@ export function extractClojure(
       projectId,
       filePath,
       language,
-      type: "function",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: fnNode.startRow + 1,
+      startLine: startRow + 1,
       endLine: fnNode.endRow + 1,
       metadata: { breadcrumb },
     });
@@ -148,7 +169,7 @@ export function extractClojure(
     if (!callee || !callNode) continue;
     const enclosing = chunks.find(
       (c) =>
-        c.type === "function" &&
+        (c.type === "function" || c.type === "method" || c.type === "macro") &&
         c.startLine <= callNode.startRow + 1 &&
         c.endLine >= callNode.endRow + 1,
     );

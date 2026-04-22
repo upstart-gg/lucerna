@@ -103,6 +103,71 @@ int add(int a, int b) {
   });
 });
 
+describe("C++ — structs, enums, namespaces, aliases, templates", () => {
+  const SRC = `#include <vector>
+
+namespace geometry {
+    struct Point {
+        double x;
+        double y;
+    };
+
+    enum class Color { Red, Green, Blue };
+
+    using Coord = double;
+
+    template <typename T>
+    T addv(T a, T b) { return a + b; }
+}
+`;
+
+  test("namespace emitted as namespace chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cpp"),
+      PROJECT_ID,
+      "cpp",
+    );
+    expect(chunksByType(chunks, "namespace").map((c) => c.name)).toContain(
+      "geometry",
+    );
+  });
+
+  test("struct emitted as struct chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cpp"),
+      PROJECT_ID,
+      "cpp",
+    );
+    expect(chunksByType(chunks, "struct").map((c) => c.name)).toContain(
+      "Point",
+    );
+  });
+
+  test("enum emitted as enum chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cpp"),
+      PROJECT_ID,
+      "cpp",
+    );
+    expect(chunksByType(chunks, "enum").map((c) => c.name)).toContain("Color");
+  });
+
+  test("type alias emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cpp"),
+      PROJECT_ID,
+      "cpp",
+    );
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "Coord",
+    );
+  });
+});
+
 describe("Graph edges — C++ EXTENDS", () => {
   const SOURCE = `class Animal {
 public:

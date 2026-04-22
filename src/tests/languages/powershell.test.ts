@@ -68,4 +68,43 @@ function Add-Numbers {
     );
     for (const c of chunks) expect(c.language).toBe("powershell");
   });
+
+  test("extracts function chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SOURCE,
+      FILE("ps1"),
+      PROJECT_ID,
+      "powershell",
+    );
+    const names = chunks
+      .filter((c) => c.type === "function")
+      .map((c) => c.name);
+    expect(names).toContain("Get-Greeting");
+    expect(names).toContain("Add-Numbers");
+  });
+});
+
+describe("PowerShell — script-scope param block", () => {
+  const SRC = `param(
+    [Parameter(Mandatory)]
+    [string] $Name,
+    [int] $Count = 1
+)
+
+function Get-Greeting {
+    param([string] $Name)
+    "Hello, $Name"
+}
+`;
+
+  test("script-scope param block emitted as param_block chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ps1"),
+      PROJECT_ID,
+      "powershell",
+    );
+    const params = chunks.filter((c) => c.type === "param_block");
+    expect(params.length).toBeGreaterThan(0);
+  });
 });

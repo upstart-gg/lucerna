@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -16,6 +18,11 @@ const RUST_QUERIES = {
   enums: `(enum_item name: (type_identifier) @name) @enum`,
   traits: `(trait_item name: (type_identifier) @name) @trait`,
   impls: `(impl_item type: (type_identifier) @name) @impl`,
+  modules: `(mod_item name: (identifier) @name) @mod`,
+  macros: `(macro_definition name: (identifier) @name) @macro`,
+  consts: `(const_item name: (identifier) @name) @const`,
+  statics: `(static_item name: (identifier) @name) @static`,
+  typeAliases: `(type_item name: (type_identifier) @name) @type`,
   callExpressions: `(call_expression function: [(identifier) @callee (field_expression field: (field_identifier) @callee)]) @call`,
 };
 
@@ -27,6 +34,7 @@ export function extractRust(
 ): { chunks: CodeChunk[]; rawEdges: RawEdge[] } {
   const sourceLines = source.split("\n");
   const language = "rust";
+  const absorb = getAbsorb(language);
 
   // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
   let extracted: any;
@@ -106,12 +114,13 @@ export function extractRust(
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "interface" | "type" | "function",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Impl: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -128,7 +137,7 @@ export function extractRust(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -142,19 +151,19 @@ export function extractRust(
   for (const m of getMatches("structs")) {
     const node = cap(m, "struct")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "class");
+    if (node && name) addChunk(node, name, "struct");
   }
 
   for (const m of getMatches("enums")) {
     const node = cap(m, "enum")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "type");
+    if (node && name) addChunk(node, name, "enum");
   }
 
   for (const m of getMatches("traits")) {
     const node = cap(m, "trait")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "interface");
+    if (node && name) addChunk(node, name, "trait");
   }
 
   for (const m of getMatches("impls")) {
@@ -164,6 +173,47 @@ export function extractRust(
       claimedRows.add(node.startRow);
       addChunk(node, name, "class");
     }
+  }
+
+  for (const m of getMatches("modules")) {
+    const node = cap(m, "mod")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "module");
+  }
+
+  for (const m of getMatches("macros")) {
+    const node = cap(m, "macro")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "macro");
+  }
+
+  const MIN_CONST_CHARS = 40;
+  for (const m of getMatches("consts")) {
+    const node = cap(m, "const")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!node || !name) continue;
+    const content = sourceLines
+      .slice(node.startRow, node.endRow + 1)
+      .join("\n");
+    if (content.length < MIN_CONST_CHARS) continue;
+    addChunk(node, name, "const");
+  }
+
+  for (const m of getMatches("statics")) {
+    const node = cap(m, "static")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!node || !name) continue;
+    const content = sourceLines
+      .slice(node.startRow, node.endRow + 1)
+      .join("\n");
+    if (content.length < MIN_CONST_CHARS) continue;
+    addChunk(node, name, "const");
+  }
+
+  for (const m of getMatches("typeAliases")) {
+    const node = cap(m, "type")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "typealias");
   }
 
   for (const m of getMatches("functions")) {

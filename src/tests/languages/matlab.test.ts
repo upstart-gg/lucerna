@@ -67,3 +67,41 @@ end
     for (const c of chunks) expect(c.language).toBe("matlab");
   });
 });
+
+describe("MATLAB — classdef with properties", () => {
+  const SRC = `classdef Robot
+    properties
+        Name
+        Battery
+    end
+    methods
+        function obj = Robot(name)
+            obj.Name = name;
+        end
+    end
+end
+`;
+
+  test("class emitted as class chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("matlab"),
+      PROJECT_ID,
+      "matlab",
+    );
+    const names = chunksByType(chunks, "class").map((c) => c.name);
+    expect(names).toContain("Robot");
+  });
+
+  test("class properties emitted as property chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("matlab"),
+      PROJECT_ID,
+      "matlab",
+    );
+    const names = chunksByType(chunks, "property").map((c) => c.name);
+    expect(names).toContain("Name");
+    expect(names).toContain("Battery");
+  });
+});

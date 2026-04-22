@@ -172,4 +172,72 @@ export function greet(name: string): string {
     );
     for (const c of chunks) expect(c.language).toBe("typescript");
   });
+
+  test("extracts enum chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      TS_SOURCE,
+      FILE("ts"),
+      PROJECT_ID,
+      "typescript",
+    );
+    const enums = chunksByType(chunks, "enum");
+    expect(enums.map((c) => c.name)).toContain("Role");
+  });
+});
+
+describe("TypeScript — namespaces, const objects, JSDoc absorption", () => {
+  const SRC = `
+/**
+ * Greets the given name with extra warmth.
+ */
+export function greet(name: string): string {
+  return \`Hello, \${name}!\`;
+}
+
+export namespace Geometry {
+  export function area(): number { return 0; }
+}
+
+export const ROUTES = {
+  home: "/",
+  about: "/about",
+  contact: "/contact",
+  settings: "/settings",
+};
+`.trim();
+
+  test("namespace emitted as namespace chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ts"),
+      PROJECT_ID,
+      "typescript",
+    );
+    expect(chunksByType(chunks, "namespace").map((c) => c.name)).toContain(
+      "Geometry",
+    );
+  });
+
+  test("top-level const object emitted as const chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ts"),
+      PROJECT_ID,
+      "typescript",
+    );
+    expect(chunksByType(chunks, "const").map((c) => c.name)).toContain(
+      "ROUTES",
+    );
+  });
+
+  test("JSDoc above function is absorbed into the function content", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ts"),
+      PROJECT_ID,
+      "typescript",
+    );
+    const fn = chunkByName(chunks, "greet");
+    expect(fn?.content).toContain("Greets the given name");
+  });
 });

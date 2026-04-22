@@ -96,15 +96,15 @@ func (u *UserService) DeleteUser(id string) {
     expect(findUser?.metadata?.className).toBe("UserService");
   });
 
-  test("struct maps to class type with name", async () => {
+  test("struct maps to struct type with name", async () => {
     const chunks = await chunker.chunkSource(
       GO_SOURCE,
       FILE("go"),
       PROJECT_ID,
       "go",
     );
-    const cls = chunksByType(chunks, "class");
-    const names = cls.map((c) => c.name);
+    const structs = chunksByType(chunks, "struct");
+    const names = structs.map((c) => c.name);
     expect(names).toContain("UserService");
   });
 
@@ -140,5 +140,31 @@ func (u *UserService) DeleteUser(id string) {
       "go",
     );
     for (const c of chunks) expect(c.language).toBe("go");
+  });
+});
+
+describe("Go — top-level const & var", () => {
+  const SRC = `package main
+
+const DefaultEndpoint = "https://api.example.com/v2/users/and/things/here"
+
+var GlobalConfig = map[string]string{
+	"region": "us-east-1",
+	"stage":  "production-canary-segment",
+}
+
+func boring() {}
+`;
+
+  test("top-level const ≥40 chars emitted as const", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("go"), PROJECT_ID, "go");
+    const consts = chunksByType(chunks, "const");
+    expect(consts.map((c) => c.name)).toContain("DefaultEndpoint");
+  });
+
+  test("top-level var ≥40 chars emitted as variable", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("go"), PROJECT_ID, "go");
+    const vars = chunksByType(chunks, "variable");
+    expect(vars.map((c) => c.name)).toContain("GlobalConfig");
   });
 });

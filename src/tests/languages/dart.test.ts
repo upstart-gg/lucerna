@@ -89,3 +89,64 @@ String farewell(String name) => 'Goodbye, $name!';
     for (const c of chunks) expect(c.language).toBe("dart");
   });
 });
+
+describe("Dart — mixins, extensions, enums, typedefs", () => {
+  const SRC = `mixin Comparable {
+  int compareTo(dynamic other);
+}
+
+extension StringExt on String {
+  String reversed2() => 'x';
+}
+
+enum Color { red, green, blue }
+
+typedef IntList = List<int>;
+`;
+
+  test("mixin emitted as mixin chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("dart"),
+      PROJECT_ID,
+      "dart",
+    );
+    expect(chunksByType(chunks, "mixin").map((c) => c.name)).toContain(
+      "Comparable",
+    );
+  });
+
+  test("extension emitted as extension chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("dart"),
+      PROJECT_ID,
+      "dart",
+    );
+    expect(chunksByType(chunks, "extension").map((c) => c.name)).toContain(
+      "StringExt",
+    );
+  });
+
+  test("enum emitted as enum chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("dart"),
+      PROJECT_ID,
+      "dart",
+    );
+    expect(chunksByType(chunks, "enum").map((c) => c.name)).toContain("Color");
+  });
+
+  test("typedef emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("dart"),
+      PROJECT_ID,
+      "dart",
+    );
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "IntList",
+    );
+  });
+});

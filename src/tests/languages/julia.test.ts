@@ -91,3 +91,47 @@ end
     expect(rawEdges.some((e) => e.type === "CALLS")).toBe(true);
   });
 });
+
+describe("Julia — macros, abstract types, consts", () => {
+  const SRC = `abstract type Shape end
+
+const PI_LONG = 3.141592653589793238462643383279502884197
+
+macro hello(name)
+    return :(println("Hello, $($name)!"))
+end
+`;
+
+  test("macro emitted as macro chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("jl"),
+      PROJECT_ID,
+      "julia",
+    );
+    const names = chunks.filter((c) => c.type === "macro").map((c) => c.name);
+    expect(names).toContain("hello");
+  });
+
+  test("abstract type emitted as type chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("jl"),
+      PROJECT_ID,
+      "julia",
+    );
+    const names = chunks.filter((c) => c.type === "type").map((c) => c.name);
+    expect(names).toContain("Shape");
+  });
+
+  test("const declaration emitted as const chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("jl"),
+      PROJECT_ID,
+      "julia",
+    );
+    const names = chunks.filter((c) => c.type === "const").map((c) => c.name);
+    expect(names).toContain("PI_LONG");
+  });
+});

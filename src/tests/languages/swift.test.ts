@@ -60,7 +60,19 @@ func greet(name: String) -> String {
     expect(TreeSitterChunker.detectLanguage("foo.swift")).toBe("swift");
   });
 
-  test("extracts struct and class as class type with names", async () => {
+  test("extracts struct as struct type", async () => {
+    const chunks = await chunker.chunkSource(
+      SWIFT_SOURCE,
+      FILE("swift"),
+      PROJECT_ID,
+      "swift",
+    );
+    const structs = chunksByType(chunks, "struct");
+    const names = structs.map((c) => c.name).filter(Boolean);
+    expect(names).toContain("UserService");
+  });
+
+  test("extracts class as class type", async () => {
     const chunks = await chunker.chunkSource(
       SWIFT_SOURCE,
       FILE("swift"),
@@ -69,31 +81,30 @@ func greet(name: String) -> String {
     );
     const cls = chunksByType(chunks, "class");
     const names = cls.map((c) => c.name).filter(Boolean);
-    expect(names).toContain("UserService");
     expect(names).toContain("AuthService");
   });
 
-  test("extracts protocol as interface type", async () => {
+  test("extracts protocol as protocol type", async () => {
     const chunks = await chunker.chunkSource(
       SWIFT_SOURCE,
       FILE("swift"),
       PROJECT_ID,
       "swift",
     );
-    const ifaces = chunksByType(chunks, "interface");
-    const names = ifaces.map((c) => c.name);
+    const protocols = chunksByType(chunks, "protocol");
+    const names = protocols.map((c) => c.name);
     expect(names).toContain("Authenticatable");
   });
 
-  test("extracts enum as type", async () => {
+  test("extracts enum as enum type", async () => {
     const chunks = await chunker.chunkSource(
       SWIFT_SOURCE,
       FILE("swift"),
       PROJECT_ID,
       "swift",
     );
-    const types = chunksByType(chunks, "type");
-    const names = types.map((c) => c.name);
+    const enums = chunksByType(chunks, "enum");
+    const names = enums.map((c) => c.name);
     expect(names).toContain("Status");
   });
 
@@ -130,6 +141,55 @@ func greet(name: String) -> String {
       "swift",
     );
     for (const c of chunks) expect(c.language).toBe("swift");
+  });
+});
+
+describe("Swift — actors, extensions, typealiases, properties", () => {
+  const SRC = `actor Counter {
+    var count = 0
+}
+
+extension String {
+    func reversed2() -> String { return String(reversed()) }
+}
+
+typealias UserId = String
+`;
+
+  test("actor emitted as actor chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("swift"),
+      PROJECT_ID,
+      "swift",
+    );
+    expect(chunksByType(chunks, "actor").map((c) => c.name)).toContain(
+      "Counter",
+    );
+  });
+
+  test("extension emitted as extension chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("swift"),
+      PROJECT_ID,
+      "swift",
+    );
+    expect(chunksByType(chunks, "extension").map((c) => c.name)).toContain(
+      "String",
+    );
+  });
+
+  test("typealias emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("swift"),
+      PROJECT_ID,
+      "swift",
+    );
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "UserId",
+    );
   });
 });
 

@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
 import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -21,6 +23,9 @@ const QUERIES = {
   methods: `(method_definition name: (property_identifier) @name) @method`,
   interfaces: `(interface_declaration name: (type_identifier) @name) @iface`,
   typeAliases: `(type_alias_declaration name: (type_identifier) @name) @type`,
+  enums: `(enum_declaration name: (identifier) @name) @enum`,
+  namespaces: `(internal_module name: (identifier) @name) @ns`,
+  constVars: `(variable_declarator name: (identifier) @name value: [(object) (array) (call_expression) (template_string) (new_expression) (as_expression) (satisfies_expression)] @v) @const`,
   classExtends: `(class_declaration name: (type_identifier) @className (class_heritage (extends_clause value: (identifier) @baseClass))) @cls`,
   callExpressions: `(call_expression function: [(identifier) @callee (member_expression property: (property_identifier) @callee)]) @call`,
   newExpressions: `(new_expression constructor: (identifier) @callee) @call`,
@@ -35,6 +40,9 @@ const JS_QUERIES = {
   classExtends: `(class_declaration name: (identifier) @className (class_heritage (identifier) @baseClass)) @cls`,
   interfaces: null, // JS has no interfaces
   typeAliases: null, // JS has no type aliases
+  enums: null, // JS has no enums
+  namespaces: null, // JS has no namespace syntax
+  constVars: `(variable_declarator name: (identifier) @name value: [(object) (array) (call_expression) (template_string) (new_expression)] @v) @const`,
 };
 
 // ---------------------------------------------------------------------------
@@ -77,12 +85,6 @@ export function extractTsJs(
 
   const chunks: CodeChunk[] = [];
   const rawEdges: RawEdge[] = [];
-
-  // Helper: get text slice for a node's row span
-  const nodeContent = (node: MatchCapture["node"]): string => {
-    if (!node) return "";
-    return sourceLines.slice(node.startRow, node.endRow + 1).join("\n");
-  };
 
   // Helper: find capture by name within a match
   const cap = (match: PatternMatch, name: string): MatchCapture | undefined =>
@@ -168,17 +170,20 @@ export function extractTsJs(
 
   // --- Structure chunks ---
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
     type: ChunkType,
     parentName?: string,
   ) => {
-    const content = nodeContent(node);
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const endRow = node.endRow;
+    const content = sourceLines.slice(startRow, endRow + 1).join("\n");
 
-    // Scope breadcrumb: class (if any) → symbol type + name. Prepended to
-    // contextContent so the embedding carries structural context
-    // (e.g. a method named `validate` knows it lives in `UserAuthService`).
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(
@@ -204,8 +209,8 @@ export function extractTsJs(
       name,
       content,
       contextContent,
-      startLine: node.startRow + 1,
-      endLine: node.endRow + 1,
+      startLine: startRow + 1,
+      endLine: endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
         : { breadcrumb },
@@ -274,6 +279,45 @@ export function extractTsJs(
     const typeNode = cap(m, "type")?.node;
     const name = cap(m, "name")?.text ?? "";
     if (typeNode && name) addChunk(typeNode, name, "type");
+  }
+
+  // Enums (TypeScript only)
+  for (const m of getMatches("enums")) {
+    const enumNode = cap(m, "enum")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (enumNode && name) addChunk(enumNode, name, "enum");
+  }
+
+  // Namespaces (TypeScript only)
+  for (const m of getMatches("namespaces")) {
+    const nsNode = cap(m, "ns")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (nsNode && name) addChunk(nsNode, name, "namespace");
+  }
+
+  // Top-level const declarations (objects, arrays, call_expressions, etc. —
+  // NOT arrow/function expressions which are handled by arrowVars).
+  // Scoped to program-level via lexical_declaration or export_statement parents.
+  const MIN_CONST_CHARS = 40;
+  for (const m of getMatches("constVars")) {
+    const constNode = cap(m, "const")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!constNode || !name) continue;
+    // Only top-level: the declarator must be 2-3 levels shallow. Heuristic:
+    // reject if any already-captured function/method/class chunk strictly
+    // contains it (nested const inside a function body).
+    const isNested = chunks.some(
+      (c) =>
+        (c.type === "function" || c.type === "method" || c.type === "class") &&
+        c.startLine - 1 < constNode.startRow &&
+        c.endLine - 1 > constNode.endRow,
+    );
+    if (isNested) continue;
+    const content = sourceLines
+      .slice(constNode.startRow, constNode.endRow + 1)
+      .join("\n");
+    if (content.length < MIN_CONST_CHARS) continue;
+    addChunk(constNode, name, "const");
   }
 
   // Fallback: if nothing was extracted, produce a whole-file chunk

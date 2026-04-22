@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -11,12 +13,14 @@ import {
 
 const MATLAB_QUERIES = {
   functions: `(function_definition name: (identifier) @name) @fn`,
-  classes: `(classdef name: (identifier) @name) @cls`,
+  // Grammar exposes classdef as `class_definition`, not `classdef`.
+  classes: `(class_definition name: (identifier) @name) @cls`,
   callExpressions: `(function_call name: (identifier) @callee) @call`,
 };
 
-// MATLAB has no standard import/module declaration syntax.
-// addpath() and import pkg.* are runtime calls, not declarations.
+const MATLAB_EXTRA_QUERIES = {
+  properties: `(property name: (identifier) @name) @prop`,
+};
 
 export function extractMatlab(
   source: string,
@@ -61,15 +65,18 @@ export function extractMatlab(
   const chunks: CodeChunk[] = [];
   const rawEdges: RawEdge[] = [];
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`% Class: ${parentName}`);
     breadcrumbParts.push(`% ${capitalize(type)}: ${name}`);
@@ -83,7 +90,7 @@ export function extractMatlab(
       name,
       content,
       contextContent: `${breadcrumb}\n\n${content}`,
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -113,6 +120,40 @@ export function extractMatlab(
       }
     }
     addChunk(fnNode, name, parentName ? "method" : "function", parentName);
+  }
+
+  // --- Properties inside classdef ---
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+    const ex: any = packExtract(source, {
+      language,
+      patterns: Object.fromEntries(
+        Object.entries(MATLAB_EXTRA_QUERIES).map(([k, q]) => [
+          k,
+          { query: q, captureOutput: "Full" },
+        ]),
+      ),
+    });
+    const exR = ex.results as Record<string, { matches: PatternMatch[] }>;
+    for (const m of exR.properties?.matches ?? []) {
+      const node = cap(m, "prop")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (!node || !name) continue;
+      let parentName: string | undefined;
+      for (const chunk of chunks) {
+        if (
+          chunk.type === "class" &&
+          chunk.startLine <= node.startRow + 1 &&
+          chunk.endLine >= node.endRow + 1
+        ) {
+          parentName = chunk.name;
+          break;
+        }
+      }
+      addChunk(node, name, "property", parentName);
+    }
+  } catch {
+    /* Matlab extras unsupported — skip */
   }
 
   if (chunks.length === 0) {

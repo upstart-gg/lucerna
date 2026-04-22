@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -17,6 +19,8 @@ const GO_QUERIES = {
   interfaces: `(type_declaration (type_spec name: (type_identifier) @name type: (interface_type))) @interface`,
   typedefs: `(type_declaration (type_spec name: (type_identifier) @name)) @typedef`,
   aliases: `(type_alias name: (type_identifier) @name) @alias`,
+  consts: `(source_file (const_declaration) @const)`,
+  vars: `(source_file (var_declaration) @var)`,
   callExpressions: `(call_expression function: [(identifier) @callee (selector_expression field: (field_identifier) @callee)]) @call`,
 };
 
@@ -27,6 +31,7 @@ export function extractGo(
   minMergeChars = 0,
 ): { chunks: CodeChunk[]; rawEdges: RawEdge[] } {
   const sourceLines = source.split("\n");
+  const absorb = getAbsorb("go");
 
   // Get imports via process() — Go import blocks need span coverage
   // biome-ignore lint/suspicious/noExplicitAny: runtime shape differs from types
@@ -105,12 +110,13 @@ export function extractGo(
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "function" | "method" | "class" | "interface" | "type",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -127,7 +133,7 @@ export function extractGo(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -151,7 +157,7 @@ export function extractGo(
   for (const m of getMatches("structs")) {
     const structNode = cap(m, "struct")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (structNode && name) addChunk(structNode, name, "class");
+    if (structNode && name) addChunk(structNode, name, "struct");
   }
 
   for (const m of getMatches("interfaces")) {
@@ -177,7 +183,32 @@ export function extractGo(
   for (const m of getMatches("aliases")) {
     const aliasNode = cap(m, "alias")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (aliasNode && name) addChunk(aliasNode, name, "type");
+    if (aliasNode && name) addChunk(aliasNode, name, "typealias");
+  }
+
+  const MIN_CONST_CHARS = 40;
+  for (const m of getMatches("consts")) {
+    const node = cap(m, "const")?.node;
+    if (!node) continue;
+    const content = sourceLines
+      .slice(node.startRow, node.endRow + 1)
+      .join("\n");
+    if (content.length < MIN_CONST_CHARS) continue;
+    const nameMatch = content.match(/(?:const\s+|^\s*)([A-Za-z_][\w]*)/);
+    const name = nameMatch?.[1] ?? "";
+    if (name) addChunk(node, name, "const");
+  }
+
+  for (const m of getMatches("vars")) {
+    const node = cap(m, "var")?.node;
+    if (!node) continue;
+    const content = sourceLines
+      .slice(node.startRow, node.endRow + 1)
+      .join("\n");
+    if (content.length < MIN_CONST_CHARS) continue;
+    const nameMatch = content.match(/(?:var\s+|^\s*)([A-Za-z_][\w]*)/);
+    const name = nameMatch?.[1] ?? "";
+    if (name) addChunk(node, name, "variable");
   }
 
   if (chunks.length === 0) {

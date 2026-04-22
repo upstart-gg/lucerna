@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -13,6 +15,8 @@ const PYTHON_QUERIES = {
   imports: `[(import_statement) (import_from_statement)] @imp`,
   classes: `(class_definition name: (identifier) @name) @cls`,
   functions: `(function_definition name: (identifier) @name) @fn`,
+  typeAliases: `(type_alias_statement left: (type (identifier) @name)) @type`,
+  topAssignments: `(module (assignment left: (identifier) @name) @assign)`,
   callExpressions: `(call function: [(identifier) @callee (attribute attribute: (identifier) @callee)]) @call`,
 };
 
@@ -103,15 +107,18 @@ export function extractPython(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "function",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -128,7 +135,7 @@ export function extractPython(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -158,6 +165,33 @@ export function extractPython(
       }
     }
     addChunk(fnNode, name, "function", parentName);
+  }
+
+  // PEP 695 type aliases: `type Vector = list[float]`
+  for (const m of getMatches("typeAliases")) {
+    const typeNode = cap(m, "type")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (typeNode && name) addChunk(typeNode, name, "typealias");
+  }
+
+  // Top-level module-scope assignments → `const` (min-char filter; skip nested)
+  const MIN_CONST_CHARS = 40;
+  for (const m of getMatches("topAssignments")) {
+    const assignNode = cap(m, "assign")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!assignNode || !name) continue;
+    const isNested = chunks.some(
+      (c) =>
+        (c.type === "function" || c.type === "method" || c.type === "class") &&
+        c.startLine - 1 < assignNode.startRow &&
+        c.endLine - 1 > assignNode.endRow,
+    );
+    if (isNested) continue;
+    const content = sourceLines
+      .slice(assignNode.startRow, assignNode.endRow + 1)
+      .join("\n");
+    if (content.length < MIN_CONST_CHARS) continue;
+    addChunk(assignNode, name, "const");
   }
 
   // --- EXTENDS edges ---

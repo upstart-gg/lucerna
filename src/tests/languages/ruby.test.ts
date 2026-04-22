@@ -129,6 +129,45 @@ end
   });
 });
 
+describe("Ruby — Rails-style DSL calls", () => {
+  const SRC = `class User < ApplicationRecord
+  has_many :posts
+  belongs_to :organization
+  validates :email, presence: true
+  before_action :authenticate
+  attr_accessor :temporary_token
+end
+`;
+
+  test("DSL calls inside class body emitted as dsl_call chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("rb"),
+      PROJECT_ID,
+      "ruby",
+    );
+    const dslNames = chunksByType(chunks, "dsl_call").map((c) => c.name);
+    expect(dslNames).toContain("has_many");
+    expect(dslNames).toContain("belongs_to");
+    expect(dslNames).toContain("validates");
+    expect(dslNames).toContain("before_action");
+    expect(dslNames).toContain("attr_accessor");
+  });
+
+  test("DSL call has metadata.className set to enclosing class", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("rb"),
+      PROJECT_ID,
+      "ruby",
+    );
+    const hasMany = chunksByType(chunks, "dsl_call").find(
+      (c) => c.name === "has_many",
+    );
+    expect(hasMany?.metadata?.className).toBe("User");
+  });
+});
+
 describe("Graph edges — Ruby EXTENDS", () => {
   const SOURCE = `class AdminService < UserService
   def promote(id)

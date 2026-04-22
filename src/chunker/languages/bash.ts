@@ -1,6 +1,9 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
+  capitalize,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -14,6 +17,12 @@ const BASH_QUERIES = {
   functions: `(function_definition name: (word) @name) @fn`,
   callExpressions: `(command name: (command_name (word) @callee)) @call`,
 };
+
+const BASH_EXTRA_QUERIES = {
+  variables: `(variable_assignment name: (variable_name) @name) @var`,
+};
+
+const MIN_CONST_CHARS = 40;
 
 export function extractBash(
   source: string,
@@ -97,14 +106,18 @@ export function extractBash(
     }
   }
 
-  for (const m of getMatches("functions")) {
-    const fnNode = cap(m, "fn")?.node;
-    const name = cap(m, "name")?.text ?? "";
-    if (!fnNode || !name) continue;
-    const content = sourceLines
-      .slice(fnNode.startRow, fnNode.endRow + 1)
-      .join("\n");
-    const breadcrumb = `# Function: ${name}`;
+  const absorb = getAbsorb(language);
+
+  const addChunk = (
+    node: NonNullable<MatchCapture["node"]>,
+    name: string,
+    type: ChunkType,
+  ) => {
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
+    const breadcrumb = `# ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -113,14 +126,55 @@ export function extractBash(
       projectId,
       filePath,
       language,
-      type: "function",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: fnNode.startRow + 1,
-      endLine: fnNode.endRow + 1,
+      startLine: startRow + 1,
+      endLine: node.endRow + 1,
       metadata: { breadcrumb },
     });
+  };
+
+  for (const m of getMatches("functions")) {
+    const fnNode = cap(m, "fn")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (fnNode && name) addChunk(fnNode, name, "function");
+  }
+
+  // --- Top-level variable assignments ≥ 40 chars → const ---
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+    const ex: any = packExtract(source, {
+      language,
+      patterns: Object.fromEntries(
+        Object.entries(BASH_EXTRA_QUERIES).map(([k, q]) => [
+          k,
+          { query: q, captureOutput: "Full" },
+        ]),
+      ),
+    });
+    const exR = ex.results as Record<string, { matches: PatternMatch[] }>;
+    for (const m of exR.variables?.matches ?? []) {
+      const node = cap(m, "var")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (!node || !name) continue;
+      // Only top-level: not inside a function chunk
+      const insideFn = chunks.some(
+        (c) =>
+          c.type === "function" &&
+          c.startLine <= node.startRow + 1 &&
+          c.endLine >= node.endRow + 1,
+      );
+      if (insideFn) continue;
+      const content = sourceLines
+        .slice(node.startRow, node.endRow + 1)
+        .join("\n");
+      if (content.length < MIN_CONST_CHARS) continue;
+      addChunk(node, name, "const");
+    }
+  } catch {
+    /* Bash variable capture unsupported — skip */
   }
 
   if (chunks.length === 0) {

@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -14,6 +16,7 @@ const JAVA_QUERIES = {
   classes: `(class_declaration name: (identifier) @name) @cls`,
   interfaces: `(interface_declaration name: (identifier) @name) @iface`,
   enums: `(enum_declaration name: (identifier) @name) @enum`,
+  records: `(record_declaration name: (identifier) @name) @record`,
   methods: `(method_declaration name: (identifier) @name) @method`,
   callExpressions: `(method_invocation name: (identifier) @callee) @call`,
 };
@@ -107,15 +110,18 @@ export function extractJava(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "interface" | "type" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -132,7 +138,7 @@ export function extractJava(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -155,7 +161,13 @@ export function extractJava(
   for (const m of getMatches("enums")) {
     const node = cap(m, "enum")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "type");
+    if (node && name) addChunk(node, name, "enum");
+  }
+
+  for (const m of getMatches("records")) {
+    const node = cap(m, "record")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "record");
   }
 
   for (const m of getMatches("methods")) {
@@ -165,7 +177,10 @@ export function extractJava(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        (chunk.type === "class" || chunk.type === "interface") &&
+        (chunk.type === "class" ||
+          chunk.type === "interface" ||
+          chunk.type === "record" ||
+          chunk.type === "enum") &&
         chunk.startLine <= methodNode.startRow + 1 &&
         chunk.endLine >= methodNode.endRow + 1
       ) {

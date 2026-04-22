@@ -93,3 +93,67 @@ GROUP BY u.id, u.name;
     for (const c of chunks) expect(c.language).toBe("sql");
   });
 });
+
+describe("SQL — functions, procedures, triggers, indexes", () => {
+  const SRC = `CREATE FUNCTION calc_total(amount DECIMAL) RETURNS DECIMAL AS $$
+BEGIN
+    RETURN amount * 1.2;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE PROCEDURE refresh_caches() AS $$
+BEGIN
+    PERFORM pg_stat_reset();
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_modified BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION set_modified();
+
+CREATE INDEX idx_users_email ON users (email);
+`;
+
+  test("emits a chunk for CREATE FUNCTION", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("sql"),
+      PROJECT_ID,
+      "sql",
+    );
+    const allContent = chunks.map((c) => c.content).join("\n");
+    expect(allContent).toContain("CREATE FUNCTION calc_total");
+  });
+
+  test("emits a chunk for CREATE PROCEDURE", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("sql"),
+      PROJECT_ID,
+      "sql",
+    );
+    const allContent = chunks.map((c) => c.content).join("\n");
+    expect(allContent).toContain("CREATE PROCEDURE refresh_caches");
+  });
+
+  test("emits a chunk for CREATE TRIGGER", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("sql"),
+      PROJECT_ID,
+      "sql",
+    );
+    const allContent = chunks.map((c) => c.content).join("\n");
+    expect(allContent).toContain("CREATE TRIGGER update_modified");
+  });
+
+  test("emits a chunk for CREATE INDEX", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("sql"),
+      PROJECT_ID,
+      "sql",
+    );
+    const allContent = chunks.map((c) => c.content).join("\n");
+    expect(allContent).toContain("CREATE INDEX idx_users_email");
+  });
+});

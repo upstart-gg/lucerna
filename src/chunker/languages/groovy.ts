@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -14,6 +16,10 @@ const GROOVY_QUERIES = {
   classes: `(class_declaration name: (identifier) @name) @cls`,
   methods: `(method_declaration name: (identifier) @name) @method`,
   callExpressions: `(method_invocation name: (identifier) @callee) @call`,
+};
+
+const GROOVY_EXTRA_QUERIES = {
+  closures: `(local_variable_declaration (variable_declarator name: (identifier) @name value: (closure))) @decl`,
 };
 
 export function extractGroovy(
@@ -99,15 +105,18 @@ export function extractGroovy(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -124,7 +133,7 @@ export function extractGroovy(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -156,6 +165,37 @@ export function extractGroovy(
     addChunk(methodNode, name, "method", parentName);
   }
 
+  // --- Top-level closures: def name = { ... } ---
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+    const ex: any = packExtract(source, {
+      language,
+      patterns: Object.fromEntries(
+        Object.entries(GROOVY_EXTRA_QUERIES).map(([k, q]) => [
+          k,
+          { query: q, captureOutput: "Full" },
+        ]),
+      ),
+    });
+    const exR = ex.results as Record<string, { matches: PatternMatch[] }>;
+    for (const m of exR.closures?.matches ?? []) {
+      const node = cap(m, "decl")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (!node || !name) continue;
+      // Only treat as a function if not already inside a class chunk
+      const insideClass = chunks.some(
+        (c) =>
+          c.type === "class" &&
+          c.startLine <= node.startRow + 1 &&
+          c.endLine >= node.endRow + 1,
+      );
+      if (insideClass) continue;
+      addChunk(node, name, "function");
+    }
+  } catch {
+    /* Groovy closure capture unsupported — skip */
+  }
+
   if (chunks.length === 0) {
     return processWithPack(
       source,
@@ -173,7 +213,7 @@ export function extractGroovy(
     if (!callee || !callNode) continue;
     const enclosing = chunks.find(
       (c) =>
-        c.type === "method" &&
+        (c.type === "method" || c.type === "function") &&
         c.startLine <= callNode.startRow + 1 &&
         c.endLine >= callNode.endRow + 1,
     );

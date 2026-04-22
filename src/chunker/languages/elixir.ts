@@ -1,6 +1,9 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
+  capitalize,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -9,9 +12,9 @@ import {
 } from "./shared.js";
 
 const ELIXIR_QUERIES = {
-  // defmodule MyModule do ... end
+  // defmodule / defprotocol / defimpl with alias name + do block
   modules: `(call target: (identifier) @def (arguments (alias) @name) (do_block)) @module`,
-  // def / defp function definitions
+  // def / defp / defmacro / defmacrop function definitions
   defs: `(call target: (identifier) @def (arguments (call target: (identifier) @name)) (do_block)) @fn`,
   // alias / import / use directives
   imports: `(call target: (identifier) @func (arguments (alias) @module)) @imp`,
@@ -100,17 +103,35 @@ export function extractElixir(
     }
   }
 
-  // Modules
-  for (const m of getMatches("modules").filter(
-    (m) => (cap(m, "def")?.text ?? "") === "defmodule",
-  )) {
+  const absorb = getAbsorb(language);
+
+  const moduleKeyToType = (key: string): ChunkType | null => {
+    if (key === "defmodule") return "module";
+    if (key === "defprotocol") return "protocol";
+    if (key === "defimpl") return "instance";
+    return null;
+  };
+
+  const defKeyToType = (key: string, hasParent: boolean): ChunkType | null => {
+    if (key === "def" || key === "defp")
+      return hasParent ? "method" : "function";
+    if (key === "defmacro" || key === "defmacrop") return "macro";
+    return null;
+  };
+
+  // Modules / protocols / impls
+  for (const m of getMatches("modules")) {
+    const defKey = cap(m, "def")?.text ?? "";
+    const type = moduleKeyToType(defKey);
+    if (!type) continue;
     const node = cap(m, "module")?.node;
     const name = cap(m, "name")?.text ?? "";
     if (!node || !name) continue;
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
-    const breadcrumb = `# Module: ${name}`;
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
+    const breadcrumb = `# ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -119,28 +140,28 @@ export function extractElixir(
       projectId,
       filePath,
       language,
-      type: "class",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: { breadcrumb },
     });
   }
 
-  // def / defp functions
-  for (const m of getMatches("defs").filter((m) => {
-    const def = cap(m, "def")?.text ?? "";
-    return def === "def" || def === "defp";
-  })) {
+  // def / defp / defmacro / defmacrop
+  for (const m of getMatches("defs")) {
+    const defKey = cap(m, "def")?.text ?? "";
     const fnNode = cap(m, "fn")?.node;
     const name = cap(m, "name")?.text ?? "";
     if (!fnNode || !name) continue;
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        chunk.type === "class" &&
+        (chunk.type === "module" ||
+          chunk.type === "protocol" ||
+          chunk.type === "instance") &&
         chunk.startLine <= fnNode.startRow + 1 &&
         chunk.endLine >= fnNode.endRow + 1
       ) {
@@ -148,12 +169,15 @@ export function extractElixir(
         break;
       }
     }
-    const content = sourceLines
-      .slice(fnNode.startRow, fnNode.endRow + 1)
-      .join("\n");
+    const type = defKeyToType(defKey, parentName != null);
+    if (!type) continue;
+    const startRow = absorb
+      ? absorbUpward(sourceLines, fnNode.startRow, absorb)
+      : fnNode.startRow;
+    const content = sourceLines.slice(startRow, fnNode.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`# Module: ${parentName}`);
-    breadcrumbParts.push(`# Function: ${name}`);
+    breadcrumbParts.push(`# ${capitalize(type)}: ${name}`);
     const breadcrumb = breadcrumbParts.join("\n");
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
@@ -163,11 +187,11 @@ export function extractElixir(
       projectId,
       filePath,
       language,
-      type: parentName ? "method" : "function",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: fnNode.startRow + 1,
+      startLine: startRow + 1,
       endLine: fnNode.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -192,7 +216,7 @@ export function extractElixir(
     if (!callee || !callNode) continue;
     const enclosing = chunks.find(
       (c) =>
-        (c.type === "function" || c.type === "method") &&
+        (c.type === "function" || c.type === "method" || c.type === "macro") &&
         c.startLine <= callNode.startRow + 1 &&
         c.endLine >= callNode.endRow + 1,
     );

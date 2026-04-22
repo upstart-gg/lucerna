@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -14,6 +16,8 @@ import {
 const KOTLIN_QUERIES = {
   imports: `(import_header) @imp`,
   classes: `(class_declaration (type_identifier) @name) @cls`,
+  objects: `(object_declaration (type_identifier) @name) @obj`,
+  typealiases: `(type_alias (type_identifier) @name) @alias`,
   functions: `(function_declaration (simple_identifier) @name) @fn`,
   callExpressions: `(call_expression (simple_identifier) @callee) @call`,
 };
@@ -108,15 +112,18 @@ export function extractKotlin(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -133,7 +140,7 @@ export function extractKotlin(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -152,7 +159,24 @@ export function extractKotlin(
           /(?:data\s+class|sealed\s+class|abstract\s+class|class|interface|object)\s+(\w+)/,
         )?.[1] ?? "";
     }
-    if (node && name) addChunk(node, name, "class");
+    if (!node || !name) continue;
+    const firstLine = sourceLines[node.startRow] ?? "";
+    let type: ChunkType = "class";
+    if (/\binterface\s+/.test(firstLine)) type = "interface";
+    else if (/\benum\s+class\s+/.test(firstLine)) type = "enum";
+    addChunk(node, name, type);
+  }
+
+  for (const m of getMatches("objects")) {
+    const node = cap(m, "obj")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "object");
+  }
+
+  for (const m of getMatches("typealiases")) {
+    const node = cap(m, "alias")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "typealias");
   }
 
   for (const m of getMatches("functions")) {
@@ -162,7 +186,10 @@ export function extractKotlin(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        chunk.type === "class" &&
+        (chunk.type === "class" ||
+          chunk.type === "interface" ||
+          chunk.type === "object" ||
+          chunk.type === "enum") &&
         chunk.startLine <= fnNode.startRow + 1 &&
         chunk.endLine >= fnNode.endRow + 1
       ) {

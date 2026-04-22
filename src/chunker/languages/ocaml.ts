@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -14,6 +16,10 @@ const OCAML_QUERIES = {
   lets: `(value_definition (let_binding pattern: (value_name) @name)) @fn`,
   types: `(type_definition (type_binding name: (type_constructor) @name)) @type`,
   modules: `(module_definition) @mod`,
+};
+
+const OCAML_EXTRA_QUERIES = {
+  moduleTypes: `(module_type_definition (module_type_name) @name) @mt`,
 };
 
 export function extractOcaml(
@@ -83,7 +89,6 @@ export function extractOcaml(
     });
     for (const m of openMatches) {
       const raw = cap(m, "imp")?.text ?? "";
-      // "open Printf" → "Printf"
       const mod = raw.replace(/^open\s+/, "").trim();
       if (mod)
         rawEdges.push({
@@ -97,15 +102,18 @@ export function extractOcaml(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "function" | "type" | "class",
+    type: ChunkType,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
-    const breadcrumb = `// ${capitalize(type)}: ${name}`;
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
+    const breadcrumb = `(* ${capitalize(type)}: ${name} *)`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -118,19 +126,45 @@ export function extractOcaml(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: { breadcrumb },
     });
   };
 
-  // --- Modules ---
+  // --- Modules (including functors) ---
   for (const m of getMatches("modules")) {
     const node = cap(m, "mod")?.node;
     if (!node) continue;
     const text = cap(m, "mod")?.text ?? "";
     const name = text.match(/^module\s+(\w+)/)?.[1] ?? "";
-    if (name) addChunk(node, name, "class");
+    if (!name) continue;
+    // Functor: `module Foo (X : SIG) = ...` or explicit `functor` keyword
+    const isFunctor =
+      /\bfunctor\b/.test(text) || /^module\s+\w+\s*\(/.test(text);
+    addChunk(node, name, isFunctor ? "functor" : "module");
+  }
+
+  // --- Module types ---
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+    const ex: any = packExtract(source, {
+      language,
+      patterns: Object.fromEntries(
+        Object.entries(OCAML_EXTRA_QUERIES).map(([k, q]) => [
+          k,
+          { query: q, captureOutput: "Full" },
+        ]),
+      ),
+    });
+    const exR = ex.results as Record<string, { matches: PatternMatch[] }>;
+    for (const m of exR.moduleTypes?.matches ?? []) {
+      const node = cap(m, "mt")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (node && name) addChunk(node, name, "module_type");
+    }
+  } catch {
+    /* OCaml extras unsupported — skip */
   }
 
   // --- Let bindings (functions / values) ---

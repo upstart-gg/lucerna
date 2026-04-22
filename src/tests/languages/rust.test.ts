@@ -72,15 +72,15 @@ pub enum Status {
     expect(names).toContain("farewell");
   });
 
-  test("struct maps to class type", async () => {
+  test("struct maps to struct type", async () => {
     const chunks = await chunker.chunkSource(
       RS_SOURCE,
       FILE("rs"),
       PROJECT_ID,
       "rust",
     );
-    const cls = chunksByType(chunks, "class");
-    const names = cls.map((c) => c.name).filter(Boolean);
+    const structs = chunksByType(chunks, "struct");
+    const names = structs.map((c) => c.name).filter(Boolean);
     expect(names).toContain("UserService");
   });
 
@@ -109,28 +109,28 @@ pub enum Status {
     expect(names).toContain("find_user");
   });
 
-  test("trait maps to interface type", async () => {
+  test("trait maps to trait type", async () => {
     const chunks = await chunker.chunkSource(
       RS_SOURCE,
       FILE("rs"),
       PROJECT_ID,
       "rust",
     );
-    const ifaces = chunksByType(chunks, "interface");
-    expect(ifaces.length).toBeGreaterThan(0);
-    expect(ifaces[0]?.name).toBe("Greeter");
+    const traits = chunksByType(chunks, "trait");
+    expect(traits.length).toBeGreaterThan(0);
+    expect(traits[0]?.name).toBe("Greeter");
   });
 
-  test("enum maps to type", async () => {
+  test("enum maps to enum type", async () => {
     const chunks = await chunker.chunkSource(
       RS_SOURCE,
       FILE("rs"),
       PROJECT_ID,
       "rust",
     );
-    const types = chunksByType(chunks, "type");
-    expect(types.length).toBeGreaterThan(0);
-    expect(types[0]?.name).toBe("Status");
+    const enums = chunksByType(chunks, "enum");
+    expect(enums.length).toBeGreaterThan(0);
+    expect(enums[0]?.name).toBe("Status");
   });
 
   test("all chunks have language: rust", async () => {
@@ -141,5 +141,83 @@ pub enum Status {
       "rust",
     );
     for (const c of chunks) expect(c.language).toBe("rust");
+  });
+});
+
+describe("Rust — modules, macros, consts, type aliases, attribute absorption", () => {
+  const SRC = `
+/// Module-level documentation about geometry helpers.
+pub mod geometry {
+    pub fn area(r: f64) -> f64 {
+        std::f64::consts::PI * r * r
+    }
+}
+
+#[macro_export]
+macro_rules! say_hello {
+    () => { println!("hello"); };
+}
+
+pub const MAX_RETRIES: u32 = 5;
+
+pub static GLOBAL_PREFIX: &str = "lucerna://default/prefix/value";
+
+pub type UserId = String;
+
+#[derive(Debug, Clone)]
+pub struct Point {
+    x: f64,
+    y: f64,
+}
+`.trim();
+
+  test("module emitted as module chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("rs"),
+      PROJECT_ID,
+      "rust",
+    );
+    expect(chunksByType(chunks, "module").map((c) => c.name)).toContain(
+      "geometry",
+    );
+  });
+
+  test("macro_rules! emitted as macro chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("rs"),
+      PROJECT_ID,
+      "rust",
+    );
+    expect(chunksByType(chunks, "macro").map((c) => c.name)).toContain(
+      "say_hello",
+    );
+  });
+
+  test("type alias emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("rs"),
+      PROJECT_ID,
+      "rust",
+    );
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "UserId",
+    );
+  });
+
+  test("#[derive(...)] attribute absorbed into struct content", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("rs"),
+      PROJECT_ID,
+      "rust",
+    );
+    const point = chunksByType(chunks, "struct").find(
+      (c) => c.name === "Point",
+    );
+    expect(point).toBeDefined();
+    expect(point?.content).toContain("#[derive(Debug, Clone)]");
   });
 });

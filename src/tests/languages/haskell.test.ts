@@ -74,3 +74,56 @@ add a b = a + b
     for (const c of chunks) expect(c.language).toBe("haskell");
   });
 });
+
+describe("Haskell — instance, newtype, type alias", () => {
+  const SRC = `module Things where
+
+data Color = Red | Green | Blue
+
+class Show a where
+  show :: a -> String
+
+instance Show Color where
+  show Red = "red"
+  show _ = "other"
+
+newtype Age = Age Int
+
+type Name = String
+`;
+
+  test("instance emitted as instance chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("hs"),
+      PROJECT_ID,
+      "haskell",
+    );
+    const insts = chunks.filter((c) => c.type === "instance");
+    expect(insts.length).toBeGreaterThan(0);
+  });
+
+  test("newtype emitted as newtype chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("hs"),
+      PROJECT_ID,
+      "haskell",
+    );
+    const nts = chunks.filter((c) => c.type === "newtype").map((c) => c.name);
+    expect(nts).toContain("Age");
+  });
+
+  test("type alias emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("hs"),
+      PROJECT_ID,
+      "haskell",
+    );
+    const aliases = chunks
+      .filter((c) => c.type === "typealias")
+      .map((c) => c.name);
+    expect(aliases).toContain("Name");
+  });
+});

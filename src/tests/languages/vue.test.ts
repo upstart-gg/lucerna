@@ -59,7 +59,7 @@ h1 {
     expect(chunks.length).toBeGreaterThan(0);
   });
 
-  test("extracts top-level blocks as sections", async () => {
+  test("extracts template + style sections, decomposes script", async () => {
     const chunks = await chunker.chunkSource(
       SOURCE,
       FILE("vue"),
@@ -67,9 +67,10 @@ h1 {
       "vue",
     );
     const names = chunks.map((c) => c.name);
-    expect(names).toContain("script");
     expect(names).toContain("template");
     expect(names).toContain("style");
+    // Script block decomposes into individual TS chunks, e.g. `increment`
+    expect(names).toContain("increment");
   });
 
   test("all chunks have language: vue", async () => {

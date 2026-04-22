@@ -104,3 +104,41 @@ end
     expect(rawEdges.some((e) => e.type === "IMPORTS")).toBe(true);
   });
 });
+
+describe("OCaml — module types and functors", () => {
+  const SRC = `module type ORDERED = sig
+  type t
+  val compare : t -> t -> int
+end
+
+module Make (Ord : ORDERED) = struct
+  type elt = Ord.t
+  let empty = []
+  let mem x lst = List.mem x lst
+end
+`;
+
+  test("module type emitted as module_type chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ml"),
+      PROJECT_ID,
+      "ocaml",
+    );
+    const names = chunks
+      .filter((c) => c.type === "module_type")
+      .map((c) => c.name);
+    expect(names).toContain("ORDERED");
+  });
+
+  test("functor emitted as functor chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ml"),
+      PROJECT_ID,
+      "ocaml",
+    );
+    const names = chunks.filter((c) => c.type === "functor").map((c) => c.name);
+    expect(names).toContain("Make");
+  });
+});

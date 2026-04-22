@@ -43,38 +43,40 @@ No graph edges are emitted for these formats.
 
 All produce symbol-level chunks and graph edges.
 
+Leading doc comments, decorators, annotations, and attributes are absorbed into the chunk that follows them, so the natural-language signal stays attached to the symbol it describes.
+
 | Language | Extensions | Chunks |
 |---|---|---|
-| TypeScript / JavaScript | `.ts`, `.tsx`, `.js`, `.jsx` | Imports, functions, generators, arrow functions, classes, methods, interfaces, type aliases |
-| Python | `.py`, `.pyw` | Imports, classes, functions (including class methods with `className`) |
-| Java | `.java` | Imports, classes, interfaces, enums (`type`), methods |
-| Go | `.go` | Imports, functions, receiver methods (`method`), structs (`class`), interfaces, type declarations |
-| Rust | `.rs` | Imports (`use`), structs (`class`), enums (`type`), traits (`interface`), impl blocks (`class`), functions |
-| C# | `.cs` | Imports (`using`), classes, records (`class`), structs (`class`), interfaces, enums (`type`), methods |
-| Swift | `.swift` | Imports, classes + structs (`class`), protocols (`interface`), enums (`type`), functions/methods |
-| Kotlin | `.kt`, `.kts` | Imports, classes + interfaces (`class`), functions/methods |
-| Ruby | `.rb` | Imports (`require`/`require_relative`), classes, modules (`class`), methods |
-| PHP | `.php` | Imports (`use`), functions, classes, interfaces, traits (`interface`), methods |
-| C | `.c`, `.h` | Includes (`#include`), functions, structs (`class`) |
-| C++ | `.cpp`, `.cc`, `.cxx`, `.hpp` | Includes (`#include`), classes, functions/methods |
-| Bash / Shell | `.sh`, `.bash` | Source imports (`source`/`.`), functions |
-| Scala | `.scala` | Imports, classes, objects (`class`), traits (`interface`), methods |
-| Lua | `.lua` | Requires (`require()`), functions, local functions |
-| R | `.r`, `.R` | Library imports (`library()`/`require()`), functions |
-| Dart | `.dart` | Imports, classes, functions/methods |
-| Haskell | `.hs` | Imports, functions, data types (`type`), type classes (`class`) |
-| Elixir | `.ex`, `.exs` | Aliases/imports, modules (`class`), def/defp functions/methods |
-| Clojure | `.clj`, `.cljs`, `.cljc` | `ns` form (import chunk), defn/defn-/defmacro functions |
-| Groovy | `.groovy`, `.gradle` | Imports, classes, methods |
-| Perl | `.pl`, `.pm` | `use` imports, subroutines |
-| PowerShell | `.ps1`, `.psm1` | `using` imports, functions, classes/methods |
-| MATLAB | `.m` | Functions, classdefs and methods |
-| Zig | `.zig` | `@import` declarations, functions |
-| Solidity | `.sol` | Imports, contracts (`class`), interfaces, functions/methods, events/modifiers (`type`) |
-| Julia | `.jl` | Imports, functions, structs (`class`), modules (`class`) |
-| OCaml | `.ml`, `.mli` | Imports (`open`), let bindings, type definitions, modules |
-| Erlang | `.erl` | Module/export attributes (import), functions |
-| Objective-C | `.m`, `.mm` | Imports (`#import`), interfaces, implementations, methods |
+| TypeScript / JavaScript | `.ts`, `.tsx`, `.js`, `.jsx` | Imports, functions, generators, arrow functions, classes, methods, interfaces, type aliases, **enums**, **namespaces**, **top-level `const`** (objects/arrays/Zod schemas/route tables) |
+| Python | `.py`, `.pyw` | Imports, classes, functions (including class methods), **PEP 695 type aliases**, **module-level `const`** |
+| Java | `.java` | Imports, classes, interfaces, **enums**, **records**, methods |
+| Go | `.go` | Imports, functions, receiver methods, structs, interfaces, type declarations, **top-level `const`/`var`** |
+| Rust | `.rs` | Imports (`use`), **structs**, **enums**, **traits**, impl blocks (`class`), functions, **modules**, **`macro_rules!` macros**, **consts/statics**, **type aliases** |
+| C# | `.cs` | Imports (`using`), classes, **records**, **structs**, interfaces, **enums**, methods, **properties**, **events**, **delegates** (typealias) |
+| Swift | `.swift` | Imports, classes, **structs**, **protocols**, **extensions**, **actors**, enums, functions/methods, **type aliases**, **properties** |
+| Kotlin | `.kt`, `.kts` | Imports, classes, interfaces, **objects**, **enums**, functions/methods, **type aliases**, **top-level properties** |
+| Ruby | `.rb` | Imports, classes, **modules**, methods, **DSL calls** (`has_many`, `validates`, `before_action`, `attr_accessor`, …) |
+| PHP | `.php` | Imports (`use`), functions, classes, interfaces, **traits**, methods, **enums**, **consts**, **properties** |
+| C | `.c`, `.h` | Includes, functions, structs, **enums**, **unions**, **typedefs**, **`#define` macros** |
+| C++ | `.cpp`, `.cc`, `.cxx`, `.hpp` | Includes, classes, functions/methods, **structs**, **enums**, **unions**, **namespaces**, **type aliases**, **template declarations** |
+| Bash / Shell | `.sh`, `.bash` | `source`/`.` imports, functions, **top-level variable assignments (`const`)** |
+| Scala | `.scala` | Imports, classes, **objects**, **traits**, methods, **case-class records**, **enums** (Scala 3), **type aliases**, **`given` instances** (Scala 3) |
+| Lua | `.lua` | `require()` imports, functions, local functions |
+| R | `.r`, `.R` | `library()`/`require()` imports, functions, **S4 `setClass`/`setMethod`/`setGeneric`** |
+| Dart | `.dart` | Imports, classes, functions/methods, **mixins**, **extensions**, **enums**, **type aliases** |
+| Haskell | `.hs` | Imports, functions, data types, type classes, **instances**, **newtypes**, **type aliases** |
+| Elixir | `.ex`, `.exs` | Aliases/imports, **modules**, def/defp functions/methods, **`defmacro`**, **`defprotocol`**, **`defimpl` instances**, **`defstruct` structs** |
+| Clojure | `.clj`, `.cljs`, `.cljc` | `ns` form (import chunk), `defn`/`defn-` functions, **`defmacro`**, **`defprotocol`**, **`defrecord`/`deftype`**, **`defmulti`/`defmethod`**, **`def` consts** |
+| Groovy | `.groovy`, `.gradle` | Imports, classes, methods, **top-level closures (`def name = { ... }`)** |
+| Perl | `.pl`, `.pm` | `use` imports, subroutines, **Moose `has` properties**, POD absorbed |
+| PowerShell | `.ps1`, `.psm1` | `using` imports, functions, classes/methods, **script-scope `param( ... )` blocks** |
+| MATLAB | `.m` | Functions, classdefs and methods, **`properties` blocks** |
+| Zig | `.zig` | `@import` declarations, functions, **container declarations (struct/enum/union)**, **`test` blocks** |
+| Solidity | `.sol` | Imports, contracts (`class`), interfaces, functions/methods, **libraries**, **structs**, **enums**, **events**, **modifiers**, **errors**, **state variables** |
+| Julia | `.jl` | Imports, functions, **modules**, **structs**, **macros**, **abstract types**, **consts** |
+| OCaml | `.ml`, `.mli` | Imports (`open`), let bindings, type definitions, **modules**, **module types**, **functors** |
+| Erlang | `.erl` | Module/export attributes (import), functions, **records** |
+| Objective-C | `.m`, `.mm` | Imports (`#import`), interfaces, implementations, methods, **protocols**, **categories (extensions)**, **properties** |
 
 Graph edges: `DEFINES` links the import chunk to every named symbol in the file. `EXTENDS`/`IMPLEMENTS` are emitted when inheritance syntax is present in the grammar. `CALLS` tracks direct invocations.
 
@@ -92,9 +94,9 @@ No graph edges are emitted for these formats.
 | SQL | `.sql` | One chunk per statement (`CREATE TABLE`, `CREATE VIEW`, `SELECT`, etc.) |
 | Markdown | `.md`, `.mdx` | Heading-based sections (H1–H3) with full breadcrumb trail |
 | CSS | `.css` | One chunk per rule-set |
-| SCSS | `.scss` | Rule-set splitting; named `@mixin` and `@function` definitions |
-| Vue | `.vue` | One chunk per top-level block: `<script>`, `<template>`, `<style>` |
-| Svelte | `.svelte` | One chunk per block: `<script>`, `<style>`, remaining markup as `template` |
+| SCSS | `.scss` | Rule-set splitting; named `@mixin`/`@function` definitions; `$variable` constants; `@keyframes`; `@media` sections |
+| Vue | `.vue` | `<script>` blocks are re-parsed as TS/JS so component props (`defineProps`), composables (`useFoo`), and top-level functions become individual chunks. `<template>` and `<style>` remain single sections. |
+| Svelte | `.svelte` | `<script>` blocks are re-parsed as TS/JS for per-symbol chunks. `<style>` is a single section; remaining markup becomes the `template` chunk. |
 
 All other file types are not indexed.
 

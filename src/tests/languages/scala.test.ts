@@ -64,15 +64,15 @@ object MathUtils {
     expect(names).toContain("UserService");
   });
 
-  test("extracts trait as interface", async () => {
+  test("extracts trait as trait type", async () => {
     const chunks = await chunker.chunkSource(
       SOURCE,
       FILE("scala"),
       PROJECT_ID,
       "scala",
     );
-    const ifaces = chunksByType(chunks, "interface");
-    const names = ifaces.map((c) => c.name);
+    const traits = chunksByType(chunks, "trait");
+    const names = traits.map((c) => c.name);
     expect(names).toContain("Greeter");
   });
 
@@ -95,5 +95,64 @@ object MathUtils {
       "scala",
     );
     for (const c of chunks) expect(c.language).toBe("scala");
+  });
+});
+
+describe("Scala — objects, case classes, enums, type aliases", () => {
+  const SRC = `object MathUtils {
+  def add(a: Int, b: Int): Int = a + b
+}
+
+case class Point(x: Double, y: Double)
+
+enum Color { case Red, Green, Blue }
+
+type UserId = String
+`;
+
+  test("object emitted as object chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("scala"),
+      PROJECT_ID,
+      "scala",
+    );
+    expect(chunksByType(chunks, "object").map((c) => c.name)).toContain(
+      "MathUtils",
+    );
+  });
+
+  test("case class emitted as record chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("scala"),
+      PROJECT_ID,
+      "scala",
+    );
+    expect(chunksByType(chunks, "record").map((c) => c.name)).toContain(
+      "Point",
+    );
+  });
+
+  test("enum emitted as enum chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("scala"),
+      PROJECT_ID,
+      "scala",
+    );
+    expect(chunksByType(chunks, "enum").map((c) => c.name)).toContain("Color");
+  });
+
+  test("type alias emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("scala"),
+      PROJECT_ID,
+      "scala",
+    );
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "UserId",
+    );
   });
 });

@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -12,6 +14,11 @@ import {
 const CPP_QUERIES = {
   includes: `(preproc_include) @imp`,
   classes: `(class_specifier name: (type_identifier) @name) @cls`,
+  structs: `(struct_specifier name: (type_identifier) @name) @struct`,
+  unions: `(union_specifier name: (type_identifier) @name) @union`,
+  enums: `(enum_specifier name: (type_identifier) @name) @enum`,
+  namespaces: `(namespace_definition name: (namespace_identifier) @name) @ns`,
+  typeAliases: `(alias_declaration name: (type_identifier) @name) @alias`,
   functions: `(function_definition declarator: (function_declarator declarator: (identifier) @name)) @fn`,
   callExpressions: `(call_expression function: [(identifier) @callee (field_expression field: (field_identifier) @callee)]) @call`,
 };
@@ -104,15 +111,18 @@ export function extractCpp(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -129,7 +139,7 @@ export function extractCpp(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -142,6 +152,31 @@ export function extractCpp(
     const name = cap(m, "name")?.text ?? "";
     if (node && name) addChunk(node, name, "class");
   }
+  for (const m of getMatches("structs")) {
+    const node = cap(m, "struct")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "struct");
+  }
+  for (const m of getMatches("unions")) {
+    const node = cap(m, "union")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "struct");
+  }
+  for (const m of getMatches("enums")) {
+    const node = cap(m, "enum")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "enum");
+  }
+  for (const m of getMatches("namespaces")) {
+    const node = cap(m, "ns")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "namespace");
+  }
+  for (const m of getMatches("typeAliases")) {
+    const node = cap(m, "alias")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "typealias");
+  }
 
   for (const m of getMatches("functions")) {
     const fnNode = cap(m, "fn")?.node;
@@ -150,7 +185,7 @@ export function extractCpp(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        chunk.type === "class" &&
+        (chunk.type === "class" || chunk.type === "struct") &&
         chunk.startLine <= fnNode.startRow + 1 &&
         chunk.endLine >= fnNode.endRow + 1
       ) {

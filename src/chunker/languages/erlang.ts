@@ -1,6 +1,9 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
+  capitalize,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -13,6 +16,10 @@ const ERLANG_QUERIES = {
   exportAttr: `(export_attribute) @attr`,
   fns: `(fun_decl) @fn`,
   calls: `(call) @call`,
+};
+
+const ERLANG_EXTRA_QUERIES = {
+  records: `(record_decl name: (atom) @name) @rec`,
 };
 
 export function extractErlang(
@@ -90,7 +97,6 @@ export function extractErlang(
     });
     for (const m of getMatches("moduleAttr")) {
       const raw = cap(m, "attr")?.text ?? "";
-      // "-module(hello)." → "hello"
       const mod = raw.match(/-module\s*\(\s*(\w+)\s*\)/)?.[1];
       if (mod)
         rawEdges.push({
@@ -104,22 +110,18 @@ export function extractErlang(
     }
   }
 
-  // --- Functions ---
-  const seenFnNames = new Set<string>();
-  for (const m of getMatches("fns")) {
-    const node = cap(m, "fn")?.node;
-    if (!node) continue;
-    const text = cap(m, "fn")?.text ?? "";
-    // Function name is always the first atom before "("
-    const name = text.match(/^(\w+)\s*\(/)?.[1] ?? "";
-    if (!name) continue;
-    // Deduplicate: Erlang fun_decl is already per-function, but guard just in case
-    if (seenFnNames.has(`${node.startRow}:${name}`)) continue;
-    seenFnNames.add(`${node.startRow}:${name}`);
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
-    const breadcrumb = `% Function: ${name}`;
+  const absorb = getAbsorb(language);
+
+  const addChunk = (
+    node: NonNullable<MatchCapture["node"]>,
+    name: string,
+    type: ChunkType,
+  ) => {
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
+    const breadcrumb = `% ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -128,14 +130,49 @@ export function extractErlang(
       projectId,
       filePath,
       language,
-      type: "function",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: { breadcrumb },
     });
+  };
+
+  // --- Records (-record(name, {...}).) ---
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+    const ex: any = packExtract(source, {
+      language,
+      patterns: Object.fromEntries(
+        Object.entries(ERLANG_EXTRA_QUERIES).map(([k, q]) => [
+          k,
+          { query: q, captureOutput: "Full" },
+        ]),
+      ),
+    });
+    const exR = ex.results as Record<string, { matches: PatternMatch[] }>;
+    for (const m of exR.records?.matches ?? []) {
+      const node = cap(m, "rec")?.node;
+      const name = cap(m, "name")?.text ?? "";
+      if (node && name) addChunk(node, name, "record");
+    }
+  } catch {
+    /* Erlang extras unsupported — skip */
+  }
+
+  // --- Functions ---
+  const seenFnNames = new Set<string>();
+  for (const m of getMatches("fns")) {
+    const node = cap(m, "fn")?.node;
+    if (!node) continue;
+    const text = cap(m, "fn")?.text ?? "";
+    const name = text.match(/^(\w+)\s*\(/)?.[1] ?? "";
+    if (!name) continue;
+    if (seenFnNames.has(`${node.startRow}:${name}`)) continue;
+    seenFnNames.add(`${node.startRow}:${name}`);
+    addChunk(node, name, "function");
   }
 
   if (chunks.length === 0) {
@@ -153,7 +190,6 @@ export function extractErlang(
     const callNode = cap(m, "call")?.node;
     if (!callNode) continue;
     const text = cap(m, "call")?.text ?? "";
-    // Local call: "func(args)" → "func"; remote: "mod:func(args)" → "mod:func"
     const callee =
       text.match(/^(\w+:\w+)\s*\(/)?.[1] ??
       text.match(/^(\w+)\s*\(/)?.[1] ??

@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -16,6 +18,14 @@ const SCALA_QUERIES = {
   traits: `(trait_definition name: (identifier) @name) @trait`,
   functions: `(function_definition name: (identifier) @name) @fn`,
   callExpressions: `(call_expression function: (identifier) @callee) @call`,
+};
+
+// Scala 3 additions — grammar support varies; each query runs in its own try
+// so one unsupported pattern doesn't kill the rest.
+const SCALA_EXTRA_QUERIES = {
+  enums: `(enum_definition name: (identifier) @name) @enum`,
+  typeAliases: `(type_definition name: (type_identifier) @name) @alias`,
+  givens: `(given_definition name: (identifier) @name) @given`,
 };
 
 const SCALA_INHERIT_QUERIES = {
@@ -102,15 +112,18 @@ export function extractScala(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "interface" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -127,7 +140,7 @@ export function extractScala(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -138,21 +151,55 @@ export function extractScala(
   for (const m of getMatches("classes")) {
     const node = cap(m, "cls")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "class");
+    const text = cap(m, "cls")?.text ?? "";
+    if (node && name) {
+      const isCase = /^\s*(?:[a-z]+\s+)*case\s+class\b/.test(text);
+      addChunk(node, name, isCase ? "record" : "class");
+    }
   }
 
-  // objects map to class type
   for (const m of getMatches("objects")) {
     const node = cap(m, "obj")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "class");
+    if (node && name) addChunk(node, name, "object");
   }
 
-  // traits map to interface type
   for (const m of getMatches("traits")) {
     const node = cap(m, "trait")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "interface");
+    if (node && name) addChunk(node, name, "trait");
+  }
+
+  // Scala 3 optional captures — each query runs independently so one
+  // unsupported pattern doesn't kill the rest.
+  const tryExtra = (key: keyof typeof SCALA_EXTRA_QUERIES): PatternMatch[] => {
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+      const ex: any = packExtract(source, {
+        language: "scala",
+        patterns: {
+          [key]: { query: SCALA_EXTRA_QUERIES[key], captureOutput: "Full" },
+        },
+      });
+      return (ex.results[key]?.matches as PatternMatch[]) ?? [];
+    } catch {
+      return [];
+    }
+  };
+  for (const m of tryExtra("enums")) {
+    const node = cap(m, "enum")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "enum");
+  }
+  for (const m of tryExtra("typeAliases")) {
+    const node = cap(m, "alias")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "typealias");
+  }
+  for (const m of tryExtra("givens")) {
+    const node = cap(m, "given")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "instance");
   }
 
   for (const m of getMatches("functions")) {
@@ -162,7 +209,11 @@ export function extractScala(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        (chunk.type === "class" || chunk.type === "interface") &&
+        (chunk.type === "class" ||
+          chunk.type === "trait" ||
+          chunk.type === "object" ||
+          chunk.type === "record" ||
+          chunk.type === "enum") &&
         chunk.startLine <= fnNode.startRow + 1 &&
         chunk.endLine >= fnNode.endRow + 1
       ) {

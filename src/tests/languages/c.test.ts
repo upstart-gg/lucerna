@@ -64,15 +64,15 @@ void print_greeting(const char *name) {
     expect(names).toContain("print_greeting");
   });
 
-  test("extracts struct as class type with name", async () => {
+  test("extracts struct as struct type with name", async () => {
     const chunks = await chunker.chunkSource(
       C_SOURCE,
       FILE("c"),
       PROJECT_ID,
       "c",
     );
-    const cls = chunksByType(chunks, "class");
-    const names = cls.map((c) => c.name);
+    const structs = chunksByType(chunks, "struct");
+    const names = structs.map((c) => c.name);
     expect(names).toContain("Point");
   });
 
@@ -108,5 +108,42 @@ void print_greeting(const char *name) {
     );
     const allContent = chunks.map((c) => c.content).join("\n");
     expect(allContent).toContain("return a + b");
+  });
+});
+
+describe("C — enums, unions, typedefs, macros", () => {
+  const SRC = `enum Color { RED, GREEN, BLUE };
+
+union Number { int i; float f; };
+
+typedef int UserId;
+
+#define LONG_BUFFER_SIZE 4096
+`;
+
+  test("enum emitted as enum chunk", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("c"), PROJECT_ID, "c");
+    expect(chunksByType(chunks, "enum").map((c) => c.name)).toContain("Color");
+  });
+
+  test("union emitted as struct chunk", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("c"), PROJECT_ID, "c");
+    expect(chunksByType(chunks, "struct").map((c) => c.name)).toContain(
+      "Number",
+    );
+  });
+
+  test("typedef emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("c"), PROJECT_ID, "c");
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "UserId",
+    );
+  });
+
+  test("#define emitted as macro chunk", async () => {
+    const chunks = await chunker.chunkSource(SRC, FILE("c"), PROJECT_ID, "c");
+    expect(chunksByType(chunks, "macro").map((c) => c.name)).toContain(
+      "LONG_BUFFER_SIZE",
+    );
   });
 });

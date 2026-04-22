@@ -83,3 +83,24 @@ add(X, Y) -> X + Y.
     expect(rawEdges.some((e) => e.type === "CALLS")).toBe(true);
   });
 });
+
+describe("Erlang — records", () => {
+  const SRC = `-module(rec_test).
+
+-record(person, {name, age = 0}).
+
+new_person(Name) ->
+    #person{name = Name}.
+`;
+
+  test("record emitted as record chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("erl"),
+      PROJECT_ID,
+      "erlang",
+    );
+    const recs = chunks.filter((c) => c.type === "record");
+    expect(recs.map((c) => c.name)).toContain("person");
+  });
+});

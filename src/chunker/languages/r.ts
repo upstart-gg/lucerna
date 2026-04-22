@@ -1,6 +1,9 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
+  capitalize,
   mergeSiblingChunks,
   packExtract,
   processWithPack,
@@ -15,6 +18,9 @@ const R_QUERIES = {
   functions: `(binary_operator lhs: (identifier) @name operator: "<-" rhs: (function_definition)) @fn`,
   callExpressions: `(call function: (identifier) @callee) @call`,
 };
+
+// S4 class system: setClass, setMethod, setGeneric
+const S4_CALL_NAMES = new Set(["setClass", "setMethod", "setGeneric"]);
 
 export function extractR(
   source: string,
@@ -100,14 +106,18 @@ export function extractR(
     }
   }
 
-  for (const m of getMatches("functions")) {
-    const fnNode = cap(m, "fn")?.node;
-    const name = cap(m, "name")?.text ?? "";
-    if (!fnNode || !name) continue;
-    const content = sourceLines
-      .slice(fnNode.startRow, fnNode.endRow + 1)
-      .join("\n");
-    const breadcrumb = `# Function: ${name}`;
+  const absorb = getAbsorb(language);
+
+  const addChunk = (
+    node: NonNullable<MatchCapture["node"]>,
+    name: string,
+    type: ChunkType,
+  ) => {
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
+    const breadcrumb = `# ${capitalize(type)}: ${name}`;
     const contextParts = [breadcrumb];
     if (importContent) contextParts.push(importContent);
     contextParts.push(content);
@@ -116,14 +126,42 @@ export function extractR(
       projectId,
       filePath,
       language,
-      type: "function",
+      type,
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: fnNode.startRow + 1,
-      endLine: fnNode.endRow + 1,
+      startLine: startRow + 1,
+      endLine: node.endRow + 1,
       metadata: { breadcrumb },
     });
+  };
+
+  for (const m of getMatches("functions")) {
+    const fnNode = cap(m, "fn")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (fnNode && name) addChunk(fnNode, name, "function");
+  }
+
+  // --- S4 class system: setClass / setMethod / setGeneric ---
+  for (const m of getMatches("callExpressions")) {
+    const callee = cap(m, "callee")?.text ?? "";
+    if (!S4_CALL_NAMES.has(callee)) continue;
+    const callCap = cap(m, "call");
+    if (!callCap?.node) continue;
+    const text = callCap.text ?? "";
+    // First arg is the class/method/generic name as a string literal
+    const nameMatch = text.match(
+      /^set(?:Class|Method|Generic)\s*\(\s*["']([^"']+)["']/,
+    );
+    const name = nameMatch?.[1] ?? "";
+    if (!name) continue;
+    const type: ChunkType =
+      callee === "setClass"
+        ? "class"
+        : callee === "setMethod"
+          ? "method"
+          : "function";
+    addChunk(callCap.node, name, type);
   }
 
   if (chunks.length === 0) {
@@ -143,7 +181,7 @@ export function extractR(
     if (!callee || !callNode) continue;
     const enclosing = chunks.find(
       (c) =>
-        c.type === "function" &&
+        (c.type === "function" || c.type === "method") &&
         c.startLine <= callNode.startRow + 1 &&
         c.endLine >= callNode.endRow + 1,
     );

@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -9,11 +11,37 @@ import {
   type PatternMatch,
 } from "./shared.js";
 
+const RUBY_DSL_METHODS = new Set([
+  "has_many",
+  "has_one",
+  "belongs_to",
+  "has_and_belongs_to_many",
+  "validates",
+  "validate",
+  "scope",
+  "before_action",
+  "after_action",
+  "around_action",
+  "before_save",
+  "after_save",
+  "before_create",
+  "after_create",
+  "attr_accessor",
+  "attr_reader",
+  "attr_writer",
+  "attr",
+  "delegate",
+  "include",
+  "extend",
+  "helper_method",
+]);
+
 const RUBY_QUERIES = {
   requires: `(call method: (identifier) @method arguments: (argument_list (string) @module)) @imp`,
   classes: `(class name: (constant) @name) @cls`,
   modules: `(module name: (constant) @name) @mod`,
   methods: `(method name: (identifier) @name) @method`,
+  dslCalls: `(call method: (identifier) @method) @dsl`,
   callExpressions: `(call method: (identifier) @callee) @call`,
 };
 
@@ -106,15 +134,18 @@ export function extractRuby(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -131,7 +162,7 @@ export function extractRuby(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -168,6 +199,27 @@ export function extractRuby(
       }
     }
     addChunk(methodNode, name, parentName ? "method" : "function", parentName);
+  }
+
+  // DSL calls (Rails validations, associations, etc.) scoped to class bodies
+  for (const m of getMatches("dslCalls")) {
+    const method = cap(m, "method")?.text ?? "";
+    const dslNode = cap(m, "dsl")?.node;
+    if (!method || !dslNode) continue;
+    if (!RUBY_DSL_METHODS.has(method)) continue;
+    let parentName: string | undefined;
+    for (const chunk of chunks) {
+      if (
+        chunk.type === "class" &&
+        chunk.startLine <= dslNode.startRow + 1 &&
+        chunk.endLine >= dslNode.endRow + 1
+      ) {
+        parentName = chunk.name;
+        break;
+      }
+    }
+    if (!parentName) continue; // only capture DSL calls inside a class/module
+    addChunk(dslNode, method, "dsl_call", parentName);
   }
 
   // --- EXTENDS edges (separate extraction to avoid breaking structure queries) ---

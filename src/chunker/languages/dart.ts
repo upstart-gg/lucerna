@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -10,11 +12,19 @@ import {
 } from "./shared.js";
 
 const DART_QUERIES = {
-  imports: `(import_or_export (uri) @module) @imp`,
+  imports: `(import_specification (configurable_uri (uri) @module)) @imp`,
   classes: `(class_definition name: (identifier) @name) @cls`,
   functions: `(function_signature name: (identifier) @name) @fn`,
-  methods: `(method_signature name: (identifier) @name) @method`,
-  callExpressions: `(function_expression_invocation function: (identifier) @callee) @call`,
+  methods: `(method_signature (function_signature name: (identifier) @name)) @method`,
+};
+
+// Dart grammar node names vary across pack versions; run extras separately
+// so a missing rule doesn't invalidate the core extraction.
+const DART_EXTRA_QUERIES = {
+  mixins: `(mixin_declaration (identifier) @name) @mx`,
+  extensions: `(extension_declaration name: (identifier) @name) @ext`,
+  enums: `(enum_declaration name: (identifier) @name) @enum`,
+  typedefs: `(type_alias (type_identifier) @name) @alias`,
 };
 
 const DART_INHERIT_QUERIES = {
@@ -102,15 +112,18 @@ export function extractDart(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "function" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -127,7 +140,7 @@ export function extractDart(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -141,6 +154,49 @@ export function extractDart(
     if (node && name) addChunk(node, name, "class");
   }
 
+  // Dart extras — grammar coverage varies across pack versions; each query
+  // runs independently so one unsupported pattern doesn't kill the rest.
+  const tryExtra = (key: keyof typeof DART_EXTRA_QUERIES): PatternMatch[] => {
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: runtime type from native addon
+      const ex: any = packExtract(source, {
+        language: "dart",
+        patterns: {
+          [key]: { query: DART_EXTRA_QUERIES[key], captureOutput: "Full" },
+        },
+      });
+      return (ex.results[key]?.matches as PatternMatch[]) ?? [];
+    } catch {
+      return [];
+    }
+  };
+  for (const m of tryExtra("mixins")) {
+    const node = cap(m, "mx")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "mixin");
+  }
+  for (const m of tryExtra("extensions")) {
+    const node = cap(m, "ext")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "extension");
+  }
+  for (const m of tryExtra("enums")) {
+    const node = cap(m, "enum")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "enum");
+  }
+  // type_alias has no `name:` field in the Dart grammar; the query matches
+  // every type_identifier child, so pick the first one per alias node.
+  const seenAliasRows = new Set<number>();
+  for (const m of tryExtra("typedefs")) {
+    const node = cap(m, "alias")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!node || !name) continue;
+    if (seenAliasRows.has(node.startRow)) continue;
+    seenAliasRows.add(node.startRow);
+    addChunk(node, name, "typealias");
+  }
+
   for (const m of getMatches("functions")) {
     const fnNode = cap(m, "fn")?.node;
     const name = cap(m, "name")?.text ?? "";
@@ -148,7 +204,10 @@ export function extractDart(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        chunk.type === "class" &&
+        (chunk.type === "class" ||
+          chunk.type === "mixin" ||
+          chunk.type === "extension" ||
+          chunk.type === "enum") &&
         chunk.startLine <= fnNode.startRow + 1 &&
         chunk.endLine >= fnNode.endRow + 1
       ) {
@@ -166,7 +225,10 @@ export function extractDart(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        chunk.type === "class" &&
+        (chunk.type === "class" ||
+          chunk.type === "mixin" ||
+          chunk.type === "extension" ||
+          chunk.type === "enum") &&
         chunk.startLine <= methodNode.startRow + 1 &&
         chunk.endLine >= methodNode.endRow + 1
       ) {
@@ -223,26 +285,6 @@ export function extractDart(
       language,
       minMergeChars,
     );
-  }
-
-  // CALLS edges
-  for (const m of getMatches("callExpressions")) {
-    const callee = cap(m, "callee")?.text ?? "";
-    const callNode = cap(m, "call")?.node;
-    if (!callee || !callNode) continue;
-    const enclosing = chunks.find(
-      (c) =>
-        (c.type === "function" || c.type === "method") &&
-        c.startLine <= callNode.startRow + 1 &&
-        c.endLine >= callNode.endRow + 1,
-    );
-    rawEdges.push({
-      sourceChunkId: enclosing?.id ?? "",
-      sourceFilePath: filePath,
-      type: "CALLS",
-      targetSymbol: callee,
-      metadata: {},
-    });
   }
 
   return { chunks: mergeSiblingChunks(chunks, minMergeChars), rawEdges };

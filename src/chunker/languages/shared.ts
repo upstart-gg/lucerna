@@ -31,6 +31,110 @@ export type MatchCapture = {
 export type PatternMatch = { captures: MatchCapture[] };
 
 // ---------------------------------------------------------------------------
+// Leading-comment / decorator / annotation / attribute absorption
+// ---------------------------------------------------------------------------
+
+export interface AbsorbConfig {
+  /** Line prefixes to absorb (checked on trimmed line). */
+  linePrefixes?: string[];
+  /** Block comment open/close pairs. */
+  blockComments?: { open: string; close: string }[];
+  /** Regexes for decorator/annotation/attribute lines (applied to trimmed line). */
+  linePatterns?: RegExp[];
+  /** Max preceding lines to scan. Default 80 — avoids swallowing license headers. */
+  maxLines?: number;
+}
+
+/**
+ * Expand a chunk's start row upward to include contiguous leading doc-comments,
+ * decorators, annotations, or attributes. Returns the new startRow (0-based) to
+ * use for the chunk. A single blank line is tolerated between the absorbed span
+ * and the node (typical docstring gap).
+ */
+export function absorbUpward(
+  sourceLines: string[],
+  nodeStartRow: number,
+  cfg: AbsorbConfig,
+): number {
+  const maxLines = cfg.maxLines ?? 80;
+  const prefixes = cfg.linePrefixes ?? [];
+  const blocks = cfg.blockComments ?? [];
+  const patterns = cfg.linePatterns ?? [];
+  if (prefixes.length === 0 && blocks.length === 0 && patterns.length === 0) {
+    return nodeStartRow;
+  }
+
+  const matchesLine = (trimmed: string): boolean => {
+    if (trimmed === "") return false;
+    for (const p of prefixes) {
+      if (trimmed.startsWith(p)) return true;
+    }
+    for (const rx of patterns) {
+      if (rx.test(trimmed)) return true;
+    }
+    for (const b of blocks) {
+      if (trimmed.startsWith(b.open) && trimmed.endsWith(b.close)) return true;
+    }
+    return false;
+  };
+
+  let row = nodeStartRow - 1;
+  let lowestAbsorbed = nodeStartRow;
+  let blankTolerated = false;
+  const stopRow = Math.max(0, nodeStartRow - maxLines);
+
+  while (row >= stopRow) {
+    const line = sourceLines[row] ?? "";
+    const trimmed = line.trim();
+
+    if (trimmed === "") {
+      if (!blankTolerated && lowestAbsorbed < nodeStartRow) {
+        blankTolerated = true;
+        row--;
+        continue;
+      }
+      break;
+    }
+
+    // Multi-line block-comment: if the line ends a block, walk up to the open.
+    let absorbedBlock = false;
+    for (const b of blocks) {
+      if (trimmed.endsWith(b.close)) {
+        let openRow = row;
+        let found = false;
+        while (openRow >= stopRow) {
+          const l = (sourceLines[openRow] ?? "").trim();
+          if (l.startsWith(b.open)) {
+            found = true;
+            break;
+          }
+          openRow--;
+        }
+        if (found) {
+          lowestAbsorbed = openRow;
+          row = openRow - 1;
+          blankTolerated = false;
+          absorbedBlock = true;
+          break;
+        }
+      }
+    }
+    if (absorbedBlock) continue;
+
+    if (matchesLine(trimmed)) {
+      lowestAbsorbed = row;
+      row--;
+      blankTolerated = false;
+      continue;
+    }
+
+    break;
+  }
+
+  return lowestAbsorbed;
+}
+
+// ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
@@ -58,6 +162,73 @@ export function makeFileChunk(
 
 export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Unified chunk builder: computes expanded line range (via absorbUpward when an
+ * AbsorbConfig is provided), extracts content, assembles breadcrumb/contextContent,
+ * and returns a CodeChunk. Replaces per-language addChunk closures.
+ */
+export function buildChunkFromNode(args: {
+  node: NonNullable<MatchCapture["node"]>;
+  sourceLines: string[];
+  projectId: string;
+  filePath: string;
+  language: string;
+  type: ChunkType;
+  name?: string;
+  parentName?: string;
+  importContent?: string;
+  absorb?: AbsorbConfig;
+  extraMetadata?: Record<string, unknown>;
+}): CodeChunk {
+  const {
+    node,
+    sourceLines,
+    projectId,
+    filePath,
+    language,
+    type,
+    name,
+    parentName,
+    importContent,
+    absorb,
+    extraMetadata,
+  } = args;
+
+  const startRow = absorb
+    ? absorbUpward(sourceLines, node.startRow, absorb)
+    : node.startRow;
+  const endRow = node.endRow;
+  const content = sourceLines.slice(startRow, endRow + 1).join("\n");
+
+  const breadcrumbParts: string[] = [];
+  if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
+  if (name) breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
+  const breadcrumb = breadcrumbParts.join("\n");
+
+  const contextParts: string[] = [];
+  if (breadcrumb) contextParts.push(breadcrumb);
+  if (importContent) contextParts.push(importContent);
+  contextParts.push(content);
+
+  const metadata: Record<string, unknown> = { ...(extraMetadata ?? {}) };
+  if (parentName) metadata.className = parentName;
+  if (breadcrumb) metadata.breadcrumb = breadcrumb;
+
+  return {
+    id: "",
+    projectId,
+    filePath,
+    language,
+    type,
+    ...(name != null ? { name } : {}),
+    content,
+    contextContent: contextParts.join("\n\n"),
+    startLine: startRow + 1,
+    endLine: endRow + 1,
+    metadata,
+  };
 }
 
 /**
@@ -106,7 +277,20 @@ export function mergeSiblingChunks(
 ): CodeChunk[] {
   if (chunks.length <= 1) return chunks;
 
-  const NEVER_MERGE: Set<ChunkType> = new Set(["import", "class"]);
+  const NEVER_MERGE: Set<ChunkType> = new Set([
+    "import",
+    "class",
+    "struct",
+    "record",
+    "enum",
+    "namespace",
+    "module",
+    "library",
+    "interface",
+    "trait",
+    "protocol",
+    "file",
+  ]);
 
   const result: CodeChunk[] = [];
   let i = 0;
@@ -217,32 +401,120 @@ export function mapKind(kind: string): ChunkType {
       return "function";
     case "class":
     case "class_declaration":
-    // Rust/C++ struct, Rust impl block — "class" is the nearest ChunkType
-    case "struct":
     case "impl":
-    // Ruby/Python/JS module
-    case "module":
       return "class";
+    case "struct":
+    case "struct_declaration":
+    case "struct_specifier":
+    case "struct_item":
+      return "struct";
+    case "record":
+    case "record_declaration":
+      return "record";
+    case "module":
+    case "module_declaration":
+    case "module_definition":
+    case "mod_item":
+      return "module";
+    case "namespace":
+    case "namespace_definition":
+    case "internal_module":
+      return "namespace";
     case "method":
     case "method_definition":
       return "method";
     case "interface":
     case "interface_declaration":
-    // Rust trait, Swift protocol
-    case "trait":
-    case "protocol":
       return "interface";
-    case "type":
-    case "type_alias":
-    case "type_declaration":
-    // Rust/Java/Kotlin enum
+    case "trait":
+    case "trait_item":
+    case "trait_definition":
+      return "trait";
+    case "protocol":
+    case "protocol_declaration":
+      return "protocol";
+    case "mixin":
+    case "mixin_declaration":
+      return "mixin";
+    case "extension":
+    case "extension_declaration":
+    case "category_interface":
+      return "extension";
+    case "object":
+    case "object_declaration":
+    case "object_definition":
+      return "object";
+    case "actor":
+    case "actor_declaration":
+      return "actor";
     case "enum":
+    case "enum_declaration":
+    case "enum_definition":
+    case "enum_specifier":
+    case "enum_item":
+    case "enum_class_declaration":
+      return "enum";
+    case "type":
+    case "type_declaration":
+    case "type_definition":
       return "type";
+    case "type_alias":
+    case "typealias":
+    case "type_alias_declaration":
+    case "type_alias_statement":
+    case "type_item":
+    case "alias_declaration":
+      return "typealias";
+    case "newtype":
+      return "newtype";
+    case "instance":
+    case "instance_declaration":
+      return "instance";
+    case "functor":
+      return "functor";
+    case "module_type":
+    case "module_type_definition":
+      return "module_type";
+    case "macro":
+    case "macro_definition":
+    case "defmacro":
+    case "preproc_def":
+      return "macro";
+    case "const":
+    case "const_item":
+    case "const_declaration":
+    case "static_item":
+      return "const";
     case "variable":
     case "variable_declaration":
-    case "const":
     case "let":
       return "variable";
+    case "property":
+    case "property_declaration":
+      return "property";
+    case "test":
+    case "test_declaration":
+      return "test";
+    case "param_block":
+      return "param_block";
+    case "dsl_call":
+      return "dsl_call";
+    case "state_variable":
+    case "state_variable_declaration":
+      return "state_variable";
+    case "event":
+    case "event_definition":
+    case "event_declaration":
+      return "event";
+    case "modifier":
+    case "modifier_definition":
+      return "modifier";
+    case "error":
+    case "error_declaration":
+      return "error";
+    case "library":
+    case "library_declaration":
+      return "library";
     case "import":
     case "import_statement":
       return "import";

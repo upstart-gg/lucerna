@@ -133,3 +133,43 @@ const farewell = (name) => \`Goodbye, \${name}!\`;
     for (const c of chunks) expect(c.language).toBe("javascript");
   });
 });
+
+describe("JavaScript — const objects + JSDoc absorption", () => {
+  const SRC = `
+/**
+ * Compute the area of a circle.
+ */
+export function area(r) {
+  return Math.PI * r * r;
+}
+
+export const ROUTES = {
+  home: "/",
+  about: "/about",
+  settings: "/settings",
+};
+`.trim();
+
+  test("top-level const object emitted as const chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("js"),
+      PROJECT_ID,
+      "javascript",
+    );
+    expect(chunksByType(chunks, "const").map((c) => c.name)).toContain(
+      "ROUTES",
+    );
+  });
+
+  test("JSDoc absorbed into function content", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("js"),
+      PROJECT_ID,
+      "javascript",
+    );
+    const fn = chunks.find((c) => c.name === "area");
+    expect(fn?.content).toContain("Compute the area of a circle");
+  });
+});

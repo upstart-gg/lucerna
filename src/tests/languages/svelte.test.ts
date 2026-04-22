@@ -61,7 +61,7 @@ describe("Svelte", () => {
     expect(chunks.length).toBeGreaterThan(0);
   });
 
-  test("extracts script and style blocks", async () => {
+  test("extracts style block + decomposes script into TS chunks", async () => {
     const chunks = await chunker.chunkSource(
       SOURCE,
       FILE("svelte"),
@@ -69,8 +69,10 @@ describe("Svelte", () => {
       "svelte",
     );
     const names = chunks.map((c) => c.name);
-    expect(names).toContain("script");
     expect(names).toContain("style");
+    // Script block is decomposed into TS/JS chunks: e.g. the `increment`
+    // function becomes its own chunk instead of one opaque "script" block.
+    expect(names).toContain("increment");
   });
 
   test("extracts template section for remaining markup", async () => {

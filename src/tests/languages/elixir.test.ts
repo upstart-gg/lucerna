@@ -58,15 +58,15 @@ end
     expect(chunks.length).toBeGreaterThan(0);
   });
 
-  test("extracts module as class", async () => {
+  test("extracts module as module chunk", async () => {
     const chunks = await chunker.chunkSource(
       SOURCE,
       FILE("ex"),
       PROJECT_ID,
       "elixir",
     );
-    const cls = chunksByType(chunks, "class");
-    const names = cls.map((c) => c.name).filter(Boolean);
+    const mods = chunksByType(chunks, "module");
+    const names = mods.map((c) => c.name).filter(Boolean);
     expect(names).toContain("MyApp.Greetings");
   });
 
@@ -91,5 +91,58 @@ end
       "elixir",
     );
     for (const c of chunks) expect(c.language).toBe("elixir");
+  });
+});
+
+describe("Elixir — protocols, impls, macros", () => {
+  const SRC = `defprotocol Stringify do
+  def to_str(value)
+end
+
+defimpl Stringify, for: Integer do
+  def to_str(value), do: Integer.to_string(value)
+end
+
+defmodule MyMacros do
+  defmacro unless(condition, do: block) do
+    quote do
+      if !unquote(condition), do: unquote(block)
+    end
+  end
+end
+`;
+
+  test("defprotocol emitted as protocol chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ex"),
+      PROJECT_ID,
+      "elixir",
+    );
+    expect(chunksByType(chunks, "protocol").map((c) => c.name)).toContain(
+      "Stringify",
+    );
+  });
+
+  test("defimpl emitted as instance chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ex"),
+      PROJECT_ID,
+      "elixir",
+    );
+    expect(chunksByType(chunks, "instance").length).toBeGreaterThan(0);
+  });
+
+  test("defmacro emitted as macro chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("ex"),
+      PROJECT_ID,
+      "elixir",
+    );
+    expect(chunksByType(chunks, "macro").map((c) => c.name)).toContain(
+      "unless",
+    );
   });
 });

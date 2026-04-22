@@ -149,3 +149,52 @@ class UserService:
     for (const c of chunks) expect(c.contextContent).not.toContain("// File:");
   });
 });
+
+describe("Python — decorators, type aliases, module constants", () => {
+  const SRC = `from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/users/<id>")
+def get_user(id):
+    return {"id": id}
+
+type UserId = int
+
+API_BASE_URL = "https://api.example.com/v1/users/and/things/here"
+`;
+
+  test("decorator absorbed into function content", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("py"),
+      PROJECT_ID,
+      "python",
+    );
+    const fn = chunkByName(chunks, "get_user");
+    expect(fn).toBeDefined();
+    expect(fn?.content).toContain("@app.route");
+  });
+
+  test("PEP 695 type alias emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("py"),
+      PROJECT_ID,
+      "python",
+    );
+    const aliases = chunksByType(chunks, "typealias");
+    expect(aliases.map((c) => c.name)).toContain("UserId");
+  });
+
+  test("module-level long constant emitted as const chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("py"),
+      PROJECT_ID,
+      "python",
+    );
+    const consts = chunksByType(chunks, "const");
+    expect(consts.map((c) => c.name)).toContain("API_BASE_URL");
+  });
+});

@@ -1264,3 +1264,121 @@ describe("GraphStore — hashEdgeId", () => {
     expect(ab).not.toBe(ba);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Leading-comment / decorator / annotation / attribute absorption
+// ---------------------------------------------------------------------------
+
+describe("absorbUpward — leading comments & annotations", () => {
+  test("absorbs JSDoc above a TypeScript function", async () => {
+    const source = `
+/**
+ * Greets the given name.
+ * @param name The person to greet.
+ */
+export function greet(name: string): string {
+  return \`Hello, \${name}\`;
+}
+`.trim();
+    const chunks = await chunker.chunkSource(
+      source,
+      "greet.ts",
+      PROJECT_ID,
+      "typescript",
+    );
+    const fn = chunks.find((c) => c.type === "function" && c.name === "greet");
+    expect(fn).toBeDefined();
+    expect(fn?.content).toContain("/**");
+    expect(fn?.content).toContain("Greets the given name");
+  });
+
+  test("absorbs Rust #[derive(...)] attribute above a struct", async () => {
+    const source = `
+#[derive(Debug, Clone)]
+pub struct User {
+    pub id: u64,
+    pub name: String,
+}
+`.trim();
+    const chunks = await chunker.chunkSource(
+      source,
+      "user.rs",
+      PROJECT_ID,
+      "rust",
+    );
+    const struct = chunks.find((c) => c.name === "User");
+    expect(struct).toBeDefined();
+    expect(struct?.content).toContain("#[derive(Debug, Clone)]");
+  });
+
+  test("absorbs Python decorator above a function", async () => {
+    const source = `
+from flask import Flask
+app = Flask(__name__)
+
+@app.route("/hello")
+def hello():
+    return "world"
+`.trim();
+    const chunks = await chunker.chunkSource(
+      source,
+      "app.py",
+      PROJECT_ID,
+      "python",
+    );
+    const fn = chunks.find((c) => c.type === "function" && c.name === "hello");
+    expect(fn).toBeDefined();
+    expect(fn?.content).toContain('@app.route("/hello")');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NEVER_MERGE — structural anchors stay un-merged
+// ---------------------------------------------------------------------------
+
+describe("mergeSiblingChunks — NEVER_MERGE anchors", () => {
+  test("TypeScript enum is not merged into adjacent siblings", async () => {
+    const source = `
+export enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+export const PI = 3.14;
+export const E = 2.71;
+`.trim();
+    const chunks = await chunker.chunkSource(
+      source,
+      "enum.ts",
+      PROJECT_ID,
+      "typescript",
+    );
+    const enumChunk = chunks.find(
+      (c) => c.type === "enum" && c.name === "Color",
+    );
+    expect(enumChunk).toBeDefined();
+  });
+
+  test("Rust struct is not merged into adjacent siblings", async () => {
+    const source = `
+pub struct Point {
+    pub x: f64,
+    pub y: f64,
+}
+
+pub struct Vector {
+    pub dx: f64,
+    pub dy: f64,
+}
+`.trim();
+    const chunks = await chunker.chunkSource(
+      source,
+      "geom.rs",
+      PROJECT_ID,
+      "rust",
+    );
+    const structChunks = chunks.filter((c) => c.type === "struct");
+    expect(structChunks.length).toBe(2);
+  });
+});

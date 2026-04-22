@@ -101,3 +101,59 @@ describe("Objective-C", () => {
     for (const c of chunks) expect(c.language).toBe("objc");
   });
 });
+
+describe("Objective-C — protocols, categories, properties", () => {
+  const SRC = `@protocol Greetable
+- (void)greet;
+@end
+
+@interface NSString (Utils)
+- (NSString *)reversed2;
+@end
+
+@interface Box : NSObject
+@property (nonatomic) NSString *label;
+@property (nonatomic) int count;
+@end
+`;
+
+  test("protocol emitted as protocol chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("m"),
+      PROJECT_ID,
+      "objc",
+    );
+    const names = chunks
+      .filter((c) => c.type === "protocol")
+      .map((c) => c.name);
+    expect(names).toContain("Greetable");
+  });
+
+  test("category interface emitted as extension chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("m"),
+      PROJECT_ID,
+      "objc",
+    );
+    const names = chunks
+      .filter((c) => c.type === "extension")
+      .map((c) => c.name);
+    expect(names).toContain("Utils");
+  });
+
+  test("@property emitted as property chunks", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("m"),
+      PROJECT_ID,
+      "objc",
+    );
+    const names = chunks
+      .filter((c) => c.type === "property")
+      .map((c) => c.name);
+    expect(names).toContain("label");
+    expect(names).toContain("count");
+  });
+});

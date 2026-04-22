@@ -99,39 +99,39 @@ public class UserService : IGreeter {
     expect(names).toContain("UserService");
   });
 
-  test("extracts record as class type", async () => {
+  test("extracts record as record type", async () => {
     const chunks = await chunker.chunkSource(
       CS_SOURCE,
       FILE("cs"),
       PROJECT_ID,
       "csharp",
     );
-    const cls = chunksByType(chunks, "class");
-    const names = cls.map((c) => c.name);
+    const records = chunksByType(chunks, "record");
+    const names = records.map((c) => c.name);
     expect(names).toContain("Person");
   });
 
-  test("extracts struct as class type", async () => {
+  test("extracts struct as struct type", async () => {
     const chunks = await chunker.chunkSource(
       CS_SOURCE,
       FILE("cs"),
       PROJECT_ID,
       "csharp",
     );
-    const cls = chunksByType(chunks, "class");
-    const names = cls.map((c) => c.name);
+    const structs = chunksByType(chunks, "struct");
+    const names = structs.map((c) => c.name);
     expect(names).toContain("Point");
   });
 
-  test("extracts enum as type", async () => {
+  test("extracts enum as enum type", async () => {
     const chunks = await chunker.chunkSource(
       CS_SOURCE,
       FILE("cs"),
       PROJECT_ID,
       "csharp",
     );
-    const types = chunksByType(chunks, "type");
-    const names = types.map((c) => c.name);
+    const enums = chunksByType(chunks, "enum");
+    const names = enums.map((c) => c.name);
     expect(names).toContain("Status");
   });
 
@@ -168,6 +168,72 @@ public class UserService : IGreeter {
       "csharp",
     );
     for (const c of chunks) expect(c.language).toBe("csharp");
+  });
+});
+
+describe("C# — properties, events, delegates, attribute & XML doc absorption", () => {
+  const SRC = `using System;
+
+/// <summary>Service that does important things.</summary>
+[Serializable]
+public class FancyService {
+    public string Name { get; set; }
+
+    public event EventHandler<string> Notified;
+
+    public delegate int Reducer(int a, int b);
+}
+`;
+
+  test("property emitted as property chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cs"),
+      PROJECT_ID,
+      "csharp",
+    );
+    expect(chunksByType(chunks, "property").map((c) => c.name)).toContain(
+      "Name",
+    );
+  });
+
+  test("event emitted as event chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cs"),
+      PROJECT_ID,
+      "csharp",
+    );
+    expect(chunksByType(chunks, "event").map((c) => c.name)).toContain(
+      "Notified",
+    );
+  });
+
+  test("delegate emitted as typealias chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cs"),
+      PROJECT_ID,
+      "csharp",
+    );
+    expect(chunksByType(chunks, "typealias").map((c) => c.name)).toContain(
+      "Reducer",
+    );
+  });
+
+  test("XML doc and [Attribute] absorbed into class content", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("cs"),
+      PROJECT_ID,
+      "csharp",
+    );
+    const cls = chunksByType(chunks, "class").find(
+      (c) => c.name === "FancyService",
+    );
+    expect(cls).toBeDefined();
+    expect(cls?.content).toContain("<summary>");
+    expect(cls?.content).toContain("[Serializable]");
   });
 });
 

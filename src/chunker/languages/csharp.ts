@@ -1,6 +1,8 @@
 import type { RawEdge } from "../../graph/types.js";
-import type { CodeChunk } from "../../types.js";
+import type { ChunkType, CodeChunk } from "../../types.js";
+import { getAbsorb } from "./absorbPresets.js";
 import {
+  absorbUpward,
   capitalize,
   mergeSiblingChunks,
   packExtract,
@@ -12,11 +14,15 @@ import {
 const CSHARP_QUERIES = {
   usings: `(using_directive) @imp`,
   classes: `(class_declaration name: (identifier) @name) @cls`,
-  records: `(record_declaration name: (identifier) @name) @cls`,
-  structs: `(struct_declaration name: (identifier) @name) @cls`,
+  records: `(record_declaration name: (identifier) @name) @record`,
+  structs: `(struct_declaration name: (identifier) @name) @struct`,
   interfaces: `(interface_declaration name: (identifier) @name) @iface`,
   enums: `(enum_declaration name: (identifier) @name) @enum`,
   methods: `(method_declaration name: (identifier) @name) @method`,
+  properties: `(property_declaration name: (identifier) @name) @prop`,
+  events: `(event_declaration name: (identifier) @name) @event`,
+  fieldEvents: `(event_field_declaration (variable_declaration (variable_declarator (identifier) @name))) @event`,
+  delegates: `(delegate_declaration name: (identifier) @name) @delegate`,
   callExpressions: `(invocation_expression function: [(identifier) @callee (member_access_expression name: (identifier) @callee)]) @call`,
 };
 
@@ -115,15 +121,18 @@ export function extractCSharp(
     }
   }
 
+  const absorb = getAbsorb(language);
+
   const addChunk = (
     node: NonNullable<MatchCapture["node"]>,
     name: string,
-    type: "class" | "interface" | "type" | "method",
+    type: ChunkType,
     parentName?: string,
   ) => {
-    const content = sourceLines
-      .slice(node.startRow, node.endRow + 1)
-      .join("\n");
+    const startRow = absorb
+      ? absorbUpward(sourceLines, node.startRow, absorb)
+      : node.startRow;
+    const content = sourceLines.slice(startRow, node.endRow + 1).join("\n");
     const breadcrumbParts: string[] = [];
     if (parentName) breadcrumbParts.push(`// Class: ${parentName}`);
     breadcrumbParts.push(`// ${capitalize(type)}: ${name}`);
@@ -140,7 +149,7 @@ export function extractCSharp(
       name,
       content,
       contextContent: contextParts.join("\n\n"),
-      startLine: node.startRow + 1,
+      startLine: startRow + 1,
       endLine: node.endRow + 1,
       metadata: parentName
         ? { className: parentName, breadcrumb }
@@ -148,12 +157,20 @@ export function extractCSharp(
     });
   };
 
-  for (const key of ["classes", "records", "structs"] as const) {
-    for (const m of getMatches(key)) {
-      const node = cap(m, "cls")?.node;
-      const name = cap(m, "name")?.text ?? "";
-      if (node && name) addChunk(node, name, "class");
-    }
+  for (const m of getMatches("classes")) {
+    const node = cap(m, "cls")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "class");
+  }
+  for (const m of getMatches("records")) {
+    const node = cap(m, "record")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "record");
+  }
+  for (const m of getMatches("structs")) {
+    const node = cap(m, "struct")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "struct");
   }
 
   for (const m of getMatches("interfaces")) {
@@ -165,7 +182,13 @@ export function extractCSharp(
   for (const m of getMatches("enums")) {
     const node = cap(m, "enum")?.node;
     const name = cap(m, "name")?.text ?? "";
-    if (node && name) addChunk(node, name, "type");
+    if (node && name) addChunk(node, name, "enum");
+  }
+
+  for (const m of getMatches("delegates")) {
+    const node = cap(m, "delegate")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (node && name) addChunk(node, name, "typealias");
   }
 
   for (const m of getMatches("methods")) {
@@ -175,7 +198,10 @@ export function extractCSharp(
     let parentName: string | undefined;
     for (const chunk of chunks) {
       if (
-        (chunk.type === "class" || chunk.type === "interface") &&
+        (chunk.type === "class" ||
+          chunk.type === "interface" ||
+          chunk.type === "record" ||
+          chunk.type === "struct") &&
         chunk.startLine <= methodNode.startRow + 1 &&
         chunk.endLine >= methodNode.endRow + 1
       ) {
@@ -184,6 +210,43 @@ export function extractCSharp(
       }
     }
     addChunk(methodNode, name, "method", parentName);
+  }
+
+  const findParent = (startRow: number, endRow: number): string | undefined => {
+    for (const chunk of chunks) {
+      if (
+        (chunk.type === "class" ||
+          chunk.type === "interface" ||
+          chunk.type === "record" ||
+          chunk.type === "struct") &&
+        chunk.startLine <= startRow + 1 &&
+        chunk.endLine >= endRow + 1
+      ) {
+        return chunk.name;
+      }
+    }
+    return undefined;
+  };
+
+  for (const m of getMatches("properties")) {
+    const node = cap(m, "prop")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!node || !name) continue;
+    addChunk(node, name, "property", findParent(node.startRow, node.endRow));
+  }
+
+  for (const m of getMatches("events")) {
+    const node = cap(m, "event")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!node || !name) continue;
+    addChunk(node, name, "event", findParent(node.startRow, node.endRow));
+  }
+
+  for (const m of getMatches("fieldEvents")) {
+    const node = cap(m, "event")?.node;
+    const name = cap(m, "name")?.text ?? "";
+    if (!node || !name) continue;
+    addChunk(node, name, "event", findParent(node.startRow, node.endRow));
   }
 
   // --- EXTENDS edges (separate extraction to avoid breaking structure queries) ---

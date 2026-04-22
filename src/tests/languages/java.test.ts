@@ -110,3 +110,55 @@ public class UserService implements Greeter {
     for (const c of chunks) expect(c.language).toBe("java");
   });
 });
+
+describe("Java — enums, records, annotation absorption", () => {
+  const SRC = `import java.util.List;
+
+public enum Role {
+    ADMIN, USER, GUEST
+}
+
+public record Point(double x, double y) {}
+
+@Deprecated
+public class LegacyService {
+    public String name() { return "legacy"; }
+}
+`;
+
+  test("enum emitted as enum chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("java"),
+      PROJECT_ID,
+      "java",
+    );
+    expect(chunksByType(chunks, "enum").map((c) => c.name)).toContain("Role");
+  });
+
+  test("record emitted as record chunk", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("java"),
+      PROJECT_ID,
+      "java",
+    );
+    expect(chunksByType(chunks, "record").map((c) => c.name)).toContain(
+      "Point",
+    );
+  });
+
+  test("annotation absorbed into class content", async () => {
+    const chunks = await chunker.chunkSource(
+      SRC,
+      FILE("java"),
+      PROJECT_ID,
+      "java",
+    );
+    const cls = chunksByType(chunks, "class").find(
+      (c) => c.name === "LegacyService",
+    );
+    expect(cls).toBeDefined();
+    expect(cls?.content).toContain("@Deprecated");
+  });
+});

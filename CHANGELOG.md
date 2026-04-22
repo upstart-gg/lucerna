@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.2.1
+
+### Patch Changes
+
+- [#93](https://github.com/upstart-gg/lucerna/pull/93) [`94089d7`](https://github.com/upstart-gg/lucerna/commit/94089d713e571370eced716347869fd4d8521510) Thanks [@mattallty](https://github.com/mattallty)! - Update deps
+
 ## 0.2.0
 
 ### Minor Changes

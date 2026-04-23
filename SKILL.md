@@ -20,8 +20,8 @@ Hybrid semantic + lexical (BM25) search over the indexed codebase. The primary t
 | `limit` | integer 1–100 | `10` | Max results per page |
 | `offset` | integer ≥ 0 | `0` | Results to skip — use for pagination when `hasMore` is `true` |
 | `includeContent` | boolean | `true` | Include chunk source code. Set `false` for metadata-only (filePath, name, type, lines) — much smaller response |
-| `language` | string | *(all)* | Filter by language: `typescript`, `python`, `rust`, `go`, etc. |
-| `type` | string | *(all)* | Filter by chunk type: `function` · `class` · `method` · `interface` · `type` · `variable` · `import` · `section` · `file` |
+| `language` | string | *(all)* | Filter by language. Common values: `typescript` · `javascript` · `tsx` · `jsx` · `python` · `rust` · `go` · `java` · `csharp` · `cpp` · `c` · `ruby` · `php` · `swift` · `kotlin` · `scala` · `dart` · `elixir` · `clojure` · `haskell` · `ocaml` · `erlang` · `sql` · `solidity` · `bash` · `powershell` · `perl` · `r` · `julia` · `matlab` · `groovy` · `zig` · `lua` · `objc` · `scss` · `css` · `html` · `vue` · `svelte` · `markdown` · `json` · `yaml` · `toml`. Any language supported by tree-sitter-language-pack is accepted. |
+| `type` | string | *(all)* | Filter by chunk type. Most common: `function` · `method` · `class` · `interface` · `type` · `enum` · `const` · `variable` · `import`. Also available: `struct` · `record` · `trait` · `protocol` · `mixin` · `extension` · `object` · `actor` · `namespace` · `module` · `macro` · `typealias` · `property` · `instance` · `newtype` · `functor` · `module_type` · `test` · `param_block` · `dsl_call` · `state_variable` · `event` · `modifier` · `error` · `library` · `section` (markdown headings) · `file` (whole-file fallback). |
 | `filePath` | string | *(all)* | Filter by file path (supports glob patterns) |
 
 ### Response shape
@@ -29,7 +29,6 @@ Hybrid semantic + lexical (BM25) search over the indexed codebase. The primary t
 ```json
 {
   "results": [...],
-  "total": 15,
   "hasMore": true,
   "offset": 10
 }
@@ -38,7 +37,6 @@ Hybrid semantic + lexical (BM25) search over the indexed codebase. The primary t
 | Field | Description |
 |---|---|
 | `results` | Array of flat result objects (see fields below) |
-| `total` | Number of results fetched before pagination (at most `offset + limit + 1`) |
 | `hasMore` | `true` if more results exist beyond the current page |
 | `offset` | Only present when non-zero — the offset used for this page |
 | `warning` | Present when indexing is still in progress or semantic search is unavailable — retry in a few seconds |

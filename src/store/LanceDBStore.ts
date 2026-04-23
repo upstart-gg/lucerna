@@ -8,6 +8,7 @@ import type {
   SearchOptions,
   SearchResult,
 } from "../types.js";
+import { log } from "../log.js";
 import { expandIdentifiers } from "./identifierExpansion.js";
 import type { VectorStore } from "./VectorStore.js";
 
@@ -130,7 +131,7 @@ export class LanceDBStore implements VectorStore {
       // if two models happen to share the same output size, but embeddings are incompatible)
       const meta = await this.readMeta();
       if (meta?.modelId && this.modelId && meta.modelId !== this.modelId) {
-        console.warn(
+        log.warn(
           `[lucerna] Embedding model changed: index was built with "${meta.modelId}" ` +
             `but the current model is "${this.modelId}". ` +
             `Search quality may be degraded. Run 'lucerna clear' then 'lucerna index' to rebuild.`,
@@ -142,7 +143,7 @@ export class LanceDBStore implements VectorStore {
       this.searchContentAvailable =
         sample.length === 0 || "searchContent" in (sample[0] ?? {});
       if (!this.searchContentAvailable) {
-        console.warn(
+        log.warn(
           "[lucerna] Index was built without code-aware BM25 tokenization. " +
             "Run `lucerna clear` then `lucerna index` to enable identifier expansion.",
         );

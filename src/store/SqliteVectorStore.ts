@@ -9,6 +9,7 @@ import type {
   SearchOptions,
   SearchResult,
 } from "../types.js";
+import { log as libLog } from "../log.js";
 import { expandIdentifiers } from "./identifierExpansion.js";
 import type { VectorStore } from "./VectorStore.js";
 
@@ -71,7 +72,7 @@ export function configureBunSqlite(): string | null {
   // Diagnostics only make sense on macOS — that's the only platform where Bun
   // needs a non-system SQLite for sqlite-vec to work.
   const log = (msg: string) => {
-    if (isMac) console.log(`[lucerna] configureBunSqlite: ${msg}`);
+    if (isMac) libLog.info(`[lucerna] configureBunSqlite: ${msg}`);
   };
 
   if (!isBun) {
@@ -344,7 +345,7 @@ export class SqliteVectorStore implements VectorStore {
     // Model-change warning (same soft check as LanceDBStore)
     const meta = await this.readMeta();
     if (meta?.modelId && this.modelId && meta.modelId !== this.modelId) {
-      console.warn(
+      libLog.warn(
         `[lucerna] Embedding model changed: index was built with "${meta.modelId}" ` +
           `but the current model is "${this.modelId}". ` +
           `Search quality may be degraded. Run 'lucerna clear' then 'lucerna index' to rebuild.`,

@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.2.5
+
+### Patch Changes
+
+- [#104](https://github.com/upstart-gg/lucerna/pull/104) [`46c7b02`](https://github.com/upstart-gg/lucerna/commit/46c7b02f504f830d33d55de0e3b71dea0377e264) Thanks [@mattallty](https://github.com/mattallty)! - Add configure path
+
 ## 0.2.4
 
 ### Patch Changes

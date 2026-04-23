@@ -52,21 +52,54 @@ The catch: `setCustomSQLite` is a **once-per-process** switch that is sealed the
 error: This build of sqlite3 does not support dynamic extension loading
 ```
 
-**Fix:** at the very top of your host entry point, before any other import, call `configureBunSqlite()`:
-
-```ts
-import { configureBunSqlite } from '@upstart.gg/lucerna';
-configureBunSqlite();
-
-// ...the rest of your imports and code
-```
-
 This requires a Homebrew SQLite build on disk:
 
 ```bash
 brew install sqlite
 ```
 
+There are three ways to wire this up, in order of robustness:
+
+### 1. `bun --preload` (recommended)
+
+Create a preload script:
+
+```ts
+// preload.ts
+import { configureBunSqlite } from '@upstart.gg/lucerna';
+configureBunSqlite();
+```
+
+Launch your app with `--preload`:
+
+```bash
+bun --preload ./preload.ts src/server.ts
+```
+
+Preloads run to completion before your entry file's imports resolve, so this is immune to import-ordering issues.
+
+### 2. Side-effect subpath import
+
+```ts
+// server.ts — must be the FIRST import, above every other import
+import '@upstart.gg/lucerna/configure';
+import { Database } from 'bun:sqlite';       // safe now
+// …everything else
+```
+
+ESM evaluates imports in source order and runs each module's top-level code before moving on. Putting `@upstart.gg/lucerna/configure` first guarantees `setCustomSQLite` runs before any other module can open a `bun:sqlite` Database.
+
+### 3. Manual call
+
+```ts
+import { configureBunSqlite } from '@upstart.gg/lucerna';
+configureBunSqlite();
+```
+
+:::caution[ESM gotcha]
+This only works if **no other import** in the module's dependency graph touches `bun:sqlite` before `configureBunSqlite()` runs. ESM hoists all imports and evaluates them before any top-level statement, so "call it at the top of the file" doesn't mean what you think — a later `import './foo'` whose module opens a Database wins the race. Prefer options 1 or 2.
+:::
+
 `configureBunSqlite()` is a no-op on Node and on non-macOS platforms, so it's safe to call unconditionally. Set `LUCERNA_SQLITE_LIB=/path/to/libsqlite3.dylib` to override the default Homebrew paths.
 
-**Alternative:** run Lucerna in a Node subprocess instead. `better-sqlite3` (used under Node) bundles its own extension-capable SQLite, so none of this applies.
+**Alternative:** run Lucerna in a Node subprocess. `better-sqlite3` (used under Node) bundles its own extension-capable SQLite, so none of this applies.

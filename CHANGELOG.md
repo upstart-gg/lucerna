@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.2.4
+
+### Patch Changes
+
+- [#102](https://github.com/upstart-gg/lucerna/pull/102) [`444e66c`](https://github.com/upstart-gg/lucerna/commit/444e66c37db55f326b9a7c50e6b8ce25b595a723) Thanks [@mattallty](https://github.com/mattallty)! - add debug logs for sqlite & macos
+
 ## 0.2.3
 
 ### Patch Changes

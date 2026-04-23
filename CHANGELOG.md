@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.2.7
+
+### Patch Changes
+
+- [#108](https://github.com/upstart-gg/lucerna/pull/108) [`0037ecd`](https://github.com/upstart-gg/lucerna/commit/0037ecd8e9e493118d6394d885ea401108ebe658) Thanks [@mattallty](https://github.com/mattallty)! - fix json output
+
 ## 0.2.6
 
 ### Patch Changes

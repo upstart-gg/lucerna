@@ -79,7 +79,18 @@ async function loadDeps(): Promise<SqliteDeps> {
           const { existsSync } = await import("node:fs");
           const libPath = candidates.find((p) => existsSync(p));
           if (libPath) {
-            mod.Database.setCustomSQLite(libPath);
+            try {
+              mod.Database.setCustomSQLite(libPath);
+            } catch (err) {
+              // `setCustomSQLite` can only be called once per process, before
+              // any Database has been opened. When lucerna is embedded in a
+              // host program that has already touched `bun:sqlite`, this call
+              // throws. That's fine: either the host already pointed
+              // `bun:sqlite` at an extension-capable SQLite (in which case
+              // loadExtension below succeeds), or it didn't — in which case
+              // loadExtension will throw a clearer error than we could here.
+              if (!/already loaded/i.test((err as Error).message)) throw err;
+            }
           }
         }
         return {

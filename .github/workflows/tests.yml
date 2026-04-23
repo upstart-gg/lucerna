@@ -28,10 +28,14 @@ permissions:
 
 jobs:
   test:
-    name: Build, Lint, Typecheck & Test
-    runs-on: ubuntu-latest
+    name: Build, Lint, Typecheck & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     if: "github.event_name != 'push' ||
       !startsWith(github.event.head_commit.message, 'chore: version packages')"
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: pnpm/action-setup@v5.0.0
@@ -42,6 +46,11 @@ jobs:
         with:
           node-version: "22"
       - uses: oven-sh/setup-bun@v2.2.0
+      # sqlite-vec needs an extension-capable SQLite under Bun on macOS.
+      # Homebrew's sqlite formula provides it; Apple's system SQLite doesn't.
+      # The configureBunSqlite() tests require this on disk.
+      - if: runner.os == 'macOS'
+        run: brew install sqlite
       - run: pnpm install
       - run: pnpm build
       - run: pnpm ci:lint

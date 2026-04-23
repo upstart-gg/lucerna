@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type {
   ChunkType,
@@ -88,12 +89,9 @@ export function configureBunSqlite(): string | null {
     );
     return null;
   }
-  // biome-ignore lint/suspicious/noExplicitAny: bun:sqlite is only available under Bun
-  const req = (globalThis as any).require;
-  if (!req) {
-    log("no synchronous `require` available — cannot load bun:sqlite");
-    return null;
-  }
+  // `bun:sqlite` is a built-in module; Bun's createRequire resolves it.
+  // `globalThis.require` is not exposed in ESM under Bun, so we build one.
+  const req = createRequire(import.meta.url);
   const mod = req("bun:sqlite") as {
     Database: { setCustomSQLite: (path: string) => void };
   };

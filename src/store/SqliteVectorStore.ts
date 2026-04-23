@@ -591,7 +591,6 @@ export class SqliteVectorStore implements VectorStore {
       if (!matchesFilter(row, options)) continue;
       results.push({
         chunk: rowToChunk(row),
-        score: 1 - n.distance,
         matchType: "semantic" as const,
       });
       if (results.length >= limit) break;
@@ -636,17 +635,14 @@ export class SqliteVectorStore implements VectorStore {
 
     const chunksByRowid = this.fetchChunksByRowid(rows.map((r) => r.rowid));
     const results: SearchResult[] = [];
-    let idx = 0;
     for (const r of rows) {
       const row = chunksByRowid.get(r.rowid);
       if (!row) continue;
       if (!matchesFilter(row, options)) continue;
       results.push({
         chunk: rowToChunk(row),
-        score: 1 / (1 + idx),
         matchType: "lexical" as const,
       });
-      idx++;
       if (results.length >= limit) break;
     }
     return results;
@@ -887,6 +883,10 @@ function getStoredDimensions(db: Database): number | null {
  * Sanitise an arbitrary user query for FTS5 MATCH by quoting each whitespace-
  * separated token. Characters unsafe in FTS5 syntax (`"`, `*`, `:`) are stripped
  * inside the token.
+ *
+ * Tokens are joined with `OR` so a chunk matches if *any* keyword is present —
+ * matching the LanceDB/Tantivy backend's default union semantics. This keeps
+ * lexical behaviour consistent across backends.
  */
 function buildFtsQuery(raw: string): string {
   const tokens = raw
@@ -894,7 +894,7 @@ function buildFtsQuery(raw: string): string {
     .map((t) => t.replace(/["*:]/g, "").trim())
     .filter(Boolean);
   if (tokens.length === 0) return "";
-  return tokens.map((t) => `"${t}"`).join(" ");
+  return tokens.map((t) => `"${t}"`).join(" OR ");
 }
 
 function fuseRrf(
@@ -918,9 +918,5 @@ function fuseRrf(
   return [...scoreMap.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
-    .map(({ result, score }) => ({
-      ...result,
-      score,
-      matchType: "hybrid" as const,
-    }));
+    .map(({ result }) => ({ ...result, matchType: "hybrid" as const }));
 }

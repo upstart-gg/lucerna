@@ -118,7 +118,8 @@ export interface EmbeddingFunction {
  * relevance score per text (higher = more relevant). Used as a second-stage
  * re-scorer after RRF fusion to improve final result precision.
  *
- * Scores should be in the 0–1 range so they are compatible with `minScore`.
+ * Scores are used only for internal ordering and are not exposed on search
+ * results — callers should rely on the result order.
  */
 export interface RerankingFunction {
   /** Score each text against the query. Returns one score per input text, in the same order. */
@@ -129,10 +130,14 @@ export interface RerankingFunction {
 // Search
 // ---------------------------------------------------------------------------
 
+/**
+ * A single search hit. Results are always returned sorted by relevance
+ * (best first); the numeric score used for ordering is intentionally not
+ * exposed — it isn't comparable across search paths (semantic vs. lexical
+ * vs. hybrid vs. reranked). Use `matchType` to know which path produced it.
+ */
 export interface SearchResult {
   chunk: CodeChunk;
-  /** Normalised relevance score (higher = more relevant) */
-  score: number;
   matchType: "semantic" | "lexical" | "hybrid";
 }
 
@@ -150,8 +155,6 @@ export interface SearchOptions {
    * Defaults to true when an embedding function is configured.
    */
   hybrid?: boolean;
-  /** Minimum score threshold for results (0–1 range after normalisation) */
-  minScore?: number;
   /**
    * Whether to apply reranking after RRF fusion.
    * Defaults to true when a `rerankingFunction` is configured on the indexer.
@@ -334,12 +337,6 @@ export interface SearchWithContextOptions extends SearchOptions {
   graphDepth?: number;
   /** Which edge types to follow when expanding. Default: all */
   graphRelationTypes?: RelationshipType[];
-  /**
-   * Score multiplier applied to graph-expanded neighbour results.
-   * A value < 1 discounts neighbours relative to the directly-matched chunks.
-   * Default: 0.7
-   */
-  contextScoreDiscount?: number;
 }
 
 // ---------------------------------------------------------------------------

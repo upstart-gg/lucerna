@@ -260,7 +260,6 @@ export class LanceDBStore implements VectorStore {
     const results = await query.toArray();
     return results.map((row) => ({
       chunk: rowToChunk(row as ChunkRow),
-      score: 1 - ((row._distance as number) ?? 0), // convert L2 distance → similarity
       matchType: "semantic" as const,
     }));
   }
@@ -284,10 +283,8 @@ export class LanceDBStore implements VectorStore {
     }
 
     const results = await search.toArray();
-    return results.map((row, idx) => ({
+    return results.map((row) => ({
       chunk: rowToChunk(row as ChunkRow),
-      // BM25 scores are not normalised; use rank-based score
-      score: 1 / (1 + idx),
       matchType: "lexical" as const,
     }));
   }
@@ -323,9 +320,9 @@ export class LanceDBStore implements VectorStore {
     if (filter) q = q.where(filter);
 
     const results = await q.toArray();
+    // LanceDB returns results sorted by _relevance_score desc from RRFReranker.
     return results.map((row) => ({
       chunk: rowToChunk(row as ChunkRow),
-      score: (row._relevance_score as number) ?? (row._score as number) ?? 0,
       matchType: "hybrid" as const,
     }));
   }

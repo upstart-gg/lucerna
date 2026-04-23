@@ -718,10 +718,11 @@ export class CodeIndexer {
    *
    * Finds the top matching chunks via search, then expands each result by
    * traversing its graph neighbourhood (callers, callees, dependencies, etc.)
-   * and adds those neighbours to the result set with a discounted score.
+   * and appends those neighbours to the result list. Base search hits come
+   * first (in rank order); graph-expanded neighbours follow in traversal
+   * order. Duplicates are collapsed (first occurrence wins).
    *
    * Use `graphDepth` to control how many hops to follow (default: 1).
-   * Use `contextScoreDiscount` to control the neighbour score multiplier (default: 0.7).
    */
   async searchWithContext(
     query: string,
@@ -729,12 +730,7 @@ export class CodeIndexer {
   ): Promise<SearchResult[]> {
     this.assertInitialized();
 
-    const {
-      graphDepth = 1,
-      graphRelationTypes,
-      contextScoreDiscount = 0.7,
-      ...searchOpts
-    } = options;
+    const { graphDepth = 1, graphRelationTypes, ...searchOpts } = options;
     const limit = searchOpts.limit ?? 10;
 
     const baseResults = await this.searcher.search(query, {
@@ -765,18 +761,12 @@ export class CodeIndexer {
       );
       for (const { chunk } of neighbourhood.edges) {
         if (!expanded.has(chunk.id)) {
-          expanded.set(chunk.id, {
-            chunk,
-            score: result.score * contextScoreDiscount,
-            matchType: result.matchType,
-          });
+          expanded.set(chunk.id, { chunk, matchType: result.matchType });
         }
       }
     }
 
-    return [...expanded.values()]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    return [...expanded.values()].slice(0, limit);
   }
 
   // ---------------------------------------------------------------------------

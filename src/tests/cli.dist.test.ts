@@ -226,6 +226,25 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
     expect(Array.isArray(parsed)).toBe(true);
   });
 
+  test("search --format json returns [] when there are no results", () => {
+    const result = run([
+      "search",
+      "zzznonexistentqueryzzz_no_match_possible",
+      "--dir",
+      projectDir,
+      "--no-semantic",
+      "--storage-dir",
+      storageDir,
+      "--format",
+      "json",
+    ]);
+    expectSuccess(result);
+    // Empty result set must still produce valid JSON (not "No results found.").
+    const parsed = JSON.parse(result.stdout);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed.length).toBe(0);
+  });
+
   test("search --format pretty-json outputs valid JSON array", () => {
     const result = run([
       "search",

@@ -14,6 +14,10 @@ const DEFAULT_RRF_K = 45; // code retrieval is better served by ~45 than the doc
  *
  * When no embedding function is configured, falls back to lexical-only search.
  * When lexical search is unavailable, falls back to semantic-only.
+ *
+ * Results are always sorted by internal relevance score (best first); the
+ * score itself is not exposed on `SearchResult` because it is not comparable
+ * across search paths. Callers should rely on the result order.
  */
 export class Searcher {
   private readonly store: VectorStore;
@@ -36,13 +40,15 @@ export class Searcher {
   ): Promise<SearchResult[]> {
     const useHybrid = options.hybrid !== false && this.embeddingFn !== false;
 
+    let results: SearchResult[];
     if (useHybrid) {
-      return this.hybridSearch(query, options);
+      results = await this.hybridSearch(query, options);
     } else if (this.embeddingFn !== false) {
-      return this.searchSemantic(query, options);
+      results = await this.searchSemantic(query, options);
     } else {
-      return this.searchLexical(query, options);
+      results = await this.searchLexical(query, options);
     }
+    return dedupeById(results);
   }
 
   async searchSemantic(
@@ -61,7 +67,7 @@ export class Searcher {
       ...options,
       limit: limit * 2,
     });
-    return applyMinScore(results, options.minScore).slice(0, limit);
+    return results.slice(0, limit);
   }
 
   async searchLexical(
@@ -73,7 +79,7 @@ export class Searcher {
       ...options,
       limit: limit * 2,
     });
-    return applyMinScore(results, options.minScore).slice(0, limit);
+    return results.slice(0, limit);
   }
 
   private async hybridSearch(
@@ -108,10 +114,10 @@ export class Searcher {
         fused,
         this.rerankingFn as RerankingFunction,
       );
-      return applyMinScore(reranked, options.minScore).slice(0, limit);
+      return reranked.slice(0, limit);
     }
 
-    return applyMinScore(fused, options.minScore).slice(0, limit);
+    return fused.slice(0, limit);
   }
 
   private async fallbackTwoQuery(
@@ -163,19 +169,23 @@ function reciprocalRankFusion(
   return [...scoreMap.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
-    .map(({ result, score }) => ({
-      ...result,
-      score,
-      matchType: "hybrid" as const,
-    }));
+    .map(({ result }) => ({ ...result, matchType: "hybrid" as const }));
 }
 
-function applyMinScore(
-  results: SearchResult[],
-  minScore?: number,
-): SearchResult[] {
-  if (minScore === undefined) return results;
-  return results.filter((r) => r.score >= minScore);
+/**
+ * Keep the first occurrence of each chunk id. RRF already dedupes, but native
+ * backend paths (e.g. LanceDB hybrid) don't always — this is the single
+ * guarantee point callers can rely on.
+ */
+function dedupeById(results: SearchResult[]): SearchResult[] {
+  const seen = new Set<string>();
+  const out: SearchResult[] = [];
+  for (const r of results) {
+    if (seen.has(r.chunk.id)) continue;
+    seen.add(r.chunk.id);
+    out.push(r);
+  }
+  return out;
 }
 
 async function embedQueryVector(
@@ -194,7 +204,9 @@ async function applyReranking(
 ): Promise<SearchResult[]> {
   const texts = results.map((r) => r.chunk.contextContent);
   const scores = await rerankFn.rerank(query, texts);
+  // Score is used only for ordering and then stripped.
   return results
-    .map((result, i) => ({ ...result, score: scores[i] ?? 0 }))
-    .sort((a, b) => b.score - a.score);
+    .map((result, i) => ({ result, score: scores[i] ?? 0 }))
+    .sort((a, b) => b.score - a.score)
+    .map(({ result }) => result);
 }

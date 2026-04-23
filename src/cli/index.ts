@@ -182,7 +182,9 @@ program
       });
 
       if (results.length === 0) {
-        console.log("No results found.");
+        if (opts.format === "json") console.log("[]");
+        else if (opts.format === "pretty-json") console.log("[]");
+        else console.log("No results found.");
         return;
       }
 
@@ -283,7 +285,9 @@ program
       }
 
       if (chunks.length === 0) {
-        console.log("No related chunks found.");
+        if (opts.format === "json" || opts.format === "pretty-json")
+          console.log("[]");
+        else console.log("No related chunks found.");
         return;
       }
       if (opts.format === "json") {

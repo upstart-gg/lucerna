@@ -205,7 +205,6 @@ describe("LanceDBStore", () => {
     });
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]?.matchType).toBe("semantic");
-    expect(typeof results[0]?.score).toBe("number");
   });
 
   test("searchVector() respects the limit option", async () => {
@@ -352,7 +351,7 @@ describe("LanceDBStore", () => {
       expect(results).toEqual([]);
     });
 
-    test("returns results with matchType=hybrid and numeric score", async () => {
+    test("returns results tagged with matchType=hybrid", async () => {
       const chunks = [
         makeChunk("id1", "src/a.ts", "function authenticate(token: string) {}"),
         makeChunk("id2", "src/b.ts", "const PI = 3.14159"),
@@ -370,8 +369,6 @@ describe("LanceDBStore", () => {
       expect(results.length).toBeGreaterThan(0);
       for (const r of results) {
         expect(r.matchType).toBe("hybrid");
-        expect(typeof r.score).toBe("number");
-        expect(r.score).toBeGreaterThanOrEqual(0);
       }
     });
 

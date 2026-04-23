@@ -66,17 +66,54 @@ export function findCustomSqliteLib(): string | null {
 export function configureBunSqlite(): string | null {
   // biome-ignore lint/suspicious/noExplicitAny: runtime feature detection
   const isBun = typeof (globalThis as any).Bun !== "undefined";
-  if (!isBun) return null;
+  const isMac = process.platform === "darwin";
+  // Diagnostics only make sense on macOS — that's the only platform where Bun
+  // needs a non-system SQLite for sqlite-vec to work.
+  const log = (msg: string) => {
+    if (isMac) console.log(`[lucerna] configureBunSqlite: ${msg}`);
+  };
+
+  if (!isBun) {
+    log("not running under Bun — no-op (better-sqlite3 handles this on Node)");
+    return null;
+  }
+  if (!isMac) return null;
+
   const libPath = findCustomSqliteLib();
-  if (!libPath) return null;
+  if (!libPath) {
+    log(
+      "no extension-capable SQLite dylib found. Checked LUCERNA_SQLITE_LIB, " +
+        "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib, /usr/local/opt/sqlite/lib/libsqlite3.dylib. " +
+        "Install one with: brew install sqlite",
+    );
+    return null;
+  }
   // biome-ignore lint/suspicious/noExplicitAny: bun:sqlite is only available under Bun
   const req = (globalThis as any).require;
-  if (!req) return null;
+  if (!req) {
+    log("no synchronous `require` available — cannot load bun:sqlite");
+    return null;
+  }
   const mod = req("bun:sqlite") as {
     Database: { setCustomSQLite: (path: string) => void };
   };
-  mod.Database.setCustomSQLite(libPath);
-  return libPath;
+  try {
+    mod.Database.setCustomSQLite(libPath);
+    log(`pointed bun:sqlite at ${libPath}`);
+    return libPath;
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (/already loaded/i.test(msg)) {
+      log(
+        `setCustomSQLite failed because bun:sqlite was already loaded. ` +
+          `Call configureBunSqlite() earlier — before any other import that opens a bun:sqlite Database. ` +
+          `Intended dylib: ${libPath}`,
+      );
+      return null;
+    }
+    log(`setCustomSQLite(${libPath}) threw: ${msg}`);
+    throw err;
+  }
 }
 
 async function getVecLoadablePath(): Promise<string> {

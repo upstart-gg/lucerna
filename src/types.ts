@@ -235,16 +235,20 @@ export interface CodeIndexOptions {
   exclude?: string[];
   /**
    * The embedding function to use for semantic search.
-   *   - `undefined` (default): semantic search disabled (no embedder configured)
-   *   - `false`: disable semantic search entirely (lexical/BM25 only)
-   *   - An `EmbeddingFunction` instance: use the provided embedder
+   *   - `undefined` (default): auto-load from `lucerna.config.ts` at / above
+   *     `projectRoot`. If no config is found, behaves like `false`.
+   *   - `false`: explicitly disable semantic search (lexical / BM25 only).
+   *     On a fresh storage dir, no vector table is created.
+   *   - An `EmbeddingFunction` instance: use the provided embedder verbatim,
+   *     bypassing any config file.
    */
   embeddingFunction?: EmbeddingFunction | false;
   /**
    * The reranking function to apply as a second stage after RRF fusion.
-   *   - `undefined` (default): no reranking
-   *   - `false`: explicitly disable reranking
-   *   - A `RerankingFunction` instance: re-score and re-sort the top candidates
+   *   - `undefined` (default): auto-load from `lucerna.config.ts` if present,
+   *     otherwise no reranking.
+   *   - `false`: explicitly disable reranking, skipping config lookup.
+   *   - A `RerankingFunction` instance: re-score and re-sort the top candidates.
    */
   rerankingFunction?: RerankingFunction | false;
   /**

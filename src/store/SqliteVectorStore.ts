@@ -235,8 +235,13 @@ async function loadDeps(): Promise<SqliteDeps> {
 export interface SqliteVectorStoreOptions {
   /** Base directory under which `sqlite/lucerna.db` is created. */
   storageDir: string;
-  /** Dimensionality of the embedding vectors. */
-  dimensions: number;
+  /**
+   * Dimensionality of the embedding vectors. Omit for lexical-only operation
+   * on a fresh index — the `vec_chunks` virtual table will not be created,
+   * and `upsert` will skip vector inserts. If an existing index is found,
+   * the stored dimension is adopted transparently.
+   */
+  dimensions?: number | undefined;
   /** Optional model identifier — persisted to index-meta.json. */
   modelId?: string | undefined;
 }
@@ -270,15 +275,22 @@ interface ChunkRow {
 export class SqliteVectorStore implements VectorStore {
   private readonly dbPath: string;
   private readonly metaFilePath: string;
-  private readonly dimensions: number;
+  /**
+   * Effective vector dim. `undefined` means: no embedder configured AND no
+   * pre-existing index — skip `vec_chunks` creation and skip vector inserts.
+   * If an existing `vec_chunks` is found on init, its dim is adopted here.
+   */
+  private dimensions: number | undefined;
   private readonly modelId: string | undefined;
   private db: Database | null = null;
   private searchContentAvailable = true;
   private stmts: {
     insertChunk: Statement;
     deleteChunkById: Statement;
-    deleteVecByRowid: Statement;
-    insertVec: Statement;
+    /** Null when `vec_chunks` was not created (no embedder, fresh index). */
+    deleteVecByRowid: Statement | null;
+    /** Null when `vec_chunks` was not created (no embedder, fresh index). */
+    insertVec: Statement | null;
     rowidById: Statement;
     getById: Statement;
     getByFile: Statement;
@@ -308,15 +320,21 @@ export class SqliteVectorStore implements VectorStore {
     const db = open(this.dbPath);
     load(db);
 
-    // Existing index? Validate dimensions.
+    // Existing index? Validate dimensions (or adopt them when we have none).
     const existingDim = getStoredDimensions(db);
-    if (existingDim !== null && existingDim !== this.dimensions) {
-      db.close();
-      throw new Error(
-        `Embedding dimension mismatch: the index was built with ${existingDim}-dimensional vectors ` +
-          `but the current model produces ${this.dimensions}-dimensional vectors. ` +
-          `Run 'lucerna clear' then 'lucerna index' to rebuild the index with the new model.`,
-      );
+    if (existingDim !== null) {
+      if (this.dimensions === undefined) {
+        // Lexical-only session opening an index built by a prior semantic run —
+        // adopt the stored dim so searchVector / schema references line up.
+        this.dimensions = existingDim;
+      } else if (existingDim !== this.dimensions) {
+        db.close();
+        throw new Error(
+          `Embedding dimension mismatch: the index was built with ${existingDim}-dimensional vectors ` +
+            `but the current model produces ${this.dimensions}-dimensional vectors. ` +
+            `Run 'lucerna clear' then 'lucerna index' to rebuild the index with the new model.`,
+        );
+      }
     }
 
     this.createSchema(db);
@@ -332,8 +350,8 @@ export class SqliteVectorStore implements VectorStore {
           `Search quality may be degraded. Run 'lucerna clear' then 'lucerna index' to rebuild.`,
       );
     }
-    if (existingDim === null) {
-      // Fresh index — write meta
+    if (existingDim === null && this.dimensions !== undefined) {
+      // Fresh index with a real embedder — persist dim/model for later runs.
       await this.writeMeta();
     }
   }
@@ -372,12 +390,14 @@ export class SqliteVectorStore implements VectorStore {
       CREATE INDEX IF NOT EXISTS idx_edges_srcFile ON edges(sourceFilePath);
     `);
 
-    db.exec(
-      `CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-         chunk_rowid INTEGER PRIMARY KEY,
-         embedding FLOAT[${this.dimensions}]
-       );`,
-    );
+    if (this.dimensions !== undefined) {
+      db.exec(
+        `CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
+           chunk_rowid INTEGER PRIMARY KEY,
+           embedding FLOAT[${this.dimensions}]
+         );`,
+      );
+    }
 
     db.exec(
       `CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
@@ -408,12 +428,16 @@ export class SqliteVectorStore implements VectorStore {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ),
       deleteChunkById: db.prepare("DELETE FROM chunks WHERE id = ?"),
-      deleteVecByRowid: db.prepare(
-        "DELETE FROM vec_chunks WHERE chunk_rowid = ?",
-      ),
-      insertVec: db.prepare(
-        "INSERT INTO vec_chunks (chunk_rowid, embedding) VALUES (?, ?)",
-      ),
+      deleteVecByRowid:
+        this.dimensions !== undefined
+          ? db.prepare("DELETE FROM vec_chunks WHERE chunk_rowid = ?")
+          : null,
+      insertVec:
+        this.dimensions !== undefined
+          ? db.prepare(
+              "INSERT INTO vec_chunks (chunk_rowid, embedding) VALUES (?, ?)",
+            )
+          : null,
       rowidById: db.prepare("SELECT rowid FROM chunks WHERE id = ?"),
       getById: db.prepare("SELECT * FROM chunks WHERE id = ?"),
       getByFile: db.prepare(
@@ -455,7 +479,7 @@ export class SqliteVectorStore implements VectorStore {
             // sqlite-vec's vec0 virtual table rejects any value not bound as
             // SQLITE_INTEGER — and better-sqlite3 binds plain JS numbers as
             // SQLITE_FLOAT. Pass a BigInt to force the integer affinity.
-            stmts.deleteVecByRowid.run(BigInt(existing.rowid));
+            stmts.deleteVecByRowid?.run(BigInt(existing.rowid));
             stmts.deleteChunkById.run(chunk.id);
           }
 
@@ -476,18 +500,27 @@ export class SqliteVectorStore implements VectorStore {
             ),
           );
 
-          const vec =
-            Array.isArray(vector) && vector.length === dims
-              ? vector
-              : new Array(dims).fill(0);
-          stmts.insertVec.run(BigInt(info.lastInsertRowid), toFloat32Blob(vec));
+          // Only insert vectors when the vec table exists. Lexical-only
+          // sessions (no embedder, fresh index) leave vec_chunks absent.
+          if (stmts.insertVec !== null && dims !== undefined) {
+            const vec =
+              Array.isArray(vector) && vector.length === dims
+                ? vector
+                : new Array(dims).fill(0);
+            stmts.insertVec.run(
+              BigInt(info.lastInsertRowid),
+              toFloat32Blob(vec),
+            );
+          }
         }
       },
     );
     doUpsert(chunks.map((chunk, i) => ({ chunk, vector: vectors[i] ?? [] })));
 
-    const meta = await this.readMeta();
-    if (!meta) await this.writeMeta();
+    if (this.dimensions !== undefined) {
+      const meta = await this.readMeta();
+      if (!meta) await this.writeMeta();
+    }
   }
 
   async delete(ids: string[]): Promise<void> {
@@ -497,7 +530,7 @@ export class SqliteVectorStore implements VectorStore {
       for (const id of batch) {
         const row = stmts.rowidById.get(id) as { rowid: number } | undefined;
         if (row) {
-          stmts.deleteVecByRowid.run(BigInt(row.rowid));
+          stmts.deleteVecByRowid?.run(BigInt(row.rowid));
           stmts.deleteChunkById.run(id);
         }
       }
@@ -514,7 +547,7 @@ export class SqliteVectorStore implements VectorStore {
     const stmts = this.stmts;
     if (!stmts) return;
     const run = this.db.transaction((batch: Array<{ rowid: number }>) => {
-      for (const r of batch) stmts.deleteVecByRowid.run(BigInt(r.rowid));
+      for (const r of batch) stmts.deleteVecByRowid?.run(BigInt(r.rowid));
       this.db?.prepare("DELETE FROM chunks WHERE filePath = ?").run(filePath);
     });
     run(rows);
@@ -525,6 +558,8 @@ export class SqliteVectorStore implements VectorStore {
     options: SearchOptions,
   ): Promise<SearchResult[]> {
     if (!this.db) throw new Error("SqliteVectorStore not initialized");
+    // No vec table → no semantic results. Searcher falls back to lexical.
+    if (this.dimensions === undefined) return [];
     const limit = options.limit ?? 20;
     const hasFilter =
       options.language !== undefined ||
@@ -774,6 +809,7 @@ export class SqliteVectorStore implements VectorStore {
   }
 
   private async writeMeta(): Promise<void> {
+    if (this.dimensions === undefined) return; // nothing to persist yet
     try {
       await writeFile(
         this.metaFilePath,

@@ -208,6 +208,77 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
     }
   });
 
+  // ---------------------------------------------------------------------
+  // Regression: `--dir <path>` with no pre-existing config must write the
+  // auto-generated lucerna.config.ts to <path>, NOT to cwd. Prior behavior
+  // dropped it in cwd where loadConfig(projectRoot) could never find it.
+  // ---------------------------------------------------------------------
+  test("index --dir <fresh-dir> writes default config into --dir (not cwd)", async () => {
+    const freshProject = join(tmpDir, "fresh-project-config-regress");
+    await mkdir(freshProject, { recursive: true });
+    await writeFile(join(freshProject, "x.ts"), `export const x = 1;\n`);
+    const freshStorage = join(tmpDir, "fresh-storage-config-regress");
+
+    // Deliberately run from a DIFFERENT cwd so we can assert the config
+    // lands in freshProject (the --dir), not cwd.
+    const { existsSync } = await import("node:fs");
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      const result = run([
+        "index",
+        "--dir",
+        freshProject,
+        "--no-semantic",
+        "--storage-dir",
+        freshStorage,
+      ]);
+      expectSuccess(result);
+      expect(existsSync(join(freshProject, "lucerna.config.ts"))).toBe(true);
+      // And pointedly NOT in cwd.
+      expect(existsSync(join(tmpDir, "lucerna.config.ts"))).toBe(false);
+    } finally {
+      process.chdir(origCwd);
+    }
+  });
+
+  test("mcp-server --dir <fresh-dir> writes default config into --dir (not cwd)", async () => {
+    const freshProject = join(tmpDir, "fresh-mcp-config-regress");
+    await mkdir(freshProject, { recursive: true });
+    const freshStorage = join(tmpDir, "fresh-mcp-storage-regress");
+
+    const { existsSync } = await import("node:fs");
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      // MCP listens on stdio — spawn, give it a moment to run the config
+      // resolution code path, then kill. The config file write happens
+      // synchronously-early in startMcpServer().
+      const proc = Bun.spawn(
+        [
+          "node",
+          CLI,
+          "mcp-server",
+          "--dir",
+          freshProject,
+          "--no-semantic",
+          "--storage-dir",
+          freshStorage,
+        ],
+        { stdout: "pipe", stderr: "pipe", stdin: "pipe" },
+      );
+      // Wait for startMcpServer's loadConfig + createDefaultConfig to run.
+      // 800ms is comfortably above the config-write latency on a dev machine.
+      await new Promise((r) => setTimeout(r, 800));
+      proc.kill("SIGKILL");
+
+      expect(existsSync(join(freshProject, "lucerna.config.ts"))).toBe(true);
+      expect(existsSync(join(tmpDir, "lucerna.config.ts"))).toBe(false);
+    } finally {
+      process.chdir(origCwd);
+    }
+  });
+
   test("clear command removes the index", () => {
     const clearStorage = join(tmpDir, "storage-to-clear");
     // First index into a fresh storage dir

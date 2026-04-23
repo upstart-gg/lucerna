@@ -287,7 +287,10 @@ export async function startMcpServer(
   const { config: cfg, configDir } = await loadConfig(resolvedRoot);
 
   if (configDir === null) {
-    await createDefaultConfig(process.cwd());
+    // Write to the resolved project root (i.e. `--dir` when supplied, else
+    // cwd). Writing to cwd would leave the generated config invisible to
+    // loadConfig(resolvedRoot) on the next run.
+    await createDefaultConfig(resolvedRoot);
   }
 
   // Embedding: --no-semantic > config file

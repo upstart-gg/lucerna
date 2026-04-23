@@ -4,6 +4,11 @@ import { dirname, join, relative, resolve } from "node:path";
 import fastGlob from "fast-glob";
 import { TreeSitterChunker } from "./chunker/index.js";
 
+import {
+  loadConfig,
+  resolveEmbeddingConfig,
+  resolveRerankingConfig,
+} from "./config.js";
 import { IndexLock } from "./IndexLock.js";
 import { GraphTraverser } from "./graph/GraphTraverser.js";
 import { SymbolResolver } from "./graph/SymbolResolver.js";
@@ -205,8 +210,11 @@ export class CodeIndexer {
   private readonly storageDir: string;
   private readonly include: string[];
   private readonly exclude: string[];
-  private readonly embeddingFn: EmbeddingFunction | false;
-  private readonly rerankingFn: RerankingFunction | false;
+  private embeddingFn: EmbeddingFunction | false;
+  private rerankingFn: RerankingFunction | false;
+  /** Distinguishes an explicit opt-out (`false`) from "not provided" (`undefined`). */
+  private readonly embedderExplicitlyDisabled: boolean;
+  private readonly rerankerExplicitlyDisabled: boolean;
   private readonly options: CodeIndexOptions;
 
   private chunker!: TreeSitterChunker;
@@ -267,20 +275,21 @@ export class CodeIndexer {
       this.exclude.push(...options.exclude);
     }
 
-    // Resolve embedding function — no default; must be configured explicitly
-    this.embeddingFn =
-      options.embeddingFunction === false || !options.embeddingFunction
-        ? false
-        : options.embeddingFunction;
+    // Resolve embedding function.
+    //   - explicit `false` → lexical-only, never auto-load
+    //   - an EmbeddingFunction instance → use it directly
+    //   - undefined → leave as `false` for now; initialize() will auto-load
+    //     from `lucerna.config.ts` if one exists under projectRoot.
+    this.embedderExplicitlyDisabled = options.embeddingFunction === false;
+    this.embeddingFn = options.embeddingFunction
+      ? options.embeddingFunction
+      : false;
 
-    // Resolve reranking function
-    if (options.rerankingFunction === false) {
-      this.rerankingFn = false;
-    } else if (options.rerankingFunction) {
-      this.rerankingFn = options.rerankingFunction;
-    } else {
-      this.rerankingFn = false;
-    }
+    // Resolve reranking function (same tri-state semantics).
+    this.rerankerExplicitlyDisabled = options.rerankingFunction === false;
+    this.rerankingFn = options.rerankingFunction
+      ? options.rerankingFunction
+      : false;
   }
 
   /**
@@ -298,6 +307,29 @@ export class CodeIndexer {
     process.stderr.write(
       `[lucerna] ${this._isLeader ? "Leader" : "Follower"} (PID ${process.pid})\n`,
     );
+
+    // Auto-load `lucerna.config.ts` when the caller didn't pass an explicit
+    // embedding/reranking function. This keeps programmatic usage aligned
+    // with CLI / MCP: any of the three entry points sees the same config.
+    // Explicit `false` (lexical-only) is respected and never triggers a load.
+    if (
+      this.options.embeddingFunction === undefined &&
+      !this.embedderExplicitlyDisabled
+    ) {
+      const { config: cfg } = await loadConfig(this.projectRoot);
+      if (cfg.embedding !== undefined) {
+        const resolved = await resolveEmbeddingConfig(cfg.embedding);
+        if (resolved) this.embeddingFn = resolved;
+      }
+      if (
+        this.options.rerankingFunction === undefined &&
+        !this.rerankerExplicitlyDisabled &&
+        cfg.reranking !== undefined
+      ) {
+        const resolvedR = await resolveRerankingConfig(cfg.reranking);
+        if (resolvedR) this.rerankingFn = resolvedR;
+      }
+    }
 
     // Auto-clear stale index when the embedding model or dimensions change.
     // Skipped when no embedding function is configured (e.g. `stats --no-semantic`):
@@ -353,12 +385,14 @@ export class CodeIndexer {
 
     // When no embedding function is configured, reuse the existing index's
     // dims/model so read-only commands (stats, lexical search) can open a
-    // store built by a prior semantic run. Fall back to 384 only when there
-    // is no existing index at all.
+    // store built by a prior semantic run. When neither an embedder nor a
+    // pre-existing index is present, `dimensions` is left undefined — the
+    // store will skip creating its vector table entirely, which is what
+    // we want for a lexical-only session on a fresh dir.
     const dimensions =
       this.embeddingFn !== false
         ? this.embeddingFn.dimensions
-        : (existingMeta?.dimensions ?? 384);
+        : existingMeta?.dimensions;
     const modelId =
       this.embeddingFn !== false
         ? this.embeddingFn.modelId
@@ -367,7 +401,7 @@ export class CodeIndexer {
     const bundle = await createStoreBundle({
       backend: this.options.vectorStore ?? "sqlite",
       storageDir: this.storageDir,
-      dimensions,
+      ...(dimensions !== undefined ? { dimensions } : {}),
       modelId,
     });
     this.store = bundle.vectorStore;

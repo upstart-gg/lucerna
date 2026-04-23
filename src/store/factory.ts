@@ -6,7 +6,12 @@ export type VectorStoreBackend = "lancedb" | "sqlite";
 export interface CreateStoreBundleOptions {
   backend: VectorStoreBackend;
   storageDir: string;
-  dimensions: number;
+  /**
+   * Embedding vector dimension. Omit when no embedder is configured and no
+   * pre-existing index is present — the store will skip creating its vector
+   * table, enabling lexical-only operation on a fresh storage dir.
+   */
+  dimensions?: number | undefined;
   modelId?: string | undefined;
 }
 
@@ -29,7 +34,7 @@ export async function createStoreBundle(
     const { SqliteGraphStore } = await import("./SqliteGraphStore.js");
     const vectorStore = new SqliteVectorStore({
       storageDir: opts.storageDir,
-      dimensions: opts.dimensions,
+      ...(opts.dimensions !== undefined ? { dimensions: opts.dimensions } : {}),
       modelId: opts.modelId,
     });
     await vectorStore.initialize();
@@ -42,7 +47,7 @@ export async function createStoreBundle(
   const { GraphStore } = await import("./GraphStore.js");
   const vectorStore = new LanceDBStore({
     storageDir: opts.storageDir,
-    dimensions: opts.dimensions,
+    ...(opts.dimensions !== undefined ? { dimensions: opts.dimensions } : {}),
     modelId: opts.modelId,
   });
   await vectorStore.initialize();

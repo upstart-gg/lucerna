@@ -299,9 +299,9 @@ describe("CodeIndexer — semantic search", () => {
   });
 
   test("initialize with embeddingFunction: false preserves an existing semantic index", async () => {
-    // Regression: `stats --no-semantic` after `index` used to wipe the index
-    // because the dim-change check defaulted to 384 when no embedder was
-    // configured, mismatching any non-384 index.
+    // Regression: `stats --no-semantic` after `index` must not clobber dim/model
+    // metadata written by a prior semantic run. A lexical-only opener now
+    // adopts the stored dim instead of guessing one.
     const semanticIndexer = new CodeIndexer({
       projectRoot,
       storageDir,

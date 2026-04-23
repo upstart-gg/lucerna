@@ -58,8 +58,13 @@ const DEFAULT_RRF_K = 45; // tuned for code retrieval (doc-IR default is 60)
 export interface LanceDBStoreOptions {
   /** Directory where the LanceDB files are stored */
   storageDir: string;
-  /** Dimensionality of the embedding vectors */
-  dimensions: number;
+  /**
+   * Dimensionality of the embedding vectors. Omit for lexical-only operation
+   * on a fresh index — the "chunks" table won't be created, and upsert will
+   * skip vector writes. If an existing index is found, the stored dim is
+   * adopted transparently.
+   */
+  dimensions?: number | undefined;
   /** Optional model identifier — persisted to index-meta.json to detect model changes on re-open */
   modelId?: string | undefined;
 }
@@ -74,7 +79,12 @@ export interface LanceDBStoreOptions {
 export class LanceDBStore implements VectorStore {
   private readonly storageDir: string;
   private readonly metaFilePath: string;
-  private readonly dimensions: number;
+  /**
+   * Effective vector dim. `undefined` means: no embedder configured AND no
+   * pre-existing index — skip table creation and skip vector writes. If an
+   * existing index is opened, its stored dim is adopted here.
+   */
+  private dimensions: number | undefined;
   private readonly modelId: string | undefined;
   private db: Connection | null = null;
   private table: Table | null = null;
@@ -103,12 +113,18 @@ export class LanceDBStore implements VectorStore {
       // search results would be garbage and upserts would fail at the LanceDB
       // level with an unhelpful schema error.
       const storedDim = await this.getStoredDimensions();
-      if (storedDim !== null && storedDim !== this.dimensions) {
-        throw new Error(
-          `Embedding dimension mismatch: the index was built with ${storedDim}-dimensional vectors ` +
-            `but the current model produces ${this.dimensions}-dimensional vectors. ` +
-            `Run 'lucerna clear' then 'lucerna index' to rebuild the index with the new model.`,
-        );
+      if (storedDim !== null) {
+        if (this.dimensions === undefined) {
+          // Lexical-only session opening an index built by a prior semantic
+          // run — adopt the stored dim so searches line up.
+          this.dimensions = storedDim;
+        } else if (storedDim !== this.dimensions) {
+          throw new Error(
+            `Embedding dimension mismatch: the index was built with ${storedDim}-dimensional vectors ` +
+              `but the current model produces ${this.dimensions}-dimensional vectors. ` +
+              `Run 'lucerna clear' then 'lucerna index' to rebuild the index with the new model.`,
+          );
+        }
       }
       // Warn if the model identifier changed (soft check — dimensions may still match
       // if two models happen to share the same output size, but embeddings are incompatible)
@@ -131,7 +147,7 @@ export class LanceDBStore implements VectorStore {
             "Run `lucerna clear` then `lucerna index` to enable identifier expansion.",
         );
       }
-    } else {
+    } else if (this.dimensions !== undefined) {
       // Create table with an empty schema row, then delete it
       const emptyRow: ChunkRow = {
         id: "__init__",
@@ -152,11 +168,28 @@ export class LanceDBStore implements VectorStore {
       await this.table.delete('id = "__init__"');
       await this.writeMeta();
     }
+    // else: no embedder AND no existing index — leave this.table null. All
+    // read/write methods short-circuit when the table is absent, so lexical
+    // search on an empty store returns [] (the Searcher handles that fine).
   }
 
   async upsert(chunks: CodeChunk[], vectors: number[][]): Promise<void> {
-    if (!this.table) throw new Error("LanceDBStore not initialized");
+    if (!this.table) {
+      // No chunks table means no embedder was configured AND no prior index
+      // existed. LanceDB's schema requires a vector column with a known dim,
+      // so we can't lazily create the table without one. Surface this as a
+      // clear actionable error rather than a cryptic "not initialized".
+      throw new Error(
+        "LanceDBStore: cannot index without an embedder. Configure `embedding` in lucerna.config.ts " +
+          "or switch to the sqlite backend which supports lexical-only operation on fresh stores.",
+      );
+    }
     if (chunks.length === 0) return;
+    if (this.dimensions === undefined) {
+      // Shouldn't reach here — initialize() adopts storedDim when table exists.
+      throw new Error("LanceDBStore: dimension not resolved before upsert");
+    }
+    const dims = this.dimensions;
 
     // Delete existing rows for these IDs first (upsert = delete + insert)
     const ids = chunks.map((c) => sqlStr(c.id)).join(", ");
@@ -174,7 +207,7 @@ export class LanceDBStore implements VectorStore {
       startLine: chunk.startLine,
       endLine: chunk.endLine,
       metadata: JSON.stringify(chunk.metadata),
-      vector: vectors[i] ?? new Array(this.dimensions).fill(0),
+      vector: vectors[i] ?? new Array(dims).fill(0),
       searchContent: expandIdentifiers(
         chunk.name ? `${chunk.content} ${chunk.name}` : chunk.content,
       ),
@@ -210,7 +243,8 @@ export class LanceDBStore implements VectorStore {
     queryVector: number[],
     options: SearchOptions,
   ): Promise<SearchResult[]> {
-    if (!this.table) throw new Error("LanceDBStore not initialized");
+    // Empty store (no embedder + no prior index) — no semantic results.
+    if (!this.table) return [];
 
     await this.ensureVectorIndex();
 
@@ -234,7 +268,7 @@ export class LanceDBStore implements VectorStore {
     query: string,
     options: SearchOptions,
   ): Promise<SearchResult[]> {
-    if (!this.table) throw new Error("LanceDBStore not initialized");
+    if (!this.table) return [];
 
     await this.ensureFtsIndex();
 
@@ -262,7 +296,7 @@ export class LanceDBStore implements VectorStore {
     query: string,
     options: SearchOptions,
   ): Promise<SearchResult[]> {
-    if (!this.table) throw new Error("LanceDBStore not initialized");
+    if (!this.table) return [];
 
     await Promise.all([this.ensureVectorIndex(), this.ensureFtsIndex()]);
 
@@ -455,6 +489,7 @@ export class LanceDBStore implements VectorStore {
   }
 
   private async writeMeta(): Promise<void> {
+    if (this.dimensions === undefined) return; // nothing to persist yet
     try {
       await writeFile(
         this.metaFilePath,

@@ -536,7 +536,10 @@ async function buildIndexer(
   const { config: cfg, configDir } = await loadConfig(projectRoot);
 
   if (createConfigIfMissing && configDir === null) {
-    await createDefaultConfig(process.cwd());
+    // Write to projectRoot (i.e. `--dir` when supplied, else cwd). Previously
+    // this unconditionally wrote to cwd, so `--dir /other/path` left the
+    // generated config somewhere loadConfig(projectRoot) could never find.
+    await createDefaultConfig(projectRoot);
   }
 
   // Embedding: --no-semantic > config file

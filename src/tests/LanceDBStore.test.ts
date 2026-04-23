@@ -270,22 +270,22 @@ describe("LanceDBStore", () => {
     }
   });
 
-  test("searchVector() throws when not initialized", async () => {
+  test("searchVector() returns [] when the table is absent (empty store)", async () => {
+    // Previously this threw "not initialized". After making the vector table
+    // optional (skipped entirely when no embedder and no prior index), an
+    // un-initialized store is indistinguishable from an empty one and should
+    // silently return no results — the Searcher falls back to lexical.
     const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
-    await expect(raw.searchVector(makeVector(DIMS), {})).rejects.toThrow(
-      "not initialized",
-    );
+    await expect(raw.searchVector(makeVector(DIMS), {})).resolves.toEqual([]);
   });
 
   // -------------------------------------------------------------------------
   // searchText()
   // -------------------------------------------------------------------------
 
-  test("searchText() throws when not initialized", async () => {
+  test("searchText() returns [] when the table is absent (empty store)", async () => {
     const raw = new LanceDBStore({ storageDir: tmpDir, dimensions: DIMS });
-    await expect(raw.searchText("hello", {})).rejects.toThrow(
-      "not initialized",
-    );
+    await expect(raw.searchText("hello", {})).resolves.toEqual([]);
   });
 
   // -------------------------------------------------------------------------

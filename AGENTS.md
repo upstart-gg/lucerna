@@ -51,6 +51,8 @@ bun run dev search /path/to/project "my query"
 | Duplicating `hashEdgeId` | Import from `src/graph/types.ts` |
 | Adding language dispatch in two places | Only in `chunkSourceInternal()` |
 | `require()` in ESM module | Use `import` + `(pkg as any).missingExport` |
+| Assuming `embeddingFunction: undefined` ≡ `false` in `new CodeIndexer` | `undefined` auto-loads `lucerna.config.ts` from `projectRoot`; `false` opts out |
+| Writing `createDefaultConfig(process.cwd())` | Pass `projectRoot` — cwd is decoupled from `--dir` |
 
 
 ---

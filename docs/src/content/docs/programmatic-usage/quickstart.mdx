@@ -41,3 +41,32 @@ for (const r of results) {
 
 await indexer.close();
 ```
+
+## Running under Bun on macOS
+
+Lucerna's SQLite backend uses the [sqlite-vec](https://github.com/asg017/sqlite-vec) extension. On macOS, Apple's system SQLite is compiled **without** dynamic extension loading, which breaks `sqlite-vec`. Under Bun, Lucerna works around this by pointing `bun:sqlite` at a Homebrew-installed SQLite via `Database.setCustomSQLite()`.
+
+The catch: `setCustomSQLite` is a **once-per-process** switch that is sealed the moment any `bun:sqlite` Database is opened anywhere in the process. If your host program (or any dependency) opens a `bun:sqlite` Database before Lucerna initializes, Lucerna can't win that race — and you'll see:
+
+```
+error: This build of sqlite3 does not support dynamic extension loading
+```
+
+**Fix:** at the very top of your host entry point, before any other import, call `configureBunSqlite()`:
+
+```ts
+import { configureBunSqlite } from '@upstart.gg/lucerna';
+configureBunSqlite();
+
+// ...the rest of your imports and code
+```
+
+This requires a Homebrew SQLite build on disk:
+
+```bash
+brew install sqlite
+```
+
+`configureBunSqlite()` is a no-op on Node and on non-macOS platforms, so it's safe to call unconditionally. Set `LUCERNA_SQLITE_LIB=/path/to/libsqlite3.dylib` to override the default Homebrew paths.
+
+**Alternative:** run Lucerna in a Node subprocess instead. `better-sqlite3` (used under Node) bundles its own extension-capable SQLite, so none of this applies.

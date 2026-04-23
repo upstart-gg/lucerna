@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.2.3
+
+### Patch Changes
+
+- [#100](https://github.com/upstart-gg/lucerna/pull/100) [`ac9dec6`](https://github.com/upstart-gg/lucerna/commit/ac9dec640dfbe379ffaa19d32784e0f05a0853bd) Thanks [@mattallty](https://github.com/mattallty)! - enhance SqliteVectorStore with custom SQLite configuration for macOS
+
 ## 0.2.2
 
 ### Patch Changes

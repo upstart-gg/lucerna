@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
@@ -34,6 +35,50 @@ interface SqliteDeps {
  * `sqlite-vec`'s own `load()` helper is bypassed because some drivers (e.g.
  * `bun:sqlite`) accept only a plain path string and not a full call helper.
  */
+/**
+ * Finds an extension-capable SQLite dylib on macOS. Checks
+ * `LUCERNA_SQLITE_LIB`, then the standard Homebrew paths. Returns `null` on
+ * other platforms, or if nothing is found.
+ */
+export function findCustomSqliteLib(): string | null {
+  if (process.platform !== "darwin") return null;
+  const candidates = [
+    process.env.LUCERNA_SQLITE_LIB,
+    "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib",
+    "/usr/local/opt/sqlite/lib/libsqlite3.dylib",
+  ].filter((p): p is string => typeof p === "string" && p.length > 0);
+  return candidates.find((p) => existsSync(p)) ?? null;
+}
+
+/**
+ * Points `bun:sqlite` at an extension-capable SQLite dylib on macOS. Must be
+ * called at the very top of a Bun program — before any other import opens a
+ * `bun:sqlite` Database — because Bun's `setCustomSQLite` is a once-per-process
+ * switch that is sealed the moment any Database is opened.
+ *
+ * When lucerna is used as a library inside a host program, the host must call
+ * this itself (or wire up the dylib some other way); lucerna cannot win the
+ * race from inside its own initialization.
+ *
+ * No-op on non-macOS platforms and on non-Bun runtimes. Returns the path used,
+ * or `null` if nothing was applied.
+ */
+export function configureBunSqlite(): string | null {
+  // biome-ignore lint/suspicious/noExplicitAny: runtime feature detection
+  const isBun = typeof (globalThis as any).Bun !== "undefined";
+  if (!isBun) return null;
+  const libPath = findCustomSqliteLib();
+  if (!libPath) return null;
+  // biome-ignore lint/suspicious/noExplicitAny: bun:sqlite is only available under Bun
+  const req = (globalThis as any).require;
+  if (!req) return null;
+  const mod = req("bun:sqlite") as {
+    Database: { setCustomSQLite: (path: string) => void };
+  };
+  mod.Database.setCustomSQLite(libPath);
+  return libPath;
+}
+
 async function getVecLoadablePath(): Promise<string> {
   try {
     const mod = (await import("sqlite-vec")) as unknown as {
@@ -70,27 +115,20 @@ async function loadDeps(): Promise<SqliteDeps> {
         // which is required by sqlite-vec. When running on darwin under Bun,
         // point bun:sqlite at a user-supplied or homebrew-provided SQLite
         // library that does support it.
-        if (process.platform === "darwin") {
-          const candidates = [
-            process.env.LUCERNA_SQLITE_LIB,
-            "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib",
-            "/usr/local/opt/sqlite/lib/libsqlite3.dylib",
-          ].filter((p): p is string => typeof p === "string" && p.length > 0);
-          const { existsSync } = await import("node:fs");
-          const libPath = candidates.find((p) => existsSync(p));
-          if (libPath) {
-            try {
-              mod.Database.setCustomSQLite(libPath);
-            } catch (err) {
-              // `setCustomSQLite` can only be called once per process, before
-              // any Database has been opened. When lucerna is embedded in a
-              // host program that has already touched `bun:sqlite`, this call
-              // throws. That's fine: either the host already pointed
-              // `bun:sqlite` at an extension-capable SQLite (in which case
-              // loadExtension below succeeds), or it didn't — in which case
-              // loadExtension will throw a clearer error than we could here.
-              if (!/already loaded/i.test((err as Error).message)) throw err;
-            }
+        const libPath = findCustomSqliteLib();
+        if (libPath) {
+          try {
+            mod.Database.setCustomSQLite(libPath);
+          } catch (err) {
+            // `setCustomSQLite` can only be called once per process, before
+            // any Database has been opened. When lucerna is embedded in a
+            // host program that has already touched `bun:sqlite`, this call
+            // throws. That's fine: either the host already pointed
+            // `bun:sqlite` at an extension-capable SQLite (in which case
+            // loadExtension below succeeds), or it didn't — in which case
+            // loadExtension will throw. We rewrite that error downstream to
+            // point users at `configureBunSqlite()`.
+            if (!/already loaded/i.test((err as Error).message)) throw err;
           }
         }
         return {
@@ -100,7 +138,28 @@ async function loadDeps(): Promise<SqliteDeps> {
             db.exec("PRAGMA foreign_keys = ON");
             return db;
           },
-          load: (db: Database) => db.loadExtension(vecPath),
+          load: (db: Database) => {
+            try {
+              db.loadExtension(vecPath);
+            } catch (err) {
+              const msg = (err as Error).message;
+              if (/does not support.*extension/i.test(msg)) {
+                throw new Error(
+                  `bun:sqlite has already loaded a SQLite build without extension support, ` +
+                    `so sqlite-vec cannot be loaded. This happens when lucerna is embedded in ` +
+                    `a host program that opened a bun:sqlite Database before lucerna initialized ` +
+                    `(Bun's setCustomSQLite is a once-per-process switch that must run first). ` +
+                    `Fix: at the very top of your host entry point, before any other import, call:\n\n` +
+                    `  import { configureBunSqlite } from "@upstart.gg/lucerna";\n` +
+                    `  configureBunSqlite();\n\n` +
+                    `This requires an extension-capable SQLite on disk — on macOS, 'brew install sqlite'. ` +
+                    `Alternatively, run lucerna in a Node subprocess (better-sqlite3 has no such constraint). ` +
+                    `Underlying error: ${msg}`,
+                );
+              }
+              throw err;
+            }
+          },
         };
       } catch (err) {
         throw new Error(

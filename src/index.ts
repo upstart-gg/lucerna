@@ -56,7 +56,11 @@ export { GraphStore } from "./store/GraphStore.js";
 export type { GraphStoreInterface } from "./store/GraphStoreInterface.js";
 export { LanceDBStore } from "./store/LanceDBStore.js";
 export { SqliteGraphStore } from "./store/SqliteGraphStore.js";
-export { SqliteVectorStore } from "./store/SqliteVectorStore.js";
+export {
+  configureBunSqlite,
+  findCustomSqliteLib,
+  SqliteVectorStore,
+} from "./store/SqliteVectorStore.js";
 // Store (for custom backends)
 export type { VectorStore } from "./store/VectorStore.js";
 // Config helper

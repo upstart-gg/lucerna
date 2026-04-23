@@ -191,7 +191,6 @@ describe("SqliteVectorStore", () => {
     });
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]?.matchType).toBe("semantic");
-    expect(typeof results[0]?.score).toBe("number");
   });
 
   test("searchVector() respects the limit option", async () => {
@@ -338,7 +337,7 @@ describe("SqliteVectorStore", () => {
       expect(results).toEqual([]);
     });
 
-    test("returns results with matchType=hybrid and numeric score", async () => {
+    test("returns results tagged with matchType=hybrid", async () => {
       const chunks = [
         makeChunk("id1", "src/a.ts", "function authenticate(token: string) {}"),
         makeChunk("id2", "src/b.ts", "const PI = 3.14159"),
@@ -356,8 +355,6 @@ describe("SqliteVectorStore", () => {
       expect(results.length).toBeGreaterThan(0);
       for (const r of results) {
         expect(r.matchType).toBe("hybrid");
-        expect(typeof r.score).toBe("number");
-        expect(r.score).toBeGreaterThanOrEqual(0);
       }
     });
 
@@ -410,6 +407,40 @@ describe("SqliteVectorStore", () => {
       });
       const ids = results.map((r) => r.chunk.id);
       expect(ids).toContain("chunk-abc");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // searchText() — multi-keyword semantics
+  // -------------------------------------------------------------------------
+
+  describe("searchText() keyword semantics", () => {
+    test("multi-keyword query uses OR semantics (single-term match is enough)", async () => {
+      // Two chunks: one matches ONLY "authenticate", the other only "logout".
+      // An AND-based FTS query ("authenticate logout") would return neither;
+      // OR semantics must return both.
+      const chunks = [
+        makeChunk("a", "src/a.ts", "function authenticate(token: string) {}"),
+        makeChunk("b", "src/b.ts", "function logout() {}"),
+      ];
+      await store.upsert(chunks, [makeVector(DIMS), makeVector(DIMS)]);
+
+      const results = await store.searchText("authenticate logout", {
+        limit: 10,
+      });
+      const ids = results.map((r) => r.chunk.id).sort();
+      expect(ids).toEqual(["a", "b"]);
+    });
+
+    test("single-keyword query still matches", async () => {
+      const chunks = [
+        makeChunk("a", "src/a.ts", "function authenticate() {}"),
+        makeChunk("b", "src/b.ts", "const PI = 3.14"),
+      ];
+      await store.upsert(chunks, [makeVector(DIMS), makeVector(DIMS)]);
+
+      const results = await store.searchText("authenticate", { limit: 10 });
+      expect(results.map((r) => r.chunk.id)).toEqual(["a"]);
     });
   });
 

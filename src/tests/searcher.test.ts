@@ -30,10 +30,13 @@ function makeChunk(id: string): CodeChunk {
 
 function makeResult(
   id: string,
-  score: number,
+  // `_score` is kept only for backwards-compat with existing call sites that
+  // encoded an intended ordering via this argument; it's unused since score
+  // is no longer a field on SearchResult.
+  _score: number,
   matchType: "semantic" | "lexical" = "semantic",
 ): SearchResult {
-  return { chunk: makeChunk(id), score, matchType };
+  return { chunk: makeChunk(id), matchType };
 }
 
 function makeMockStore(overrides: Partial<VectorStore> = {}): VectorStore {
@@ -110,19 +113,6 @@ describe("Searcher — searchLexical()", () => {
     expect(results).toHaveLength(2);
   });
 
-  test("applies minScore filter", async () => {
-    const store = makeMockStore({
-      searchText: async () => [
-        makeResult("high", 0.9, "lexical"),
-        makeResult("low", 0.3, "lexical"),
-      ],
-    });
-    const searcher = new Searcher(store, false);
-    const results = await searcher.searchLexical("foo", { minScore: 0.5 });
-    expect(results).toHaveLength(1);
-    expect(results[0]?.chunk.id).toBe("high");
-  });
-
   test("returns empty array when store has no results", async () => {
     const searcher = new Searcher(makeMockStore(), false);
     const results = await searcher.searchLexical("nothing");
@@ -165,19 +155,6 @@ describe("Searcher — searchSemantic()", () => {
     const searcher = new Searcher(makeMockStore(), emptyEmbedding);
     const results = await searcher.searchSemantic("foo");
     expect(results).toHaveLength(0);
-  });
-
-  test("applies minScore filter", async () => {
-    const store = makeMockStore({
-      searchVector: async () => [
-        makeResult("pass", 0.9),
-        makeResult("fail", 0.2),
-      ],
-    });
-    const searcher = new Searcher(store, mockEmbedding);
-    const results = await searcher.searchSemantic("foo", { minScore: 0.5 });
-    expect(results.map((r) => r.chunk.id)).toContain("pass");
-    expect(results.map((r) => r.chunk.id)).not.toContain("fail");
   });
 
   test("slices results to the limit", async () => {
@@ -314,8 +291,8 @@ describe("Searcher — hybrid / RRF", () => {
     expect(ids).toContain("c");
   });
 
-  test("chunk appearing in both lists gets a higher RRF score", async () => {
-    // 'b' is in both lists; 'solo' only in one
+  test("chunk appearing in both lists ranks higher than solo chunks", async () => {
+    // 'b' is in both lists; solos only in one
     const store = makeMockStore({
       searchVector: async () => [
         makeResult("b", 0.9),
@@ -328,13 +305,11 @@ describe("Searcher — hybrid / RRF", () => {
     });
     const searcher = new Searcher(store, mockEmbedding);
     const results = await searcher.search("foo", { limit: 10 });
-    const bResult = results.find((r) => r.chunk.id === "b");
-    const soloResult = results.find((r) => r.chunk.id === "solo_vec");
-    // 'b' should have a higher score than 'solo_vec' (two RRF contributions)
-    expect(bResult).toBeDefined();
-    expect(soloResult).toBeDefined();
-    // biome-ignore lint/style/noNonNullAssertion: ok to assert presence of results in this test
-    expect(bResult!.score).toBeGreaterThan(soloResult!.score);
+    const ids = results.map((r) => r.chunk.id);
+    // 'b' has two RRF contributions, so it should come first.
+    expect(ids[0]).toBe("b");
+    expect(ids.indexOf("b")).toBeLessThan(ids.indexOf("solo_vec"));
+    expect(ids.indexOf("b")).toBeLessThan(ids.indexOf("solo_lex"));
   });
 
   test("results are tagged as 'hybrid' matchType", async () => {
@@ -369,17 +344,6 @@ describe("Searcher — hybrid / RRF", () => {
     const searcher = new Searcher(store, mockEmbedding);
     const results = await searcher.search("foo");
     expect(results.map((r) => r.chunk.id)).toContain("vector_only");
-  });
-
-  test("applies minScore to fused scores (all low RRF scores filtered out)", async () => {
-    const store = makeMockStore({
-      searchVector: async () => [makeResult("a", 0.9), makeResult("b", 0.8)],
-      searchText: async () => [makeResult("c", 0.9, "lexical")],
-    });
-    const searcher = new Searcher(store, mockEmbedding);
-    // RRF scores are around 1/(60+rank+1) ≈ 0.016 which is below 0.5
-    const results = await searcher.search("foo", { minScore: 0.5 });
-    expect(results).toHaveLength(0);
   });
 
   test("respects limit in hybrid results", async () => {
@@ -423,19 +387,6 @@ describe("Searcher — reranking", () => {
     expect(reranker.calls[0]?.query).toBe("my query");
     expect(reranker.calls[0]?.texts).toContain("content of a");
     expect(reranker.calls[0]?.texts).toContain("content of b");
-  });
-
-  test("reranker scores replace RRF scores", async () => {
-    const store = makeMockStore({
-      searchVector: async () => [makeResult("a", 0.9), makeResult("b", 0.8)],
-      searchText: async () => [],
-    });
-    const reranker = makeMockReranker([0.75, 0.42]);
-    const searcher = new Searcher(store, mockEmbedding, reranker);
-    const results = await searcher.search("q", { limit: 2 });
-    // Scores should be the reranker's values, not RRF (~0.016)
-    expect(results[0]?.score).toBeCloseTo(0.75);
-    expect(results[1]?.score).toBeCloseTo(0.42);
   });
 
   test("results are re-sorted by reranker scores", async () => {
@@ -487,18 +438,6 @@ describe("Searcher — reranking", () => {
     };
     const searcher = new Searcher(store, mockEmbedding, failingReranker);
     await expect(searcher.search("q")).rejects.toThrow("reranker unavailable");
-  });
-
-  test("minScore is applied to reranked scores", async () => {
-    const store = makeMockStore({
-      searchVector: async () => [makeResult("a", 0.9), makeResult("b", 0.8)],
-      searchText: async () => [],
-    });
-    const reranker = makeMockReranker([0.8, 0.3]);
-    const searcher = new Searcher(store, mockEmbedding, reranker);
-    const results = await searcher.search("q", { minScore: 0.5 });
-    expect(results).toHaveLength(1);
-    expect(results[0]?.chunk.id).toBe("a");
   });
 
   test("reranking is not applied on semantic-only path", async () => {
@@ -642,15 +581,6 @@ describe("Searcher — native hybrid path (searchHybrid)", () => {
     expect(capturedOpts?.rrfK).toBe(30);
   });
 
-  test("minScore filters results from native path", async () => {
-    const store = makeMockStore({
-      searchHybrid: async () => [makeResult("a", 0.2, "semantic")],
-    });
-    const searcher = new Searcher(store, mockEmbedding);
-    const results = await searcher.search("foo", { minScore: 0.5 });
-    expect(results).toHaveLength(0);
-  });
-
   test("respects limit after native path results", async () => {
     const store = makeMockStore({
       searchHybrid: async () => [
@@ -679,5 +609,53 @@ describe("Searcher — native hybrid path (searchHybrid)", () => {
     const ids = results.map((r) => r.chunk.id);
     expect(ids).toContain("vec_result");
     expect(ids).toContain("fts_result");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dedup — final search() output must have unique chunk ids regardless of
+// which backend / path produced the results.
+// ---------------------------------------------------------------------------
+
+describe("Searcher — dedup", () => {
+  test("lexical-only: duplicate chunk ids from the store are collapsed", async () => {
+    const store = makeMockStore({
+      searchText: async () => [
+        makeResult("a", 0.9, "lexical"),
+        makeResult("a", 0.8, "lexical"),
+        makeResult("b", 0.7, "lexical"),
+      ],
+    });
+    const searcher = new Searcher(store, false);
+    const results = await searcher.search("foo");
+    expect(results.map((r) => r.chunk.id)).toEqual(["a", "b"]);
+  });
+
+  test("semantic-only: duplicate chunk ids from the store are collapsed", async () => {
+    const store = makeMockStore({
+      searchVector: async () => [
+        makeResult("a", 0.9),
+        makeResult("a", 0.7),
+        makeResult("b", 0.5),
+      ],
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    const results = await searcher.search("foo", { hybrid: false });
+    expect(results.map((r) => r.chunk.id)).toEqual(["a", "b"]);
+  });
+
+  test("native hybrid: duplicates from the backend are collapsed", async () => {
+    const store = makeMockStore({
+      searchHybrid: async () => [
+        makeResult("a", 0.9),
+        makeResult("b", 0.8),
+        makeResult("a", 0.7),
+      ],
+      searchVector: async () => [],
+      searchText: async () => [],
+    });
+    const searcher = new Searcher(store, mockEmbedding);
+    const results = await searcher.search("foo");
+    expect(results.map((r) => r.chunk.id)).toEqual(["a", "b"]);
   });
 });

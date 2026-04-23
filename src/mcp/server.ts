@@ -186,7 +186,6 @@ export function createMcpServer(
           content,
           metadata,
         } = r.chunk;
-        const score = Math.round(r.score * 100) / 100;
         const loc = `${filePath}:${startLine}-${endLine}`;
         const base = {
           id,
@@ -194,7 +193,6 @@ export function createMcpServer(
           type: chunkType,
           ...(name !== undefined ? { name } : {}),
           ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
-          score,
         };
         return includeContent ? { ...base, content } : base;
       });

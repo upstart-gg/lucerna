@@ -191,7 +191,6 @@ describe("search_codebase delegation", () => {
         endLine: 3,
         metadata: {},
       },
-      score: 0.9452,
       matchType: "lexical" as const,
     } satisfies import("../types.js").SearchResult;
     harness = await makeHarness(
@@ -209,7 +208,8 @@ describe("search_codebase delegation", () => {
     expect(r.id).toBe("c1");
     expect(r.loc).toBe("src/a.ts:1-3");
     expect(r.content).toBe("function foo() {}");
-    expect(r.score).toBe(0.95); // rounded to 2dp
+    // score is intentionally not exposed — results are ordered by relevance.
+    expect(r.score).toBeUndefined();
     // Internal / verbose fields absent
     expect(r.chunk).toBeUndefined();
     expect(r.language).toBeUndefined();
@@ -235,7 +235,6 @@ describe("search_codebase delegation", () => {
         endLine: 5,
         metadata: {},
       },
-      score: 0.8,
       matchType: "lexical" as const,
     } satisfies import("../types.js").SearchResult;
     harness = await makeHarness(
@@ -274,7 +273,6 @@ describe("search_codebase delegation", () => {
           endLine: 1,
           metadata: {},
         },
-        score: 1 - i * 0.01,
         matchType: "lexical" as const,
       }) satisfies import("../types.js").SearchResult;
 
@@ -311,7 +309,6 @@ describe("search_codebase delegation", () => {
           endLine: 1,
           metadata: {},
         },
-        score: 1 - i * 0.01,
         matchType: "lexical" as const,
       }) satisfies import("../types.js").SearchResult;
 

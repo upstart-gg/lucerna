@@ -285,8 +285,8 @@ describe("CodeIndexer — semantic search", () => {
     // Verify result shape
     if (results.length > 0) {
       expect(results[0]).toHaveProperty("chunk");
-      expect(results[0]).toHaveProperty("score");
       expect(results[0]).toHaveProperty("matchType");
+      expect(results[0]).not.toHaveProperty("score");
     }
     await indexer.close();
   });

@@ -28,7 +28,6 @@ const results = await indexer.searchWithContext(query, options?);
   types?: ChunkType[],                     // filter by chunk type
   filePath?: string,                       // path filter (glob patterns supported)
   hybrid?: boolean,                        // default: true when embeddings available
-  minScore?: number,                       // minimum score threshold (0–1)
   rerank?: boolean,                        // apply reranking after RRF; default: true when rerankingFunction set
   rrfK?: number,                           // RRF rank constant k; default: 45 (tuned for code retrieval)
 }
@@ -42,16 +41,19 @@ Extends `SearchOptions`:
 {
   graphDepth?: number,                     // BFS hops to expand — default: 1
   graphRelationTypes?: RelationshipType[], // edge types to follow — default: all
-  contextScoreDiscount?: number,           // score multiplier for neighbour chunks — default: 0.7
 }
 ```
 
 ## `SearchResult`
 
+Results are always returned sorted by relevance (best first). The numeric
+score used internally for ordering is not exposed — it is not comparable
+across search paths (semantic / lexical / hybrid / reranked). Use
+`matchType` to know which path produced a given result.
+
 ```ts
 {
   chunk: CodeChunk,
-  score: number,                           // higher = more relevant
   matchType: 'semantic' | 'lexical' | 'hybrid',
 }
 ```

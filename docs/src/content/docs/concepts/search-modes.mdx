@@ -26,4 +26,8 @@ Identifiers are expanded before indexing — `getUserById` becomes `getUserById 
 
 ## Graph-context expansion
 
-`searchWithContext()` runs hybrid search and then expands the result set by following knowledge graph edges (BFS up to `graphDepth` hops). Neighbour chunks are included with a discounted score (`contextScoreDiscount`, default `0.7`).
+`searchWithContext()` runs hybrid search and then expands the result set by following knowledge graph edges (BFS up to `graphDepth` hops). Direct search hits come first (in rank order); graph-expanded neighbour chunks follow in traversal order. Duplicates are collapsed.
+
+## Result ordering
+
+Results are always returned sorted by relevance (best first). The internal ordering score is **not exposed** on the result type — it is not comparable across paths (semantic cosine similarity, BM25 rank, RRF fused score, reranker output all live on different scales). Callers should rely on the result order; the `matchType` field (`'semantic' | 'lexical' | 'hybrid'`) indicates which path produced each result.

@@ -1,5 +1,13 @@
 # @upstart.gg/lucerna
 
+## 0.2.6
+
+### Patch Changes
+
+- [#107](https://github.com/upstart-gg/lucerna/pull/107) [`a9d71d2`](https://github.com/upstart-gg/lucerna/commit/a9d71d2783e30e0a00c7a7cea0b15ddd942c5bc9) Thanks [@mattallty](https://github.com/mattallty)! - add apache-arrow dependency and .npmrc configuration
+
+- [`0709b64`](https://github.com/upstart-gg/lucerna/commit/0709b646f6f5bb118e32998a4093a720994f232a) Thanks [@mattallty](https://github.com/mattallty)! - Fix config handling
+
 ## 0.2.5
 
 ### Patch Changes

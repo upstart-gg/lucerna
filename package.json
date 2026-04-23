@@ -47,10 +47,12 @@
     "fast-glob": "^3.3.3",
     "google-auth-library": "^10.6.2",
     "jiti": "^2.6.1",
+    "tslib": "^2.8.1",
     "zod": "^4.3.6"
   },
   "optionalDependencies": {
     "@lancedb/lancedb": "^0.27.2",
+    "apache-arrow": "^18.1.0",
     "better-sqlite3": "^12.9.0",
     "sqlite-vec": "^0.1.0"
   },
@@ -63,6 +65,7 @@
     "@typescript/native-preview": "^7.0.0-dev.20260412.1",
     "cross-env": "^10.1.0",
     "tsdown": "^0.21.9",
+    "tslib": "^2.8.1",
     "typescript": "^5.0.0"
   },
   "engines": {

@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.2.2
+
+### Patch Changes
+
+- [#98](https://github.com/upstart-gg/lucerna/pull/98) [`98fe265`](https://github.com/upstart-gg/lucerna/commit/98fe2656858c33044d4c86f35c2bdfb1521a037f) Thanks [@mattallty](https://github.com/mattallty)! - handle error when setting custom SQLite in SqliteVectorStore
+
 ## 0.2.1
 
 ### Patch Changes

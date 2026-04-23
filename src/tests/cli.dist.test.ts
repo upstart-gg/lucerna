@@ -169,9 +169,27 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
       "json",
     ]);
     expectSuccess(result);
+    // stdout must be *only* JSON — no stray library logs polluting the stream.
     const parsed = JSON.parse(result.stdout);
     expect(parsed).toHaveProperty("totalFiles");
     expect(parsed).toHaveProperty("totalChunks");
+  });
+
+  test("stats --format pretty-json outputs valid JSON", () => {
+    const result = run([
+      "stats",
+      "--dir",
+      projectDir,
+      "--storage-dir",
+      storageDir,
+      "--format",
+      "pretty-json",
+    ]);
+    expectSuccess(result);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed).toHaveProperty("totalFiles");
+    // Pretty output should contain newlines (indented).
+    expect(result.stdout).toContain("\n");
   });
 
   test("search command returns results", () => {
@@ -202,10 +220,27 @@ describe("CLI smoke tests (dist/cli.mjs)", () => {
       "json",
     ]);
     expectSuccess(result);
-    // Could be an empty array or results — either is valid JSON
-    if (result.stdout.trim().startsWith("[")) {
-      expect(() => JSON.parse(result.stdout)).not.toThrow();
-    }
+    // stdout must parse as JSON with nothing else mixed in. A stray library
+    // `console.log` before/after would make JSON.parse throw.
+    const parsed = JSON.parse(result.stdout);
+    expect(Array.isArray(parsed)).toBe(true);
+  });
+
+  test("search --format pretty-json outputs valid JSON array", () => {
+    const result = run([
+      "search",
+      "add",
+      "--dir",
+      projectDir,
+      "--no-semantic",
+      "--storage-dir",
+      storageDir,
+      "--format",
+      "pretty-json",
+    ]);
+    expectSuccess(result);
+    const parsed = JSON.parse(result.stdout);
+    expect(Array.isArray(parsed)).toBe(true);
   });
 
   // ---------------------------------------------------------------------

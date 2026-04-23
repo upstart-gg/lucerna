@@ -10,6 +10,7 @@ import {
   resolveRerankingConfig,
 } from "./config.js";
 import { IndexLock } from "./IndexLock.js";
+import { log } from "./log.js";
 import { GraphTraverser } from "./graph/GraphTraverser.js";
 import { SymbolResolver } from "./graph/SymbolResolver.js";
 import type { ChunkingWithEdgesResult, RawEdge } from "./graph/types.js";
@@ -359,7 +360,7 @@ export class CodeIndexer {
         const reason = dimChanged
           ? `dimensions changed (${existingMeta.dimensions} → ${currentDimensions})`
           : `model changed ("${existingMeta.modelId}" → "${currentModelId}")`;
-        console.warn(
+        log.warn(
           `[lucerna] Embedding ${reason} — clearing index for full reindex.`,
         );
         await rm(join(this.storageDir, "lance"), {

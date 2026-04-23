@@ -112,7 +112,7 @@ describe.skipIf(!IS_MAC)("configureBunSqlite (macOS)", () => {
 
     // Open a bun:sqlite Database *before* configureBunSqlite — simulates a
     // host program that touched sqlite before importing lucerna.
-    const { status, stdout } = runBun(`
+    const { status, stdout, stderr } = runBun(`
       import { Database } from "bun:sqlite";
       new Database(":memory:");                 // seals SQLite choice
       const { configureBunSqlite } = await import("${REPO_ROOT}/src/index.ts");
@@ -122,7 +122,7 @@ describe.skipIf(!IS_MAC)("configureBunSqlite (macOS)", () => {
     // The helper should return null and log a diagnostic pointing at the race.
     expect(status).toBe(0);
     expect(stdout).toContain("RESULT:null");
-    expect(stdout).toMatch(/configureBunSqlite.*already loaded/i);
+    expect(stderr).toMatch(/configureBunSqlite.*already loaded/i);
   });
 
   test("late open: loadExtension throws the friendly error", () => {

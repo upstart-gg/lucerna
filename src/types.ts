@@ -207,6 +207,10 @@ export interface IndexEvent {
   type: "indexed" | "removed" | "error";
   filePath: string;
   chunksAffected?: number;
+  /** For `indexed` events on individual files: whether the file was newly added
+   * to the index or had changed since the last run. Absent for the project-level
+   * completion event. */
+  reason?: "new" | "changed";
   error?: Error;
 }
 

@@ -38,7 +38,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v6.0.2
-      - uses: pnpm/action-setup@v5.0.0
+      - uses: pnpm/action-setup@v6.0.3
         with:
           version: "10"
           cache: true
@@ -72,7 +72,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v6.0.2
-      - uses: pnpm/action-setup@v5.0.0
+      - uses: pnpm/action-setup@v6.0.3
         with:
           version: "10"
           cache: true

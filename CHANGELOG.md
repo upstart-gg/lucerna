@@ -1,5 +1,11 @@
 # @upstart.gg/lucerna
 
+## 0.2.9
+
+### Patch Changes
+
+- [#112](https://github.com/upstart-gg/lucerna/pull/112) [`6b6cf7d`](https://github.com/upstart-gg/lucerna/commit/6b6cf7d7c51d75c264fdf2a4550ac252692dad32) Thanks [@mattallty](https://github.com/mattallty)! - handle removals correctly
+
 ## 0.2.8
 
 ### Patch Changes

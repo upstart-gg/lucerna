@@ -473,18 +473,23 @@ export class CodeIndexer {
 
     // Process a batch of changed files: chunk → embed → store → emit per file
     const processBatch = async (
-      batch: Array<{ absPath: string; relPath: string; hash: string }>,
+      batch: Array<{
+        absPath: string;
+        relPath: string;
+        hash: string;
+        reason: "new" | "changed";
+      }>,
     ): Promise<void> => {
       const fileResults = (
         await Promise.all(
-          batch.map(async ({ absPath, relPath, hash }) => {
+          batch.map(async ({ absPath, relPath, hash, reason }) => {
             const result = await this.chunker.chunkFileWithEdges(
               absPath,
               this.projectId,
             );
             if (result.chunks.length === 0) return null;
             const { chunks, rawEdges } = this.normalizeResult(result, relPath);
-            return { relPath, hash, chunks, rawEdges };
+            return { relPath, hash, chunks, rawEdges, reason };
           }),
         )
       ).filter((r): r is NonNullable<typeof r> => r !== null);
@@ -500,7 +505,7 @@ export class CodeIndexer {
       }
 
       let vectorOffset = 0;
-      for (const { relPath, hash, chunks, rawEdges } of fileResults) {
+      for (const { relPath, hash, chunks, rawEdges, reason } of fileResults) {
         const vectors = batchVectors.slice(
           vectorOffset,
           vectorOffset + chunks.length,
@@ -519,13 +524,20 @@ export class CodeIndexer {
           type: "indexed",
           filePath: relPath,
           chunksAffected: chunks.length,
+          reason,
         });
       }
     };
 
     try {
       const BATCH_SIZE = 50;
-      let batch: Array<{ absPath: string; relPath: string; hash: string }> = [];
+      let batch: Array<{
+        absPath: string;
+        relPath: string;
+        hash: string;
+        reason: "new" | "changed";
+      }> = [];
+      const seenPaths = new Set<string>();
 
       // Stream files via native glob — hash each on arrival, skip unchanged
       for await (const relPath of glob(this.include, {
@@ -535,11 +547,15 @@ export class CodeIndexer {
         const absPath = join(this.projectRoot, relPath);
         const fileStat = await stat(absPath).catch(() => null);
         if (!fileStat?.isFile()) continue;
+        seenPaths.add(relPath);
         const hash = await hashFile(absPath);
-        if (this.fileHashes.get(relPath) === hash) continue;
+        const previousHash = this.fileHashes.get(relPath);
+        if (previousHash === hash) continue;
+        const reason: "new" | "changed" =
+          previousHash === undefined ? "new" : "changed";
 
         anyChanges = true;
-        batch.push({ absPath, relPath, hash });
+        batch.push({ absPath, relPath, hash, reason });
         if (batch.length >= BATCH_SIZE) {
           await processBatch(batch);
           batch = [];
@@ -547,6 +563,26 @@ export class CodeIndexer {
       }
 
       if (batch.length > 0) await processBatch(batch);
+
+      // Prune entries for files that no longer exist on disk (or are now
+      // excluded by include/exclude patterns).
+      const removedPaths: string[] = [];
+      for (const knownPath of this.fileHashes.keys()) {
+        if (!seenPaths.has(knownPath)) removedPaths.push(knownPath);
+      }
+      for (const relPath of removedPaths) {
+        const chunks = await this.store.getChunksByFile(relPath);
+        const chunkIds = chunks.map((c) => c.id);
+        await this.store.deleteByFile(relPath);
+        await this.graphStore.deleteEdgesByFile(relPath);
+        if (chunkIds.length > 0) {
+          await this.graphStore.deleteEdgesByTargetChunks(chunkIds);
+        }
+        this.cachedChunksByFile.delete(relPath);
+        this.fileHashes.delete(relPath);
+        anyChanges = true;
+        this.emit({ type: "removed", filePath: relPath });
+      }
 
       if (!anyChanges) {
         this.lastIndexed = new Date();
@@ -1019,9 +1055,12 @@ export class CodeIndexer {
 
       // Skip files whose content hasn't changed
       const hash = await hashFile(absPath);
-      if (this.fileHashes.get(relPath) === hash) {
+      const previousHash = this.fileHashes.get(relPath);
+      if (previousHash === hash) {
         return 0;
       }
+      const reason: "new" | "changed" =
+        previousHash === undefined ? "new" : "changed";
 
       const result = await this.chunker.chunkFileWithEdges(
         absPath,
@@ -1071,6 +1110,7 @@ export class CodeIndexer {
         type: "indexed",
         filePath: relPath,
         chunksAffected: chunks.length,
+        reason,
       });
       return chunks.length;
     } catch (err) {

@@ -53,8 +53,9 @@ program
           if (event.filePath === resolvedRoot) return;
           if (event.type === "indexed") {
             filesIndexed++;
+            const tag = event.reason ? `[${event.reason}] ` : "";
             console.log(
-              `  indexed  ${event.filePath} (${event.chunksAffected ?? 0} chunks)`,
+              `  indexed  ${tag}${event.filePath} (${event.chunksAffected ?? 0} chunks)`,
             );
           } else if (event.type === "removed") {
             console.log(`  removed  ${event.filePath}`);
@@ -112,8 +113,9 @@ program
         watchDebounce: parseInt(String(opts.debounce ?? "500"), 10),
         onIndexed: (event: IndexEvent) => {
           if (event.type === "indexed") {
+            const tag = event.reason ? `[${event.reason}] ` : "";
             console.log(
-              `[indexed] ${event.filePath} (${event.chunksAffected ?? 0} chunks)`,
+              `[indexed] ${tag}${event.filePath} (${event.chunksAffected ?? 0} chunks)`,
             );
           } else if (event.type === "removed") {
             console.log(`[removed] ${event.filePath}`);
